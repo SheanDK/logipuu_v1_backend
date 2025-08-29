@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "es2022", // Use a recent ES version like es2022 or esnext
+    "module": "commonjs",
+    "lib": ["es2022"], // Ensure standard ES libs are included
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,         // Very good for type safety
+    "skipLibCheck": true,   // Skips type checking of declaration files, improves compile time
+    "experimentalDecorators": true, // Needed for class-validator
+    "emitDecoratorMetadata": true,  // Needed for class-validator     
+    "resolveJsonModule": true,         // (optional, but good to have)
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types"
+    ]
+  },
+  "files": [ // Add this 'files' array
+    "src/types/express.d.ts"
+  ],
+  "include": [
+    "src/**/*.ts" // Only .ts files, as .d.ts is in 'files'
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
