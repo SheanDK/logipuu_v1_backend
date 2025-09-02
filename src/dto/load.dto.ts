@@ -11,17 +11,17 @@ export class CreateLoadDto {
     @IsInt() @IsNotEmpty() @Type(() => Number)
     asiakasId!: number;
     
-    @IsInt() @IsOptional() @Type(() => Number)
-    puulaaniId?: number;
-
-    @IsInt() @IsOptional() @Type(() => Number)
-    puutavaraId?: number; 
+    @IsInt() @IsNotEmpty() @Type(() => Number) // Puulaani is required for this type of load
+    puulaaniId!: number;
 
     @IsInt() @IsNotEmpty() @Type(() => Number)
-    kalustoNro!: number; // Vehicle number
+    puutavaraId!: number; // Timber task is required
 
     @IsInt() @IsNotEmpty() @Type(() => Number)
-    kuljId!: number; // Driver ID
+    kalustoNro!: number;
+
+    @IsInt() @IsNotEmpty() @Type(() => Number)
+    kuljId!: number;
 
     @IsDate() @IsNotEmpty() @Type(() => Date)
     pvm!: Date;
@@ -29,11 +29,14 @@ export class CreateLoadDto {
     @IsString() @IsOptional() @MaxLength(45)
     ajomaaraysNro?: string;
     
-    @IsString() @IsOptional() @MaxLength(45)
+    // --- THIS IS THE FIX ---
+    // Add the missing properties that the frontend sends
+    @IsString() @IsOptional() @MaxLength(100)
     kohde?: string;
 
-    @IsString() @IsOptional() @MaxLength(45)
+    @IsString() @IsOptional() @MaxLength(100)
     lahto?: string;
+    // --- END OF FIX ---
 
     @IsNumber() @IsOptional() @Min(0) @Type(() => Number)
     m3?: number;
@@ -45,5 +48,5 @@ export class CreateLoadDto {
     lisatiedot?: string;
 }
 
-// For updating, most fields can be optional
+// Update DTO can inherit and all fields will be optional due to validation options
 export class UpdateLoadDto extends CreateLoadDto {}

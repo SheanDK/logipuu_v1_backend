@@ -64,16 +64,13 @@ apiRouter.use('/dashboards', dashboardRoutes);
 apiRouter.use('/role-permissions', rolePermissionRoutes); 
 apiRouter.use('/admin/users', adminUserRoutes);
 apiRouter.use('/unloading-sites', unloadingSiteRoutes);
-// REMOVED: apiRouter.use('/other-infos', otherInfoRoutes);
 apiRouter.use('/waybills', waybillRoutes);
 apiRouter.use('/wood-types', puutavaraRoutes);
 apiRouter.use('/locations', locationRoutes);
-app.use('/api/loads', loadRoutes);
-
-
-// This line will now work because 'otherMarkerRoutes' is imported.
 apiRouter.use('/other-markers', otherMarkerRoutes);
-app.use('/api/timber-logs', puutavaralajiRoutes);
+apiRouter.use('/timber-logs', puutavaralajiRoutes); 
+apiRouter.use('/loads', loadRoutes);
+
 
 app.use('/api', apiRouter);
 

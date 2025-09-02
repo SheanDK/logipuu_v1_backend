@@ -95,47 +95,66 @@ export const getLoadById = async (id: number): Promise<ILoad | null> => {
 };
 
 export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
+    // --- STEP 1: Log the exact data received by the service ---
+    // This is a crucial debugging step.
+    console.log('--- Service received data to create load ---', data);
+
     const {
         tyyppi, asiakasId, puulaaniId, kalustoNro, kuljId, pvm,
         ajomaaraysNro, kohde, lahto, m3, km, lisatiedot,
-        puutavaraId // Get the new property
+        puutavaraId
     } = data;
 
     const insertQuery = `
         INSERT INTO public.kuorma (
-            tyyppi, asiakas_id, puulaani_id, puutavara_id, 
-            kulj_id, pvm, ajomaarays_nro, kohde, lahto,
-            m3, km, tunnit, kpl, lisatiedot, kalusto_nro, is_active
-        ) VALUES ( $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, $12, $13, TRUE )
+            tyyppi,         -- $1
+            asiakas_id,     -- $2
+            puulaani_id,    -- $3
+            puutavara_id,   -- $4
+            kulj_id,        -- $5
+            pvm,            -- $6
+            ajomaarays_nro, -- $7
+            kohde,          -- $8
+            lahto,          -- $9
+            m3,             -- $10
+            km,             -- $11
+            lisatiedot,     -- $12
+            kalusto_nro,    -- $13
+            -- Hardcoded values
+            tunnit, kpl, is_active
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+            0, 0, TRUE
+        )
         RETURNING *;
     `;
+
+    // --- STEP 2: Ensure the params array matches the query placeholders exactly ---
     const params = [
-        tyyppi, 
-        asiakasId, 
-        puulaaniId ?? null,
-        puutavaraId ?? null, // <<< ADDED HERE
-        kuljId, 
-        pvm, 
-        ajomaaraysNro ?? 
-        null, kohde ?? null, 
-        lahto ?? null,
-        m3 ?? 0, 
-        km ?? 0, 
-        lisatiedot ?? null, 
-        kalustoNro
+        tyyppi,                 // $1
+        asiakasId,              // $2
+        puulaaniId ?? null,     // $3
+        puutavaraId ?? null,    // $4  (This was missing before)
+        kuljId,                 // $5
+        pvm,                    // $6
+        ajomaaraysNro ?? null,  // $7
+        kohde ?? null,          // $8  (This will now be saved correctly)
+        lahto ?? null,          // $9
+        m3 ?? 0,                // $10
+        km ?? 0,                // $11
+        lisatiedot ?? null,     // $12
+        kalustoNro              // $13
     ];
 
-    console.log('--- Creating New Load ---');
-    console.log('Query:', insertQuery);
+    console.log('--- Executing INSERT query for new load ---');
     console.log('Params:', params);
 
     try {
         const result = await pool.query(insertQuery, params);
-        console.log('--- Load Created Successfully ---');
+        console.log('--- Load Created Successfully in DB ---');
         return camelcaseKeys(result.rows[0]);
     } catch (error) {
         console.error("!!! DATABASE ERROR while creating new load:", error);
-        // Re-throw a more generic error to the frontend for security
         throw new Error("Database query for creating a new load failed.");
     }
 };

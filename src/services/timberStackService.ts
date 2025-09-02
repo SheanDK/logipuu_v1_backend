@@ -394,9 +394,11 @@ export const getActiveTimberStacksByClient = async (clientId: number) => {
 };
 
 export const getWoodEntriesByPuulaaniId = async (puulaaniId: number) => {
-    // This query now joins with the other tables to get the actual names.
+    // --- THIS IS THE FIX ---
+    // The DISTINCT ON (pl.puutavara_id) ensures that we only get one row
+    // for each unique puutavara_id, preventing duplicates from JOINs.
     const query = `
-        SELECT
+        SELECT DISTINCT ON (pl.puutavara_id)
             pl.puutavara_id,
             pl.puulaani_id,
             pl.asiakas_id,
@@ -406,8 +408,8 @@ export const getWoodEntriesByPuulaaniId = async (puulaaniId: number) => {
             pl.haettu,
             pl.jaljella,
             pl.valmis,
-            pt.puutavara AS puutavara_name, -- Get the timber name from the puutavarat table
-            pp.purkupaikka AS purkupaikka_name -- Get the destination name from the purkupaikka table
+            pt.puutavara AS puutavara_name,
+            pp.purkupaikka AS purkupaikka_name
         FROM
             public.puutavaralaji pl
         LEFT JOIN
@@ -419,6 +421,5 @@ export const getWoodEntriesByPuulaaniId = async (puulaaniId: number) => {
     `;
     
     const result = await pool.query(query, [puulaaniId]);
-    // The 'camelcase-keys' middleware will convert puutavara_name -> puutavaraName
     return camelcaseKeys(result.rows);
 };
