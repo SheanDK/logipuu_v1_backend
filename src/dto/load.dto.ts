@@ -48,5 +48,13 @@ export class CreateLoadDto {
     lisatiedot?: string;
 }
 
+// --- THIS IS THE  DTO FOR STATUS UPDATES ---
+export class UpdateLoadStatusDto {
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(50)
+    status!: string;
+}
+
 // Update DTO can inherit and all fields will be optional due to validation options
 export class UpdateLoadDto extends CreateLoadDto {}

@@ -2,7 +2,7 @@
 import { Response, NextFunction } from 'express';
 import * as loadService from '../services/loadService';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
-import { CreateLoadDto, UpdateLoadDto, } from '../dto/load.dto';
+import { CreateLoadDto, UpdateLoadDto, UpdateLoadStatusDto,  } from '../dto/load.dto';
 
 export const getAllLoadsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
@@ -79,6 +79,57 @@ export const deleteLoadHandler = async (req: AuthenticatedRequest, res: Response
         }
         res.status(200).json(result);
     } catch (error) {
+        next(error);
+    }
+};
+
+// --- THIS IS THE NEW HANDLER FOR THE DRIVER'S PORTAL ---
+export const getMyLoadsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const user = req.user;
+        
+        console.log("--- USER OBJECT RECEIVED IN getMyLoadsHandler ---", user);
+
+        // --- NEW, SIMPLER VALIDATION ---
+        // We check if driverNumericId is "falsy" (null, undefined, 0).
+        // Since a driver ID of 0 is unlikely, this is a safe and robust check.
+        if (!user || !user.driverNumericId) {
+            console.error("!!! AUTHORIZATION FAILED in controller: driverNumericId is missing or falsy.", user);
+            return res.status(403).json({ message: "Forbidden: User is not associated with a valid driver ID." });
+        }
+
+        const driverId = user.driverNumericId;
+        const myLoads = await loadService.getMyLoadsForList(driverId);
+        res.status(200).json(myLoads);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// --- THIS IS THE NEW HANDLER FOR STATUS UPDATES ---
+export const updateLoadStatusHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const user = req.user;
+        const loadId = parseInt(req.params.id, 10);
+        const { status } = req.body as UpdateLoadStatusDto;
+
+        if (isNaN(loadId)) {
+            return res.status(400).json({ message: "Invalid Load ID format." });
+        }
+        
+        if (!user || !user.driverNumericId) {
+            return res.status(403).json({ message: "Forbidden: User is not a driver." });
+        }
+
+        const driverId = user.driverNumericId;
+        const updatedLoad = await loadService.updateLoadStatus(loadId, status, driverId);
+        
+        res.status(200).json(updatedLoad);
+    } catch (error: any) {
+        // Handle specific "not found or not authorized" error from service
+        if (error.message.includes('not found or you are not authorized')) {
+            return res.status(404).json({ message: error.message });
+        }
         next(error);
     }
 };

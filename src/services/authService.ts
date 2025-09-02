@@ -2,6 +2,7 @@
 import pool from '../config/db';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions, Secret } from 'jsonwebtoken';
+import camelcaseKeys from 'camelcase-keys';
 import { findUserByTunnusWithRolesAndPermissionsQuery } from '../queries/authQueries';
 import { UserLoginDTO } from '../dto/auth.dto';
 import { UserPayload } from '../middlewares/authMiddleware';
@@ -13,17 +14,24 @@ const ACCESS_TOKEN_EXPIRES_IN_CONFIG: string = process.env.ACCESS_TOKEN_EXPIRES_
 export const loginUserService = async (loginData: UserLoginDTO) => {
     const { username, password } = loginData;
     
-    // The query now returns original column names (tunnus, nimi, salasana...)
     const userResult = await pool.query(findUserByTunnusWithRolesAndPermissionsQuery, [username]);
 
     if (userResult.rows.length === 0) {
         throw new Error('Invalid username or password');
     }
+    
+    const rawUserFromDb = userResult.rows[0];
+    
+    // --- DEBUGGING STEP 1: Check the raw data from the database ---
+    console.log("--- RAW DB RESULT (before camelCase) ---", rawUserFromDb);
+    
+    const userFromDb = camelcaseKeys(rawUserFromDb);
 
-    // The middleware converts DB results to camelCase (e.g., tunnus, nimi, salasana, kuljId)
-    const userFromDb = userResult.rows[0];
+    // --- DEBUGGING STEP 2: Check the data after converting to camelCase ---
+    console.log("--- CAMELCASED OBJECT (after camelCase) ---", userFromDb);
 
-    if (!userFromDb.salasana) { // 'salasana' is the camelCased version of the DB column
+
+    if (!userFromDb.salasana) {
         console.error(`CRITICAL: User ${username} has no password hash.`);
         throw new Error('Authentication configuration error.');
     }
@@ -37,30 +45,24 @@ export const loginUserService = async (loginData: UserLoginDTO) => {
         throw new Error('This user account is inactive.');
     }
 
-    // CORRECTED: Map the camelCased DB results to the JWT payload interface.
-    // This is the correct place for this mapping.
     const payload: UserPayload = {
-        userId: userFromDb.tunnus, // Map tunnus -> userId
-        fullName: userFromDb.nimi, // Map nimi -> fullName
+        userId: userFromDb.tunnus,
+        fullName: userFromDb.nimi,
         roles: userFromDb.roles || [],
         permissions: userFromDb.permissions || [],
-        userLevel: userFromDb.taso, // Map taso -> userLevel
-        driverNumericId: userFromDb.kulj_Id ? parseInt(String(userFromDb.kulj_Id), 10) : undefined,
+        userLevel: userFromDb.taso,
+        driverNumericId: userFromDb.kuljId ? parseInt(String(userFromDb.kuljId), 10) : undefined,
     };
+    
+    // --- DEBUGGING STEP 3: The final check before signing ---
+    console.log("--- PAYLOAD BEING SIGNED INTO TOKEN ---", payload);
 
-    let expiresInFinalValue: number | JwtTimeString;
-    if (/^\d+$/.test(ACCESS_TOKEN_EXPIRES_IN_CONFIG)) {
-        expiresInFinalValue = parseInt(ACCESS_TOKEN_EXPIRES_IN_CONFIG, 10);
-    } else {
-        expiresInFinalValue = ACCESS_TOKEN_EXPIRES_IN_CONFIG as JwtTimeString;
-    }
-
-    const signOptions: SignOptions = { expiresIn: expiresInFinalValue };
+    const signOptions: SignOptions = { expiresIn: ACCESS_TOKEN_EXPIRES_IN_CONFIG as JwtTimeString };
     const token = jwt.sign(payload, JWT_SECRET, signOptions);
 
     return {
         token,
-        user: { // The object returned to the frontend uses the payload structure
+        user: {
             username: payload.userId,
             fullName: payload.fullName,
             roles: payload.roles,

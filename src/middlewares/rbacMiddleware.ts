@@ -2,7 +2,6 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from './authMiddleware';
 
-// The authorize function checks for EITHER a required role OR a required permission.
 export const authorize = (requiredRoles: string[] = [], requiredPermissions: string[] = []) => {
     return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         const user = req.user;
@@ -10,24 +9,34 @@ export const authorize = (requiredRoles: string[] = [], requiredPermissions: str
         if (!user) {
             return res.status(401).json({ message: 'Authentication error: User not found in request.' });
         }
+        
+        // --- START OF DEBUGGING BLOCK ---
+        console.log(`--- RBAC Middleware Check for path: ${req.path} ---`);
+        console.log("Required Roles:", requiredRoles);
+        console.log("User's Roles found in Token:", user.roles);
+        
+        const hasRequiredRole = user.roles && user.roles.some((role: string) => {
+            const roleExists = requiredRoles.includes(role);
+            console.log(`Checking if user role "${role}" is in required list [${requiredRoles.join(', ')}]: ${roleExists}`);
+            return roleExists;
+        });
+        
+        console.log("Final check result for 'hasRequiredRole':", hasRequiredRole);
+        // --- END OF DEBUGGING BLOCK ---
 
-        // Check if user has at least one of the required roles
-        const hasRequiredRole = user.roles && user.roles.some((role: string) => requiredRoles.includes(role));
-
-        // CORRECTED: Explicitly type the 'permission' parameter as a string
         const hasRequiredPermission = user.permissions && user.permissions.some((permission: string) => requiredPermissions.includes(permission));
 
-        // Allow access if user has a required role (for general access, e.g., viewing a page)
         if (requiredRoles.length > 0 && hasRequiredRole) {
+            console.log("--- RBAC PASSED: User has the required role. ---");
             return next();
         }
 
-        // Allow access if user has a required permission (for specific actions, e.g., deleting an item)
         if (requiredPermissions.length > 0 && hasRequiredPermission) {
+            console.log("--- RBAC PASSED: User has the required permission. ---");
             return next();
         }
         
-        // If we reach here, user has neither the required roles nor permissions.
+        console.error("!!! RBAC FAILED: User does not have required role or permission. !!!");
         return res.status(403).json({ 
             message: 'Forbidden: You do not have the required permissions for this action.',
             required: { 

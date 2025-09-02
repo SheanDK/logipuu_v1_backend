@@ -230,3 +230,77 @@ export const deleteLoad = async (id: number): Promise<{ kuormaId: number; messag
         throw error;
     }
 };
+
+
+// --- THIS IS THE NEW FUNCTION FOR THE DRIVER'S PORTAL ---
+export const getMyLoadsForList = async (driverId: number): Promise<ILoadListItem[]> => {
+    // We use the same base query as getAllLoadsForList, but add a specific condition for the driver
+    let queryText = `
+        SELECT
+            k.kuorma_id,
+            TO_CHAR(k.pvm, 'YYYY-MM-DD') AS pvm,
+            a.asiakkaan_nimi,
+            COALESCE(p.nimi, k.lahto, 'N/A') AS lahto,
+            COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
+            kal.rek_nro,
+            kul.nimi AS kuljettajan_nimi,
+            CASE
+                WHEN k.tyyppi = 0 THEN 'Puulaani'
+                WHEN k.tyyppi = 1 THEN 'Pole Transport'
+                ELSE 'Unknown'
+            END AS tyyppi,
+            k.is_active
+        FROM
+            public.kuorma k
+        LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+        LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
+        LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+        LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+        LEFT JOIN public.purkupaikka pp ON k.kohde = pp.purkupaikka
+        -- The WHERE clause now filters for ACTIVE loads assigned to THIS specific driver
+        WHERE k.is_active = TRUE AND k.kulj_id = $1
+        ORDER BY k.pvm ASC, k.kuorma_id ASC; -- Order by date ascending for drivers
+    `;
+    
+    console.log(`Executing "My Loads" query for driver ID: ${driverId}`);
+
+    try {
+        const result = await pool.query(queryText, [driverId]);
+        return camelcaseKeys(result.rows);
+    } catch (error) {
+        console.error(`Error fetching loads for driver ID ${driverId}:`, error);
+        throw new Error("Database query for fetching driver's loads failed.");
+    }
+};
+
+
+// --- THIS IS THE NEW FUNCTION FOR STATUS UPDATES ---
+export const updateLoadStatus = async (id: number, status: string, driverId: number): Promise<ILoad> => {
+    console.log(`--- Driver ${driverId} is updating status of load ${id} to "${status}" ---`);
+
+    // This query updates the status but ALSO verifies that the load belongs to the driver making the request.
+    // This is a crucial security check.
+    const updateQuery = `
+        UPDATE public.kuorma 
+        SET status = $1 
+        WHERE kuorma_id = $2 AND kulj_id = $3
+        RETURNING *;
+    `;
+    
+    try {
+        const result = await pool.query(updateQuery, [status, id, driverId]);
+
+        if (result.rowCount === 0) {
+            // This can happen if the load doesn't exist OR it's not assigned to this driver.
+            console.warn(`Status update failed: Load ID ${id} not found or not assigned to driver ID ${driverId}.`);
+            throw new Error('Load not found or you are not authorized to update it.');
+        }
+        
+        console.log(`Successfully updated status for load ID: ${id}`);
+        return camelcaseKeys(result.rows[0]);
+
+    } catch (error) {
+        console.error(`Error during status update for load ID ${id}:`, error);
+        throw error;
+    }
+};

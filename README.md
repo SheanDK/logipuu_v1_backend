@@ -95,27 +95,9 @@ For Soft Delete On Loads
 ALTER TABLE public.kuorma
 ADD COLUMN is_active BOOLEAN DEFAULT TRUE NOT NULL;
 
-When creating the deleteLoad function, I wrote logic to find out what timber entries are related to the load being deleted, then reduced the retrieved amount from those and increased the remaining amount. Since multiple timber entries can be related to one load, a new linking table is needed between the kuorma and puutavaralaji tables to maintain that link.
-COMMENT ON TABLE public.kuorma_puutavaralaji_link IS 'Links loads (kuorma) to the specific timber log entries (puutavaralaji) they contain.';
-COMMENT ON COLUMN public.kuorma_puutavaralaji_link.amount_loaded IS 'The specific volume (m³) of this timber log entry that was included in this particular load.';
-CREATE TABLE public.kuorma_puutavaralaji_link (
-    link_id SERIAL PRIMARY KEY,
-    kuorma_id BIGINT NOT NULL,
-    puutavaralaji_id BIGINT NOT NULL,
-    amount_loaded NUMERIC(8, 2) NOT NULL,
-    
-    -- Foreign key constraints to ensure data integrity
-    CONSTRAINT fk_kuorma
-        FOREIGN KEY(kuorma_id) 
-        REFERENCES public.kuorma(kuorma_id)
-        ON DELETE CASCADE, -- If a load is deleted, these links are also deleted
-    
-    CONSTRAINT fk_puutavaralaji
-        FOREIGN KEY(puutavaralaji_id) 
-        REFERENCES public.puutavaralaji(puutavara_id)
-        ON DELETE RESTRICT, -- Prevent deleting a timber log if it's part of a load
+For identyfi the current situation of vehicle 
+-- COMMENT ON COLUMN public.kuorma.status IS 'The current status of the load (e.g., Assigned, In Progress, At Origin, Loaded, En Route to Destination, Completed).'; --
 
-    -- Ensure a timber log entry can only be added once to a specific load
-    UNIQUE (kuorma_id, puutavaralaji_id)
-);
-
+-- Add a new 'status' column to the 'kuorma' table
+ALTER TABLE public.kuorma
+ADD COLUMN status VARCHAR(50) DEFAULT 'Assigned' NOT NULL;
