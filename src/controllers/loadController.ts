@@ -20,18 +20,32 @@ export const getAllLoadsHandler = async (req: AuthenticatedRequest, res: Respons
     }
 };
 
+// --- THIS IS THE UPDATED HANDLER WITH A SECURITY CHECK ---
 export const getLoadByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (isNaN(id)) {
             return res.status(400).json({ message: "Invalid Load ID format." });
         }
+
         const load = await loadService.getLoadById(id);
         if (!load) {
-            // Send a clear "Resource not found" message
             return res.status(404).json({ message: `Resource not found at /api/loads/${id}` });
         }
+
+        // --- SECURITY CHECK ---
+        const user = req.user!;
+        const isDriver = user.roles.includes('Kuljettaja');
+
+        // If the user is a driver, we must verify they own this load.
+        if (isDriver && load.kuljId !== user.driverNumericId) {
+            console.warn(`SECURITY ALERT: Driver ${user.driverNumericId} tried to access load ${id} owned by driver ${load.kuljId}.`);
+            return res.status(403).json({ message: "Forbidden: You are not authorized to view this specific load." });
+        }
+        
+        // If the user is not a driver, or if they are the correct driver, allow access.
         res.status(200).json(load);
+
     } catch (error) {
         next(error);
     }
@@ -55,14 +69,18 @@ export const updateLoadHandler = async (req: AuthenticatedRequest, res: Response
         }
 
         const dto = req.body as UpdateLoadDto;
-        const updatedLoad = await loadService.updateLoad(id, dto);
+        const user = req.user!; // Get the logged-in user from the 'protect' middleware
+        
+        // --- THIS IS THE FIX ---
+        // Pass the user object to the service function for permission checks
+        const updatedLoad = await loadService.updateLoad(id, dto, user);
+        
         res.status(200).json(updatedLoad);
     } catch (error: any) {
-        // Handle "Load not found" error from service specifically
-        if (error.message === 'Load not found.') {
+        if (error.message.includes('not found') || error.message.includes('not authorized')) {
             return res.status(404).json({ message: error.message });
         }
-        next(error); // Pass other errors to the global handler
+        next(error);
     }
 };
 

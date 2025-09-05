@@ -55,3 +55,41 @@ export interface ILoadListItem {
     tyyppi: string; // 'Puulaani' or 'Pole Transport'
     isActive: boolean;
 }
+
+// --- THIS IS THE NEW INTERFACE FOR THE LOAD DETAILS VIEW ---
+export interface ILoadDetails {
+    // Core Load Info (from 'kuorma' table)
+    kuormaId: number;
+    pvm: Date;
+    ajomaaraysNro: string | null;
+    status: string;
+    lisatiedot: string | null; // Special instructions for the whole load
+    kuljId: number;
+
+    // Customer Info
+    asiakkaanNimi: string;
+
+    // Vehicle Info
+    rekNro: string;
+
+    // Driver Info
+    kuljettajanNimi: string;
+
+    // Origin (Puulaani) Info
+    originName: string;
+    originAddress: string | null; // We need to join to get this
+    originLat: number | null;
+    originLng: number | null;
+    originInstructions: string | null; // lisatiedot from puulaani table
+
+    // Timber Task Info (from puutavaralaji)
+    taskTimberTypeName: string;
+    taskVolume: number; // The m3 amount set by the driver/office for THIS trip
+    taskRemainingVolumeBeforeThisTrip: number; // 'jaljella' from puutavaralaji
+
+    // Destination (Purkupaikka) Info
+    destinationName: string;
+    destinationAddress: string | null; // We need to join to get this
+    destinationLat: number | null;
+    destinationLng: number | null;
+}

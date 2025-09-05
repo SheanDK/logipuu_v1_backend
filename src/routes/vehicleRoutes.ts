@@ -8,50 +8,29 @@ import { CreateVehicleDto, UpdateVehicleDto } from '../dto/vehicle.dto';
 
 const router = Router();
 
-const vehicleManagementRoles = ['Superuser', 'Admin', 'Toimisto'];
+// Define permissions required for each action
+const VIEW_VEHICLE_PERMISSION = ['vehicle_view'];
+const CREATE_VEHICLE_PERMISSION = ['vehicle_create'];
+const EDIT_VEHICLE_PERMISSION = ['vehicle_edit'];
+const DELETE_VEHICLE_PERMISSION = ['vehicle_delete'];
+const officeRoles = ['Superuser', 'Admin', 'Toimisto']; // Roles that can use check-reg-no
+
 // GET all vehicles: Requires 'vehicle_view' permission
-router.get(
-    '/', 
-    protect, 
-    authorize(vehicleManagementRoles), 
-    vehicleController.getAllVehiclesHandler);
+router.get('/', protect, authorize([], VIEW_VEHICLE_PERMISSION), vehicleController.getAllVehiclesHandler);
 
 // GET vehicle by ID: Requires 'vehicle_view' permission
-router.get(
-    '/:id', 
-    protect, 
-    authorize(vehicleManagementRoles), 
-    vehicleController.getVehicleByIdHandler);
+router.get('/:id', protect, authorize([], VIEW_VEHICLE_PERMISSION), vehicleController.getVehicleByIdHandler);
 
 // POST a new vehicle: Requires 'vehicle_create' permission
-router.post(
-    '/', 
-    protect, 
-    authorize(vehicleManagementRoles), 
-    validateDto(CreateVehicleDto), 
-    vehicleController.createVehicleHandler);
+router.post('/', protect, authorize([], CREATE_VEHICLE_PERMISSION), validateDto(CreateVehicleDto), vehicleController.createVehicleHandler);
 
 // PUT to update a vehicle: Requires 'vehicle_edit' permission
-router.put(
-    '/:id', 
-    protect, 
-    authorize(vehicleManagementRoles), 
-    validateDto(UpdateVehicleDto), 
-    vehicleController.updateVehicleHandler);
+router.put('/:id', protect, authorize([], EDIT_VEHICLE_PERMISSION), validateDto(UpdateVehicleDto), vehicleController.updateVehicleHandler);
 
 // DELETE a vehicle: Requires 'vehicle_delete' permission
-router.delete(
-    '/:id', 
-    protect, 
-    authorize(vehicleManagementRoles), 
-    vehicleController.deleteVehicleHandler);
+router.delete('/:id', protect, authorize([], DELETE_VEHICLE_PERMISSION), vehicleController.deleteVehicleHandler);
 
-    // This route must exist for the frontend validation to work.
-router.get(
-    '/check-reg-no', 
-    protect, 
-    authorize(vehicleManagementRoles), // Ensure only authorized users can use this endpoint
-    vehicleController.checkRegistrationNoExistsHandler
-);
+// This route can be restricted to office staff roles or a specific permission
+router.get('/check-reg-no', protect, authorize(officeRoles), vehicleController.checkRegistrationNoExistsHandler);
 
 export default router;
