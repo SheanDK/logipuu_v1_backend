@@ -4,7 +4,7 @@ export const INSERT_CLIENT = `
     INSERT INTO public.asiakkaat (
         asiakkaan_nimi, osoite, posti_nro, paikkakunta, 
         puhelin_nro, ytunnus, kohteen_vari, tyyppi, 
-        aktiivinen, yhteyshenkilo, sahkoposti, lisatiedot
+        aktiivinen, yhteyshenkilo, sahkoposti, lisatietoja
     ) 
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     RETURNING *; -- CORRECTED: Return all columns. The camelcase-keys middleware will handle naming.
