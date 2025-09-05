@@ -1,3 +1,4 @@
+// backend/src/routes/driverRoutes.ts
 import { Router } from 'express';
 import * as driverController from '../controllers/driverController';
 import { protect } from '../middlewares/authMiddleware';
@@ -7,43 +8,20 @@ import { CreateDriverDto, UpdateDriverDto } from '../dto/driver.dto';
 
 const router = Router();
 
-const driverManagementRoles = ['Superuser', 'Admin', 'Toimisto'];
+// Define permissions required for each action
+const VIEW_DRIVER_PERMISSION = ['driver_view'];
+const CREATE_DRIVER_PERMISSION = ['driver_create'];
+const EDIT_DRIVER_PERMISSION = ['driver_edit'];
+const DELETE_DRIVER_PERMISSION = ['driver_delete'];
 
-router.get(
-    '/',
-    protect,
-    authorize(driverManagementRoles),
-    driverController.getAllDriversHandler
-);
+router.get('/', protect, authorize([], VIEW_DRIVER_PERMISSION), driverController.getAllDriversHandler);
 
-router.get(
-    '/:id',
-    protect,
-    authorize(driverManagementRoles),
-    driverController.getDriverByIdHandler
-);
+router.get('/:id', protect, authorize([], VIEW_DRIVER_PERMISSION), driverController.getDriverByIdHandler);
 
-router.post(
-    '/',
-    protect,
-    authorize(driverManagementRoles),
-    validateDto(CreateDriverDto),
-    driverController.createDriverHandler
-);
+router.post('/', protect, authorize([], CREATE_DRIVER_PERMISSION), validateDto(CreateDriverDto), driverController.createDriverHandler);
 
-router.put(
-    '/:id',
-    protect,
-    authorize(driverManagementRoles),
-    validateDto(UpdateDriverDto),
-    driverController.updateDriverHandler
-);
+router.put('/:id', protect, authorize([], EDIT_DRIVER_PERMISSION), validateDto(UpdateDriverDto), driverController.updateDriverHandler);
 
-router.delete(
-    '/:id',
-    protect,
-    authorize(driverManagementRoles),
-    driverController.deleteDriverHandler
-);
+router.delete('/:id', protect, authorize([], DELETE_DRIVER_PERMISSION), driverController.deleteDriverHandler);
 
 export default router;

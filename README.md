@@ -95,9 +95,55 @@ For Soft Delete On Loads
 ALTER TABLE public.kuorma
 ADD COLUMN is_active BOOLEAN DEFAULT TRUE NOT NULL;
 
+09-03-2025
+
 For identyfi the current situation of vehicle 
 -- COMMENT ON COLUMN public.kuorma.status IS 'The current status of the load (e.g., Assigned, In Progress, At Origin, Loaded, En Route to Destination, Completed).'; --
 
 -- Add a new 'status' column to the 'kuorma' table
 ALTER TABLE public.kuorma
 ADD COLUMN status VARCHAR(50) DEFAULT 'Assigned' NOT NULL;
+
+permission Assign for the  "Kuljettaja" 
+1-
+Find the "Kuljettaja" Role ID
+SELECT rooli_id FROM public.roolit WHERE roolin_nimi = 'Kuljettaja';
+
+2-
+Check Permission ID's 
+SELECT permission_id, permission_name FROM public.permissions 
+WHERE permission_name IN ('client_view', 'vehicle_view', 'driver_view');
+
+3-
+Connected  permissions with  "Kuljettaja" role
+-- Assign 'client_view' (ID 1) to 'Kuljettaja' role (ID 5)
+INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (5, 1);
+
+-- Assign 'vehicle_view' (ID 5) to 'Kuljettaja' role (ID 5)
+INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (5, 5);
+
+-- Assign 'driver_view' (ID 9) to 'Kuljettaja' role (ID 5)
+INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (5, 9);
+
+Add load_view permission
+
+1-
+INSERT INTO public.permissions (permission_name, description) 
+VALUES ('load_view', 'Can view the details of assigned loads');
+
+2- Find IDs
+--Find "Kuljettaja" role  ID  (5 )
+SELECT rooli_id FROM public.roolit WHERE roolin_nimi = 'Kuljettaja';
+
+-- 'load_view' permission  (ID 29 )
+SELECT permission_id FROM public.permissions WHERE permission_name = 'load_view';
+
+3-Add Records for role_permissions Table  :
+- Assign 'load_view' (ID 29) to 'Kuljettaja' role (ID 5)
+INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (5, 29) ON CONFLICT DO NOTHING;
+
+-- Assign 'load_view' to other office roles as well for consistency
+-- (Assuming Toimisto ID is 3, Admin is 2, Superuser is 1)
+INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (3, 29) ON CONFLICT DO NOTHING;
+INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (2, 29) ON CONFLICT DO NOTHING;
+INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (1, 29) ON CONFLICT DO NOTHING;
