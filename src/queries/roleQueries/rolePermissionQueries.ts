@@ -15,7 +15,7 @@ export const SELECT_ALL_ROLES_WITH_PERMISSIONS = `
 `;
 
 export const SELECT_ALL_PERMISSIONS = `
-    SELECT permission_id as "permissionId", permission_name as "permissionName", description
+    SELECT permission_id as "permissionId", permission_name as "permissionName", description, category
     FROM public.permissions ORDER BY permission_name;
 `;
 
