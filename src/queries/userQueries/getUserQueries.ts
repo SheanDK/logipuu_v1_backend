@@ -53,5 +53,25 @@ export const SELECT_USER_BY_tunnus_FOR_ADMIN = `
 `;
 
 export const SELECT_USER_ROLE_IDS_BY_TUNNUS = `
-    SELECT rooli_id FROM public.kayttaja_roolit WHERE kayttaja_tunnus = $1;
+  SELECT kr.rooli_id AS "rooliId"
+  FROM public.kayttaja_roolit kr
+  WHERE kr.kayttaja_tunnus = $1;
+`;
+
+export const SELECT_USER_WITH_ROLES_FOR_ADMIN = `
+  SELECT
+    u.tunnus       AS "tunnus",
+    u.nimi         AS "nimi",
+    u.taso         AS "taso",
+    u.aktiivinen   AS "aktiivinen",
+    u.kulj_id      AS "kuljId",
+    COALESCE(ARRAY_AGG(DISTINCT r.rooli_id)
+             FILTER (WHERE r.rooli_id IS NOT NULL), '{}') AS "roleIds",
+    COALESCE(ARRAY_AGG(DISTINCT r.roolin_nimi)
+             FILTER (WHERE r.roolin_nimi IS NOT NULL), '{}') AS "roles"
+  FROM public.kayttajat u
+  LEFT JOIN public.kayttaja_roolit kr ON TRIM(kr.kayttaja_tunnus) = TRIM(u.tunnus)
+  LEFT JOIN public.roolit r           ON r.rooli_id = kr.rooli_id
+  WHERE LOWER(TRIM(u.tunnus)) = LOWER(TRIM($1))
+  GROUP BY u.tunnus, u.nimi, u.aktiivinen, u.taso, u.kulj_id;
 `;

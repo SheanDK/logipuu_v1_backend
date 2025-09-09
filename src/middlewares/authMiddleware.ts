@@ -33,8 +33,8 @@ export const protect = (req: AuthenticatedRequest, res: Response, next: NextFunc
             const decoded = jwt.verify(token, JWT_SECRET) as UserPayload;
 
             // --- FOR DEBUGGING: Log what is decoded from the token ---
-            console.log('--- Decoded Payload from Token in "protect" middleware ---');
-            console.log(decoded);
+            //console.log('--- Decoded Payload from Token in "protect" middleware ---');
+            //console.log(decoded);
             // --- END DEBUGGING ---
 
             // CORRECTED: Assign the whole decoded object directly to req.user
