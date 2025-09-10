@@ -21,8 +21,11 @@ export const getAllUsersHandler = async (req: Request, res: Response, next: Next
  */
 export const getUserByTunnusHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { tunnus } = req.params;
-        const user = await adminUserService.adminGetUserByTunnus(tunnus);
+        const { username } = req.params;
+        const user = await adminUserService.adminGetUserByTunnus(username);
+
+        //console.log('[GET /admin/users/:tunnus] user =', JSON.stringify(user, null, 2));
+
         if (!user) { // This check is now valid because the service returns a user or null.
             return res.status(404).json({ message: 'User not found.' });
         }
@@ -35,19 +38,23 @@ export const getUserByTunnusHandler = async (req: Request, res: Response, next: 
 
 /**
  * Handler to create a new user.
- * <<<--- CORRECTION IS HERE: Renamed function to match the route ---<<<
  */
 export const createUserHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const userData = res.locals.validatedDto; // This is now a fully typed and validated CreateUserDto instance
-        const newUser = await adminUserService.adminCreateNewUser(userData); // Correctly calls adminCreateNewUser
+        const { username, fullName, password, roleIds, isActive } = req.body as CreateUserDto;
+
+        if (!username || !fullName || !password || !Array.isArray(roleIds)) {
+            return res.status(400).json({ message: 'Invalid data provided' });
+        }
+
+        const newUser = await adminUserService.adminCreateNewUser(req.body as CreateUserDto);
         res.status(201).json(newUser);
     } catch (error: any) {
         if (error.message.includes('already exists')) {
-            return res.status(409).json({ message: error.message }); // 409 Conflict is more appropriate
+            return res.status(409).json({ message: error.message });
         }
         if (error.message.includes('Invalid data provided')) {
-             return res.status(400).json({ message: error.message });
+            return res.status(400).json({ message: error.message });
         }
         next(error);
     }
@@ -58,24 +65,36 @@ export const createUserHandler = async (req: Request, res: Response, next: NextF
  */
 export const updateUserHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { tunnus } = req.params;
-        const updateData = res.locals.validatedDto;
+        const { username } = req.params;
+        const updateData = req.body as Partial<AdminUpdateUserDto> | undefined;
 
-        if (Object.keys(updateData).length === 0) {
+        if (!username) {
+            return res.status(400).json({ message: 'User identifier (username) is required.' });
+        }
+
+        if (!updateData || Object.keys(updateData).length === 0) {
             return res.status(400).json({ message: 'No update data provided.' });
         }
-        
-        const updatedUser = await adminUserService.adminUpdateUser(tunnus, updateData);
+
+        const updatedUser = await adminUserService.adminUpdateUser(username, updateData);
         if (!updatedUser) { // This check is now valid.
             return res.status(404).json({ message: 'User not found for update.' });
         }
+
         res.status(200).json(updatedUser);
+
     } catch (error: any) {
-        if (error.message.includes('not found') || error.message.includes('Invalid data')) {
-            return res.status(error.message.includes('not found') ? 404 : 400).json({ message: error.message });
+        if (typeof error?.message === 'string') {
+            if (error.message.includes('not found')) {
+                return res.status(404).json({ message: error.message });
+            }
+            if (error.message.includes('Invalid data')) {
+                return res.status(400).json({ message: error.message });
+            }
         }
-        next(error);
+        return next(error);
     }
+
 };
 
 /**
@@ -83,13 +102,19 @@ export const updateUserHandler = async (req: Request, res: Response, next: NextF
  */
 export const deleteUserHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { tunnus } = req.params;
-        const result = await adminUserService.adminDeleteUser(tunnus); // Correctly calls adminDeleteUser
-        res.status(200).json(result);
-    } catch (error: any) {
-        if (error.message.includes('not found')) {
-            return res.status(404).json({ message: error.message });
+        const { username } = req.params;
+
+        if (!username) {
+            return res.status(400).json({ message: 'User identifier (username) is required.' });
         }
-        next(error);
+
+        const result = await adminUserService.adminDeleteUser(username);
+        return res.status(200).json(result);
+    } catch (error: any) {
+        const msg = typeof error?.message === 'string' ? error.message : '';
+        if (msg.includes('not found')) {
+            return res.status(404).json({ message: msg });
+        }
+        return next(error);
     }
 };

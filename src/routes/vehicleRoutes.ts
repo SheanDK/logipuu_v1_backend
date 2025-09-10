@@ -9,10 +9,10 @@ import { CreateVehicleDto, UpdateVehicleDto } from '../dto/vehicle.dto';
 const router = Router();
 
 // Define permissions required for each action
-const VIEW_VEHICLE_PERMISSION = ['vehicle_view'];
-const CREATE_VEHICLE_PERMISSION = ['vehicle_create'];
-const EDIT_VEHICLE_PERMISSION = ['vehicle_edit'];
-const DELETE_VEHICLE_PERMISSION = ['vehicle_delete'];
+const VIEW_VEHICLE_PERMISSION = ['vehicles_view'];
+const CREATE_VEHICLE_PERMISSION = ['vehicles_create'];
+const EDIT_VEHICLE_PERMISSION = ['vehicles_edit'];
+const DELETE_VEHICLE_PERMISSION = ['vehicles_delete'];
 const officeRoles = ['Superuser', 'Admin', 'Toimisto']; // Roles that can use check-reg-no
 
 // GET all vehicles: Requires 'vehicle_view' permission

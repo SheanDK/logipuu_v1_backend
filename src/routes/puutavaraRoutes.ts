@@ -6,7 +6,7 @@ import { authorize } from '../middlewares/rbacMiddleware';
 
 const router = Router();
 // Assume anyone who can see timber stacks can also see wood types
-const viewPermission = ['timber_stack_view']; 
+const viewPermission = ['timber management_view']; 
 
 router.get('/', protect, authorize([], viewPermission), controller.getAllHandler);
 

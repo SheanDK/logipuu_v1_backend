@@ -9,10 +9,10 @@ import { CreateClientDto, UpdateClientDto } from '../dto/client.dto';
 const router = Router();
 
 // Define permissions required for each action
-const VIEW_CLIENT_PERMISSION = ['client_view'];
-const CREATE_CLIENT_PERMISSION = ['client_create'];
-const EDIT_CLIENT_PERMISSION = ['client_edit'];
-const DELETE_CLIENT_PERMISSION = ['client_delete'];
+const VIEW_CLIENT_PERMISSION = ['clients_view'];
+const CREATE_CLIENT_PERMISSION = ['clients_create'];
+const EDIT_CLIENT_PERMISSION = ['clients_edit'];
+const DELETE_CLIENT_PERMISSION = ['clients_delete'];
 
 // GET all clients: Requires 'client_view' permission
 router.get(

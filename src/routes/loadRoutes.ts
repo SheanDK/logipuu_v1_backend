@@ -8,11 +8,6 @@ import { validateDto } from '../middlewares/validationMiddleware';
 
 const router = Router();
 
-// --- Define Permissions for fine-grained control ---
-const VIEW_LOAD_PERMISSION = ['load_view'];
-const CREATE_LOAD_PERMISSION = ['load_create']; // You would create these in your DB
-const EDIT_LOAD_PERMISSION = ['load_edit'];
-const DELETE_LOAD_PERMISSION = ['load_delete'];
 
 // --- Define Roles ---
 const officeRoles = ['Superuser', 'Admin', 'Toimisto', 'Ajärjestelijä'];

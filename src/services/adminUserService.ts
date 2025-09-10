@@ -12,15 +12,12 @@ export const adminGetAllUsers = async () => {
     return rows;
 };
 
-export const adminGetUserByTunnus = async (tunnus: string) => {
-    const userResult = await pool.query(userQueries.SELECT_USER_BY_tunnus_FOR_ADMIN, [tunnus]);
-    if (userResult.rows.length === 0) return null; // Returns null if not found
-    
-    const roleIdsResult = await pool.query(userQueries.SELECT_USER_ROLE_IDS_BY_TUNNUS, [tunnus]);
-    
-    const user = userResult.rows[0];
-    user.roleIds = roleIdsResult.rows.map((r: { rooliId: number }) => r.rooliId);
-    return user; // Returns the user object if found
+export const adminGetUserByTunnus = async (username: string) => {
+  const clean = username?.trim();
+  console.log('[adminGetUserByTunnus] IN tunnus =', JSON.stringify(clean));
+  const { rows } = await pool.query(userQueries.SELECT_USER_WITH_ROLES_FOR_ADMIN, [clean]);
+  console.log('[adminGetUserByTunnus] rows.length =', rows.length);
+  return rows[0] ?? null;
 };
 
 

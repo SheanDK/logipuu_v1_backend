@@ -9,10 +9,10 @@ import { CreateDriverDto, UpdateDriverDto } from '../dto/driver.dto';
 const router = Router();
 
 // Define permissions required for each action
-const VIEW_DRIVER_PERMISSION = ['driver_view'];
-const CREATE_DRIVER_PERMISSION = ['driver_create'];
-const EDIT_DRIVER_PERMISSION = ['driver_edit'];
-const DELETE_DRIVER_PERMISSION = ['driver_delete'];
+const VIEW_DRIVER_PERMISSION = ['drivers_view'];
+const CREATE_DRIVER_PERMISSION = ['drivers_create'];
+const EDIT_DRIVER_PERMISSION = ['drivers_edit'];
+const DELETE_DRIVER_PERMISSION = ['drivers_delete'];
 
 router.get('/', protect, authorize([], VIEW_DRIVER_PERMISSION), driverController.getAllDriversHandler);
 

@@ -11,9 +11,9 @@ export const authorize = (requiredRoles: string[] = [], requiredPermissions: str
         }
         
         // --- START OF DEBUGGING BLOCK ---
-        console.log(`--- RBAC Middleware Check for path: ${req.path} ---`);
-        console.log("Required Roles:", requiredRoles);
-        console.log("User's Roles found in Token:", user.roles);
+        //console.log(`--- RBAC Middleware Check for path: ${req.path} ---`);
+        //console.log("Required Roles:", requiredRoles);
+        //console.log("User's Roles found in Token:", user.roles);
         
         const hasRequiredRole = user.roles && user.roles.some((role: string) => {
             const roleExists = requiredRoles.includes(role);
@@ -21,18 +21,18 @@ export const authorize = (requiredRoles: string[] = [], requiredPermissions: str
             return roleExists;
         });
         
-        console.log("Final check result for 'hasRequiredRole':", hasRequiredRole);
+        //console.log("Final check result for 'hasRequiredRole':", hasRequiredRole);
         // --- END OF DEBUGGING BLOCK ---
 
         const hasRequiredPermission = user.permissions && user.permissions.some((permission: string) => requiredPermissions.includes(permission));
 
         if (requiredRoles.length > 0 && hasRequiredRole) {
-            console.log("--- RBAC PASSED: User has the required role. ---");
+            //console.log("--- RBAC PASSED: User has the required role. ---");
             return next();
         }
 
         if (requiredPermissions.length > 0 && hasRequiredPermission) {
-            console.log("--- RBAC PASSED: User has the required permission. ---");
+            //console.log("--- RBAC PASSED: User has the required permission. ---");
             return next();
         }
         
