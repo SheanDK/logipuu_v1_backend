@@ -8,6 +8,17 @@ import { validateDto } from '../middlewares/validationMiddleware';
 
 const router = Router();
 
+// Define permissions for clarity
+const VIEW_LOAD_PERMISSION = ['load management_view'];
+const CREATE_LOAD_PERMISSION = ['load management_create']; // We can create this later if needed
+const EDIT_LOAD_PERMISSION = ['load management_edit'];     // We can create this later if needed
+const DELETE_LOAD_PERMISSION = ['load management_delete'];   // We can create this later if needed
+
+// // Define permissions for clarity
+// const VIEW_LOAD_PERMISSION = ['load_view'];
+// const CREATE_LOAD_PERMISSION = ['load_create']; // We can create this later if needed
+// const EDIT_LOAD_PERMISSION = ['load_edit'];     // We can create this later if needed
+// const DELETE_LOAD_PERMISSION = ['load_delete'];   // We can create this later if needed
 
 // --- Define Roles ---
 const officeRoles = ['Superuser', 'Admin', 'Toimisto', 'Ajärjestelijä'];
