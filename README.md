@@ -95,7 +95,7 @@ For Soft Delete On Loads
 ALTER TABLE public.kuorma
 ADD COLUMN is_active BOOLEAN DEFAULT TRUE NOT NULL;
 
-09-03-2025
+******** 09-03-2025 *************
 
 For identyfi the current situation of vehicle 
 -- COMMENT ON COLUMN public.kuorma.status IS 'The current status of the load (e.g., Assigned, In Progress, At Origin, Loaded, En Route to Destination, Completed).'; --
@@ -147,3 +147,16 @@ INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (5, 29) ON 
 INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (3, 29) ON CONFLICT DO NOTHING;
 INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (2, 29) ON CONFLICT DO NOTHING;
 INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (1, 29) ON CONFLICT DO NOTHING;
+
+****** 09-05-2025 *********
+
+Currently, the m3 and km columns in the kuorma table can be used with the initially assigned 'estimated' values from the office. Creating separate columns for the actual values entered by the driver is very good for data analysis and history tracking.
+
+ALTER TABLE public.kuorma
+ADD COLUMN actual_m3 NUMERIC(8, 2),
+ADD COLUMN actual_km NUMERIC(8, 2),
+ADD COLUMN completion_timestamp TIMESTAMPTZ;
+
+COMMENT ON COLUMN public.kuorma.actual_m3 IS 'The actual volume (m³) unloaded by the driver.';
+COMMENT ON COLUMN public.kuorma.actual_km IS 'The actual kilometers driven for the trip.';
+COMMENT ON COLUMN public.kuorma.completion_timestamp IS 'The exact timestamp when the driver marked the trip as completed.';

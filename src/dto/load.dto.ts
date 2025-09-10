@@ -1,21 +1,20 @@
 // backend/src/dto/load.dto.ts
-import { IsInt, IsNotEmpty, IsString, MaxLength, IsNumber, IsDate, IsEnum, IsOptional, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsString, MaxLength, IsNumber, IsDate, IsEnum, IsOptional, Min, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
 import { LoadTypeEnum } from '../types/load.types';
 
 export class CreateLoadDto {
-    @IsEnum(LoadTypeEnum)
-    @IsNotEmpty()
+    @IsEnum(LoadTypeEnum) @IsNotEmpty()
     tyyppi!: LoadTypeEnum;
 
     @IsInt() @IsNotEmpty() @Type(() => Number)
     asiakasId!: number;
     
-    @IsInt() @IsNotEmpty() @Type(() => Number) // Puulaani is required for this type of load
-    puulaaniId!: number;
+    @IsInt() @IsOptional() @Type(() => Number)
+    puulaaniId?: number;
 
-    @IsInt() @IsNotEmpty() @Type(() => Number)
-    puutavaraId!: number; // Timber task is required
+    @IsInt() @IsOptional() @Type(() => Number)
+    puutavaraId?: number;
 
     @IsInt() @IsNotEmpty() @Type(() => Number)
     kalustoNro!: number;
@@ -29,15 +28,12 @@ export class CreateLoadDto {
     @IsString() @IsOptional() @MaxLength(45)
     ajomaaraysNro?: string;
     
-    // --- THIS IS THE FIX ---
-    // Add the missing properties that the frontend sends
     @IsString() @IsOptional() @MaxLength(100)
     kohde?: string;
 
     @IsString() @IsOptional() @MaxLength(100)
     lahto?: string;
-    // --- END OF FIX ---
-
+    
     @IsNumber() @IsOptional() @Min(0) @Type(() => Number)
     m3?: number;
 
@@ -46,15 +42,39 @@ export class CreateLoadDto {
     
     @IsString() @IsOptional()
     lisatiedot?: string;
+
+    @IsString() @IsOptional() @MaxLength(45)
+    vastaanottoNro?: string;
+
+    @IsString() @IsOptional() @MaxLength(100)
+    reitti?: string;
+
+    @IsNumber() @IsOptional() @Min(0) @Type(() => Number)
+    tunnit?: number;
+
+    @IsNumber() @IsOptional() @Min(0) @Type(() => Number)
+    kpl?: number;
 }
 
-// --- THIS IS THE  DTO FOR STATUS UPDATES ---
+// Update DTO can now correctly inherit all optional fields
+export class UpdateLoadDto extends CreateLoadDto {}
+
 export class UpdateLoadStatusDto {
-    @IsString()
-    @IsNotEmpty()
-    @MaxLength(50)
+    @IsString() @IsNotEmpty() @MaxLength(50)
     status!: string;
 }
 
-// Update DTO can inherit and all fields will be optional due to validation options
-export class UpdateLoadDto extends CreateLoadDto {}
+export class CompleteLoadDto {
+    @IsNumber() @IsNotEmpty() @Min(0) @Type(() => Number)
+    actualM3!: number;
+    @IsNumber() @IsNotEmpty() @Min(0) @Type(() => Number)
+    actualKm!: number;
+}
+
+export class AcceptLoadsDto {
+    @IsArray()
+    @IsNotEmpty()
+    @IsInt({ each: true })
+    @Type(() => Number)
+    loadIds!: number[];
+}

@@ -2,12 +2,12 @@
 import { Response, NextFunction } from 'express';
 import * as loadService from '../services/loadService';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
-import { CreateLoadDto, UpdateLoadDto, UpdateLoadStatusDto,  } from '../dto/load.dto';
+import { CreateLoadDto, UpdateLoadDto, UpdateLoadStatusDto, CompleteLoadDto, AcceptLoadsDto   } from '../dto/load.dto';
 
 export const getAllLoadsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        // Extract filter parameters from the request query string
         const filters: loadService.ILoadListFilters = {
+            status: req.query.status as 'active' | 'all' | undefined, // <<< Ensure status is extracted
             asiakasId: req.query.asiakasId as string | undefined,
             kalustoNro: req.query.kalustoNro as string | undefined,
             kuljId: req.query.kuljId as string | undefined,
@@ -69,10 +69,8 @@ export const updateLoadHandler = async (req: AuthenticatedRequest, res: Response
         }
 
         const dto = req.body as UpdateLoadDto;
-        const user = req.user!; // Get the logged-in user from the 'protect' middleware
+        const user = req.user!;
         
-        // --- THIS IS THE FIX ---
-        // Pass the user object to the service function for permission checks
         const updatedLoad = await loadService.updateLoad(id, dto, user);
         
         res.status(200).json(updatedLoad);
@@ -148,6 +146,53 @@ export const updateLoadStatusHandler = async (req: AuthenticatedRequest, res: Re
         if (error.message.includes('not found or you are not authorized')) {
             return res.status(404).json({ message: error.message });
         }
+        next(error);
+    }
+};
+
+export const completeLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const user = req.user!;
+        const loadId = parseInt(req.params.id, 10);
+        const dto = req.body as CompleteLoadDto;
+
+        if (isNaN(loadId)) {
+            return res.status(400).json({ message: "Invalid Load ID." });
+        }
+        
+        if (!user.driverNumericId) {
+            return res.status(403).json({ message: "Forbidden: User is not a driver." });
+        }
+
+        const driverId = user.driverNumericId;
+        const completedLoad = await loadService.completeLoad(loadId, driverId, dto);
+        
+        res.status(200).json(completedLoad);
+    } catch (error: any) {
+        // Handle specific errors from the service
+        if (error.message.includes('not found') || error.message.includes('not authorized') || error.message.includes('current status')) {
+            return res.status(400).json({ message: error.message });
+        }
+        next(error);
+    }
+};
+
+// --- THIS IS THE NEW HANDLER FOR THE DRIVEN/INSPECTION PAGE ---
+export const getLoadsForInspectionHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const loads = await loadService.getLoadsForInspection();
+        res.status(200).json(loads);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const acceptLoadsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const { loadIds } = req.body as AcceptLoadsDto;
+        const result = await loadService.acceptLoadsForInvoicing(loadIds);
+        res.status(200).json({ message: `${result.count} loads successfully accepted for invoicing.`, ...result });
+    } catch (error) {
         next(error);
     }
 };
