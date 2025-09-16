@@ -196,3 +196,39 @@ export const acceptLoadsHandler = async (req: AuthenticatedRequest, res: Respons
         next(error);
     }
 };
+
+export const getMyCompletedLoadsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const user = req.user;
+        if (!user || !user.driverNumericId) {
+            return res.status(403).json({ message: "Forbidden: User is not a valid driver." });
+        }
+        const driverId = user.driverNumericId;
+        const completedLoads = await loadService.getMyCompletedLoadsForList(driverId);
+        res.status(200).json(completedLoads);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getMyLastCompletedLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const user = req.user;
+        if (!user || !user.driverNumericId) {
+            return res.status(403).json({ message: "Forbidden: User is not a valid driver." });
+        }
+        const lastLoad = await loadService.getMyLastCompletedLoad(user.driverNumericId);
+        res.status(200).json(lastLoad); // Will return the object or null
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getActiveTripsForMapHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const trips = await loadService.getActiveTripsForMap();
+        res.status(200).json(trips);
+    } catch (error) {
+        next(error);
+    }
+};

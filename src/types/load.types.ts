@@ -93,3 +93,15 @@ export interface ILoadDetails {
     destinationLat: number | null;
     destinationLng: number | null;
 }
+
+// --- NEW interface for map trip lines ---
+export interface IMapTrip {
+    tripId: number;
+    driverName: string;
+    vehicleRegNo: string;
+    originName: string;
+    destinationName: string;
+    status: string;
+    originCoords: { lat: number, lng: number };
+    destinationCoords: { lat: number, lng: number };
+} 

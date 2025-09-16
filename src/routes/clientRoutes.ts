@@ -8,51 +8,59 @@ import { CreateClientDto, UpdateClientDto } from '../dto/client.dto';
 
 const router = Router();
 
-// Define permissions required for each action
+// --- Define Roles ---
+const officeRoles = ['Superuser', 'Admin', 'Toimisto', 'Ajojärjestelijä'];
+const driverRoles = ['Kuljettaja'];
+// A combined list for routes accessible by both
+const allStaffRoles = [...officeRoles, ...driverRoles];
+
+// --- Define Permissions ---
 const VIEW_CLIENT_PERMISSION = ['clients_view'];
 const CREATE_CLIENT_PERMISSION = ['clients_create'];
 const EDIT_CLIENT_PERMISSION = ['clients_edit'];
 const DELETE_CLIENT_PERMISSION = ['clients_delete'];
 
-// GET all clients: Requires 'client_view' permission
+// GET all clients: Requires 'clients_view' permission, accessible by all staff
 router.get(
     '/',
     protect, 
-    authorize([], VIEW_CLIENT_PERMISSION), // Pass permission array as second argument
+    // --- THIS IS THE FIX ---
+    // Pass both the roles and the permission for a more robust check.
+    authorize(allStaffRoles, VIEW_CLIENT_PERMISSION), 
     clientController.getAllClientsHandler
 );
 
-// GET client by ID: Also requires 'client_view' permission
+// GET client by ID: Also requires 'clients_view' permission, accessible by all staff
 router.get(
     '/:id',
     protect,
-    authorize([], VIEW_CLIENT_PERMISSION),
+    authorize(allStaffRoles, VIEW_CLIENT_PERMISSION),
     clientController.getClientByIdHandler
 );
 
-// POST a new client: Requires 'client_create' permission
+// POST a new client: Restricted to office roles with create permission
 router.post(
     '/',
     protect,
-    authorize([], CREATE_CLIENT_PERMISSION), 
+    authorize(officeRoles, CREATE_CLIENT_PERMISSION), 
     validateDto(CreateClientDto),
     clientController.createClientHandler
 );
 
-// PUT to update a client: Requires 'client_edit' permission
+// PUT to update a client: Restricted to office roles with edit permission
 router.put(
     '/:id',
     protect,
-    authorize([], EDIT_CLIENT_PERMISSION),
-    validateDto(UpdateClientDto),
+    authorize(officeRoles, EDIT_CLIENT_PERMISSION),
+    validateDto(UpdateClientDto, { skipMissingProperties: true }), // Allow partial updates
     clientController.updateClientHandler
 );
 
-// DELETE a client: Requires 'client_delete' permission
+// DELETE a client: Restricted to office roles with delete permission
 router.delete(
     '/:id',
     protect,
-    authorize([], DELETE_CLIENT_PERMISSION),
+    authorize(officeRoles, DELETE_CLIENT_PERMISSION),
     clientController.deleteClientHandler
 );
 

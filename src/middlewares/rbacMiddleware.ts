@@ -10,38 +10,34 @@ export const authorize = (requiredRoles: string[] = [], requiredPermissions: str
             return res.status(401).json({ message: 'Authentication error: User not found in request.' });
         }
         
-        // --- START OF DEBUGGING BLOCK ---
-        //console.log(`--- RBAC Middleware Check for path: ${req.path} ---`);
-        //console.log("Required Roles:", requiredRoles);
-        //console.log("User's Roles found in Token:", user.roles);
-        
-        const hasRequiredRole = user.roles && user.roles.some((role: string) => {
-            const roleExists = requiredRoles.includes(role);
-            console.log(`Checking if user role "${role}" is in required list [${requiredRoles.join(', ')}]: ${roleExists}`);
-            return roleExists;
-        });
-        
-        //console.log("Final check result for 'hasRequiredRole':", hasRequiredRole);
-        // --- END OF DEBUGGING BLOCK ---
-
-        const hasRequiredPermission = user.permissions && user.permissions.some((permission: string) => requiredPermissions.includes(permission));
-
-        if (requiredRoles.length > 0 && hasRequiredRole) {
-            //console.log("--- RBAC PASSED: User has the required role. ---");
+        // --- THIS IS THE FIX ---
+        // If the user's roles array includes 'Superuser', they are automatically authorized.
+        // This check happens before any other role or permission checks.
+        if (user.roles && user.roles.includes('Superuser')) {
+            console.log(`--- RBAC PASSED: Superuser '${user.userId}' granted access automatically. ---`);
             return next();
         }
+        // --- END OF FIX ---
+        
+        const hasRequiredRole = user.roles && user.roles.some((role: string) => requiredRoles.includes(role));
+        
+        const hasRequiredPermission = user.permissions && requiredPermissions.every((permission: string) => user.permissions.includes(permission));
 
-        if (requiredPermissions.length > 0 && hasRequiredPermission) {
-            //console.log("--- RBAC PASSED: User has the required permission. ---");
+        // Note: The logic is now "OR". If you have the role OR the permission, you pass.
+        if (hasRequiredRole || hasRequiredPermission) {
             return next();
         }
         
-        console.error("!!! RBAC FAILED: User does not have required role or permission. !!!");
+        console.error(`!!! RBAC FAILED: User ${user.userId} does not have required role or permission.`);
         return res.status(403).json({ 
             message: 'Forbidden: You do not have the required permissions for this action.',
             required: { 
-                roles: requiredRoles.length > 0 ? requiredRoles : 'None specified',
-                permissions: requiredPermissions.length > 0 ? requiredPermissions : 'None specified'
+                roles: requiredRoles.length > 0 ? requiredRoles : 'Not applicable',
+                permissions: requiredPermissions.length > 0 ? requiredPermissions : 'Not applicable'
+            },
+            userHas: {
+                roles: user.roles,
+                permissions: user.permissions
             }
         });
     };

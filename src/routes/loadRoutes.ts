@@ -8,35 +8,100 @@ import { validateDto } from '../middlewares/validationMiddleware';
 
 const router = Router();
 
-// Define permissions for clarity
+// --- Define Permissions ---
 const VIEW_LOAD_PERMISSION = ['load management_view'];
-const CREATE_LOAD_PERMISSION = ['load management_create']; // We can create this later if needed
-const EDIT_LOAD_PERMISSION = ['load management_edit'];     // We can create this later if needed
-const DELETE_LOAD_PERMISSION = ['load management_delete'];   // We can create this later if needed
-
-// // Define permissions for clarity
-// const VIEW_LOAD_PERMISSION = ['load_view'];
-// const CREATE_LOAD_PERMISSION = ['load_create']; // We can create this later if needed
-// const EDIT_LOAD_PERMISSION = ['load_edit'];     // We can create this later if needed
-// const DELETE_LOAD_PERMISSION = ['load_delete'];   // We can create this later if needed
+const CREATE_LOAD_PERMISSION = ['load management_create'];
+const EDIT_LOAD_PERMISSION = ['load management_edit'];
+const DELETE_LOAD_PERMISSION = ['load management_delete'];
+const INSPECTION_VIEW_PERMISSION = ['driven & inspection_view'];
+const INSPECTION_ACCEPT_PERMISSION = ['driven & inspection_accept'];
 
 // --- Define Roles ---
 const officeRoles = ['Superuser', 'Admin', 'Toimisto', 'Ajärjestelijä'];
 const driverRoles = ['Kuljettaja'];
-const allStaffRoles = [...officeRoles, ...driverRoles]; // For actions both can perform
+const allStaffRoles = [...officeRoles, ...driverRoles];
 
 
+// ===================================================
+// MOST SPECIFIC ROUTES FIRST
+// ===================================================
 
-// === DRIVER PORTAL ROUTES ===
+// --- DRIVER PORTAL ---
+router.get('/my-loads/completed',
+    protect,
+    authorize(driverRoles),
+    loadController.getMyCompletedLoadsHandler
+);
 
-// Get all loads assigned to the currently logged-in driver
+// --- THIS IS THE NEW ROUTE ---
+router.get('/my-loads/last-completed',
+    protect,
+    authorize(driverRoles),
+    loadController.getMyLastCompletedLoadHandler
+);
+
 router.get('/my-loads', 
     protect, 
     authorize(driverRoles), 
     loadController.getMyLoadsHandler
 );
 
-// Update the status of a load (e.g., 'In Progress', 'At Origin')
+// --- OFFICE PORTAL ---
+router.get('/for-inspection',
+    protect,
+    authorize(officeRoles, INSPECTION_VIEW_PERMISSION),
+    loadController.getLoadsForInspectionHandler
+);
+
+router.get('/active-trips',
+    protect,
+    authorize(officeRoles, VIEW_LOAD_PERMISSION),
+    loadController.getActiveTripsForMapHandler
+);
+
+router.post('/accept-for-invoicing', 
+    protect, 
+    authorize(officeRoles, INSPECTION_ACCEPT_PERMISSION), 
+    validateDto(AcceptLoadsDto), 
+    loadController.acceptLoadsHandler
+);
+
+
+// ===================================================
+// GENERAL & DYNAMIC ROUTES
+// ===================================================
+
+// GET a list of all loads (with filters) for the main management table
+router.get('/', 
+    protect, 
+    authorize(officeRoles, VIEW_LOAD_PERMISSION), 
+    loadController.getAllLoadsHandler
+);
+
+// Create a new load (can be done by both roles)
+router.post('/', 
+    protect, 
+    authorize(allStaffRoles, CREATE_LOAD_PERMISSION),
+    validateDto(CreateLoadDto), 
+    loadController.createLoadHandler
+);
+
+// GET the full details of a single load by its ID
+router.get('/:id', 
+    protect, 
+    authorize(allStaffRoles, VIEW_LOAD_PERMISSION), // Allow drivers to view their own loads
+    loadController.getLoadByIdHandler
+);
+
+// Update an existing load's details
+router.put('/:id', 
+    protect, 
+    authorize(allStaffRoles, EDIT_LOAD_PERMISSION), // Allow drivers to edit their own loads (service layer restricts fields)
+    validateDto(UpdateLoadDto, { skipMissingProperties: true }), 
+    loadController.updateLoadHandler
+);
+
+// Update a load's status
 router.patch('/:id/status', 
     protect, 
     authorize(driverRoles), 
@@ -44,8 +109,7 @@ router.patch('/:id/status',
     loadController.updateLoadStatusHandler
 );
 
-// --- THIS IS THE NEW ROUTE for COMPLETING a trip ---
-// Mark a trip as complete and submit final data (actual_m3, actual_km)
+// Complete a trip
 router.patch('/:id/complete',
     protect,
     authorize(driverRoles),
@@ -53,61 +117,11 @@ router.patch('/:id/complete',
     loadController.completeLoadHandler
 );
 
-
-// === OFFICE / GENERAL ROUTES ===
-
-router.get('/for-inspection',
-    protect,
-    authorize(officeRoles), // Or a specific permission like 'driven_inspection_view'
-    loadController.getLoadsForInspectionHandler
-);
-
-// Get a list of all loads, with optional filters (for office staff)
-router.get('/', 
-    protect, 
-    authorize(officeRoles), 
-    loadController.getAllLoadsHandler
-);
-
-// Get the full details of a single load by its ID
-// Accessible by both drivers (for their own loads) and office staff
-router.get('/:id', 
-    protect, 
-    authorize([], VIEW_LOAD_PERMISSION), 
-    loadController.getLoadByIdHandler
-);
-
-// Create a new load (can be done by both roles)
-router.post('/', 
-    protect, 
-    authorize(allStaffRoles, CREATE_LOAD_PERMISSION), // Added permission check for consistency
-    validateDto(CreateLoadDto), 
-    loadController.createLoadHandler
-);
-
-// Update an existing load's details
-// Now checks for a specific permission, which both roles can have (but service layer restricts fields for drivers)
-router.put('/:id', 
-    protect, 
-    authorize([], EDIT_LOAD_PERMISSION), 
-    validateDto(UpdateLoadDto, { skipMissingProperties: true }), 
-    loadController.updateLoadHandler
-);
-
-// --- THIS IS THE NEW ROUTE FOR ACCEPTING TRIPS ---
-router.post('/accept-for-invoicing', 
-    protect, 
-    authorize(officeRoles), // Or a specific permission like 'driven_inspection_accept'
-    validateDto(AcceptLoadsDto), 
-    loadController.acceptLoadsHandler
-);
-
-// Soft-delete a load (restricted to office staff or specific permission)
+// Soft-delete a load
 router.delete('/:id', 
     protect, 
     authorize(officeRoles, DELETE_LOAD_PERMISSION), 
     loadController.deleteLoadHandler
 );
-
 
 export default router;

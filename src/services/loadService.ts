@@ -1,7 +1,7 @@
 // backend/src/services/loadService.ts
 import pool from '../config/db';
 import camelcaseKeys from 'camelcase-keys';
-import { ILoad, ILoadDetails, ILoadListItem } from '../types/load.types';
+import { ILoad, ILoadDetails, ILoadListItem, IMapTrip } from '../types/load.types';
 import { CreateLoadDto, UpdateLoadDto, CompleteLoadDto } from '../dto/load.dto';
 import { UserPayload } from '../middlewares/authMiddleware';
 
@@ -16,10 +16,23 @@ export interface ILoadListFilters {
 export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILoadListItem[]> => {
     let queryText = `
         SELECT
-            k.kuorma_id, TO_CHAR(k.pvm, 'DD.MM.YYYY') AS pvm, k.ajomaarays_nro,
-            k.vastaanotto_nro, kal.rek_nro, kul.nimi AS kuljettajan_nimi,
-            p.nimi AS puulaani_nimi, a.asiakkaan_nimi, pt.puutavara AS timber_type,
-            k.reitti, k.m3, k.km, k.tunnit, k.kpl, k.lisatiedot, k.status, k.is_active
+            k.kuorma_id,
+            TO_CHAR(k.pvm, 'DD.MM.YYYY') AS pvm,
+            k.ajomaarays_nro,
+            k.vastaanotto_nro,
+            kal.rek_nro,
+            kul.nimi AS kuljettajan_nimi,
+            p.nimi AS puulaani_nimi,
+            a.asiakkaan_nimi,
+            pt.puutavara AS timber_type,
+            k.reitti,
+            k.m3,
+            k.km,
+            k.tunnit,
+            k.kpl,
+            k.lisatiedot,
+            k.status,
+            k.is_active
         FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
         LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
@@ -27,21 +40,28 @@ export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILo
         LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
         LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
         LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
-        LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
     `;
 
-    const conditions: string[] = ['k.is_active = TRUE'];
+    const conditions: string[] = [];
     const queryParams: (string | number)[] = [];
     let paramIndex = 1;
 
-    // --- THIS IS THE FIX: Add a condition for billing status ---
-    // By default, "Active Loads" should not include those already accepted for invoicing.
-    if (filters.status === 'active') {
+    // --- THIS IS THE FIX FOR FILTERING LOGIC ---
+     if (filters.status === 'active') {
+        conditions.push(`k.status != 'Completed'`);
+        conditions.push(`k.is_active = TRUE`);
+    } 
+    // Change 'inspection' to 'pending_inspection' to match the interface
+    else if (filters.status === 'pending_inspection') { 
+        conditions.push(`k.status = 'Completed'`);
         conditions.push(`k.laskutukseen = 0`);
+        conditions.push(`k.is_active = TRUE`);
+    } else {
+        // "All" just filters by is_active = TRUE
+        conditions.push(`k.is_active = TRUE`);
     }
-    // Note: The 'pending_inspection' case is handled by a separate service function,
-    // but if you wanted to merge them, you would add a condition here.
 
+    // Add other filters
     if (filters.asiakasId) {
         conditions.push(`k.asiakas_id = $${paramIndex++}`);
         queryParams.push(parseInt(filters.asiakasId, 10));
@@ -156,6 +176,7 @@ export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
     }
 };
 
+// --- THIS IS THE UPDATED, SECURE updateLoad FUNCTION ---
 export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayload): Promise<ILoad> => {
     const { rows: existingRows, rowCount } = await pool.query('SELECT * FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [id]);
     if (rowCount === 0) {
@@ -165,57 +186,83 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
 
     const isDriver = user.roles.includes('Kuljettaja');
 
+    // Security Check 1: Drivers can only edit their own loads.
     if (isDriver && existingLoad.kulj_id !== user.driverNumericId) {
         throw new Error('You are not authorized to edit this load.');
     }
 
-    // --- THIS IS THE FIX ---
-    // Build a complete, new object by merging new data over the existing data.
-    // This ensures no existing IDs are accidentally set to null.
-    const mergedData = {
-        tyyppi: data.tyyppi ?? existingLoad.tyyppi,
-        asiakas_id: data.asiakasId ?? existingLoad.asiakas_id,
-        puulaani_id: data.puulaaniId ?? existingLoad.puulaani_id,
-        puutavara_id: data.puutavaraId ?? existingLoad.puutavara_id,
-        kalusto_nro: data.kalustoNro ?? existingLoad.kalusto_nro,
-        kulj_id: data.kuljId ?? existingLoad.kulj_id,
-        pvm: data.pvm ?? existingLoad.pvm,
-        ajomaarays_nro: data.ajomaaraysNro ?? existingLoad.ajomaarays_nro,
-        vastaanotto_nro: data.vastaanottoNro ?? existingLoad.vastaanotto_nro,
-        kohde: data.kohde ?? existingLoad.kohde,
-        lahto: data.lahto ?? existingLoad.lahto,
-        reitti: data.reitti ?? existingLoad.reitti,
-        m3: data.m3 ?? existingLoad.m3,
-        km: data.km ?? existingLoad.km,
-        tunnit: data.tunnit ?? existingLoad.tunnit,
-        kpl: data.kpl ?? existingLoad.kpl,
-        lisatiedot: data.lisatiedot ?? existingLoad.lisatiedot,
-    };
+    // Security Check 2: Drivers can only edit loads that are in 'Assigned' state.
+    if (isDriver && existingLoad.status !== 'Assigned') {
+        throw new Error('This load is already in progress and cannot be edited.');
+    }
 
-    let params: any[];
-    let setClauses: string;
+    let fieldsToUpdate: Partial<ILoad>;
 
     if (isDriver) {
-        // Drivers have a restricted set of updatable fields.
-        setClauses = `pvm = $1, m3 = $2, km = $3, lisatiedot = $4, kohde = $5`;
-        params = [ mergedData.pvm, mergedData.m3, mergedData.km, mergedData.lisatiedot, mergedData.kohde, id ];
+        // DRIVERS have a restricted set of updatable fields.
+        console.log(`--- Driver ${user.userId} is updating load ${id} ---`);
+        fieldsToUpdate = {
+            kalustoNro: data.kalustoNro,
+            pvm: data.pvm,
+            ajomaaraysNro: data.ajomaaraysNro,
+            m3: data.m3,
+            km: data.km,
+            lisatiedot: data.lisatiedot,
+            kohde: data.kohde
+        };
     } else {
-        // Office staff can update a wider set of fields.
-        setClauses = `
-            pvm = $1, vastaanotto_nro = $2, reitti = $3, m3 = $4, km = $5,
-            tunnit = $6, kpl = $7, lisatiedot = $8
-        `;
-        params = [
-            mergedData.pvm, mergedData.vastaanotto_nro, mergedData.reitti, mergedData.m3, mergedData.km,
-            mergedData.tunnit, mergedData.kpl, mergedData.lisatiedot, id
-        ];
+        // OFFICE STAFF can update a wider set of fields.
+        console.log(`--- Office user ${user.userId} is updating load ${id} ---`);
+        fieldsToUpdate = {
+            tyyppi: data.tyyppi,
+            asiakasId: data.asiakasId,
+            puulaaniId: data.puulaaniId,
+            puutavaraId: data.puutavaraId,
+            kalustoNro: data.kalustoNro,
+            kuljId: data.kuljId,
+            pvm: data.pvm,
+            ajomaaraysNro: data.ajomaaraysNro,
+            vastaanottoNro: data.vastaanottoNro,
+            kohde: data.kohde,
+            lahto: data.lahto,
+            reitti: data.reitti,
+            m3: data.m3,
+            km: data.km,
+            tunnit: data.tunnit,
+            kpl: data.kpl,
+            lisatiedot: data.lisatiedot
+        };
     }
+
+    // Filter out undefined values so we only build the query with fields that were actually passed
+    const updates: { [key: string]: any } = {};
+    for (const [key, value] of Object.entries(fieldsToUpdate)) {
+        if (value !== undefined) {
+            // Convert camelCase key from DTO to snake_case for the database query
+            const snakeCaseKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+            updates[snakeCaseKey] = value;
+        }
+    }
+
+    // If no valid fields were passed to update, return the existing data without hitting the DB
+    if (Object.keys(updates).length === 0) {
+        console.log(`--- No valid fields to update for load ${id}, returning existing data ---`);
+        return camelcaseKeys(existingLoad);
+    }
+    
+    // Dynamically build the SET clause for the SQL query
+    const setClauses = Object.keys(updates).map((key, index) => `${key} = $${index + 1}`).join(', ');
+    const params = [...Object.values(updates), id];
     
     const updateQuery = `UPDATE public.kuorma SET ${setClauses} WHERE kuorma_id = $${params.length} RETURNING *;`;
 
+    console.log('--- Executing UPDATE query for load ---');
+    console.log('Query:', updateQuery);
+    console.log('Params:', params);
+
     try {
         const result = await pool.query(updateQuery, params);
-        console.log(`--- Load ID: ${id} Updated Successfully by ${user.userId} ---`);
+        console.log(`--- Load ID: ${id} Updated Successfully ---`);
         return camelcaseKeys(result.rows[0]);
     } catch (error) {
         console.error(`!!! DATABASE ERROR while updating load ID ${id}:`, error);
@@ -267,32 +314,44 @@ export const updateLoadStatus = async (id: number, status: string, driverId: num
 export const getMyLoadsForList = async (driverId: number): Promise<ILoadListItem[]> => {
     let queryText = `
         SELECT
-            k.kuorma_id, TO_CHAR(k.pvm, 'YYYY-MM-DD') AS pvm, a.asiakkaan_nimi,
+            k.kuorma_id,
+            TO_CHAR(k.pvm, 'YYYY-MM-DD') AS pvm,
+            a.asiakkaan_nimi,
             COALESCE(p.nimi, k.lahto, 'N/A') AS lahto,
             COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
-            kal.rek_nro, kul.nimi AS kuljettajan_nimi,
-            CASE WHEN k.tyyppi = 0 THEN 'Puulaani' WHEN k.tyyppi = 1 THEN 'Pole Transport' ELSE 'Unknown' END AS tyyppi,
-            k.is_active, k.status
+            kal.rek_nro,
+            kul.nimi AS kuljettajan_nimi,
+            CASE
+                WHEN k.tyyppi = 0 THEN 'Puulaani'
+                WHEN k.tyyppi = 1 THEN 'Pole Transport'
+                ELSE 'Unknown'
+            END AS tyyppi,
+            k.is_active,
+            k.status
         FROM
             public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
         LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
         LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
-        -- --- THIS IS THE FIX ---
         LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
         LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
         LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
-        -- The WHERE clause now filters for ACTIVE loads assigned to THIS specific driver
-        WHERE k.is_active = TRUE AND k.kulj_id = $1
-        ORDER BY k.pvm ASC, k.kuorma_id ASC;
+        -- --- THIS IS THE FIX ---
+        -- Filter for loads that are ACTIVE, assigned to THIS driver, AND are NOT COMPLETED.
+        WHERE 
+            k.is_active = TRUE 
+            AND k.kulj_id = $1
+            AND k.status != 'Completed'
+        ORDER BY 
+            k.pvm ASC, k.kuorma_id ASC; -- Order by date ascending for drivers
     `;
     
     try {
         const result = await pool.query(queryText, [driverId]);
         return camelcaseKeys(result.rows);
     } catch (error) {
-        console.error(`Error fetching loads for driver ID ${driverId}:`, error);
-        throw new Error("Database query for fetching driver's loads failed.");
+        console.error(`Error fetching active loads for driver ID ${driverId}:`, error);
+        throw new Error("Database query for fetching driver's active loads failed.");
     }
 };
 
@@ -305,7 +364,7 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
     try {
         await client.query('BEGIN'); // Start a database transaction
 
-        // 1. Fetch the load and ensure it belongs to the driver and is in a completable state
+        // Step 1: Fetch the load and ensure it's valid for completion
         const loadResult = await client.query('SELECT * FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [loadId]);
         if (loadResult.rowCount === 0) {
             throw new Error('Load not found.');
@@ -318,7 +377,7 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
             throw new Error(`Load cannot be completed from its current status: ${load.status}`);
         }
 
-        // 2. Update the kuorma table with actuals and set status to 'Completed'
+        // Step 2: Update the kuorma table with actuals and set status to 'Completed'
         const updateLoadQuery = `
             UPDATE public.kuorma 
             SET 
@@ -331,28 +390,39 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
         `;
         const updatedLoadResult = await client.query(updateLoadQuery, [data.actualM3, data.actualKm, loadId]);
 
-        // 3. Update the puutavaralaji table (the timber task)
+        // Step 3: Update the puutavaralaji table (the timber task)
         if (load.puutavara_id) {
             const updateTaskQuery = `
                 UPDATE public.puutavaralaji
                 SET 
-                    haettu = haettu + $1, -- Add the actual volume to the retrieved amount
-                    jaljella = jaljella - $1 -- Subtract the actual volume from the remaining amount
+                    haettu = haettu + $1,
+                    jaljella = jaljella - $1
                 WHERE puutavara_id = $2;
             `;
             await client.query(updateTaskQuery, [data.actualM3, load.puutavara_id]);
         }
         
-        await client.query('COMMIT'); // Commit the transaction
-        console.log(`--- Load ${loadId} completed successfully and timber task updated ---`);
+        // --- THIS IS THE FIX: Step 4: Update the parent puulaani's remaining volume ---
+        if (load.puulaani_id) {
+            const updatePuulaaniQuery = `
+                UPDATE public.puulaani
+                SET
+                    jaljella = jaljella - $1
+                WHERE puulaani_id = $2;
+            `;
+            await client.query(updatePuulaaniQuery, [data.actualM3, load.puulaani_id]);
+        }
+        
+        await client.query('COMMIT'); // Commit all changes if successful
+        console.log(`--- Load ${loadId} completed and ALL related tables updated ---`);
         return camelcaseKeys(updatedLoadResult.rows[0]);
 
     } catch (error) {
-        await client.query('ROLLBACK'); // Roll back the transaction on error
+        await client.query('ROLLBACK'); // Roll back all changes on any error
         console.error(`Error completing load ${loadId}:`, error);
-        throw error; // Re-throw the error to be handled by the controller
+        throw error;
     } finally {
-        client.release(); // Release the client back to the pool
+        client.release();
     }
 };
 
@@ -428,5 +498,136 @@ export const acceptLoadsForInvoicing = async (loadIds: number[]): Promise<{ coun
     } catch (error) {
         console.error("Error accepting loads for invoicing:", error);
         throw new Error("Database query for accepting loads failed.");
+    }
+};
+
+// --- THIS IS THE NEW FUNCTION FOR FETCHING COMPLETED TRIPS ---
+export const getMyCompletedLoadsForList = async (driverId: number): Promise<ILoadListItem[]> => {
+    let queryText = `
+        SELECT
+            k.kuorma_id,
+            TO_CHAR(k.pvm, 'YYYY-MM-DD') AS pvm,
+            a.asiakkaan_nimi,
+            COALESCE(p.nimi, k.lahto, 'N/A') AS lahto,
+            COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
+            kal.rek_nro,
+            kul.nimi AS kuljettajan_nimi,
+            CASE
+                WHEN k.tyyppi = 0 THEN 'Puulaani'
+                WHEN k.tyyppi = 1 THEN 'Pole Transport'
+                ELSE 'Unknown'
+            END AS tyyppi,
+            k.is_active,
+            k.status
+        FROM
+            public.kuorma k
+        LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+        LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
+        LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+        LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+        LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
+        LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
+        WHERE 
+            k.is_active = TRUE 
+            AND k.kulj_id = $1
+            AND k.status = 'Completed' -- The only difference is this line
+        ORDER BY 
+            k.pvm DESC, k.kuorma_id DESC; -- Show most recent completed trips first
+    `;
+    
+    try {
+        const result = await pool.query(queryText, [driverId]);
+        return camelcaseKeys(result.rows);
+    } catch (error) {
+        console.error(`Error fetching completed loads for driver ID ${driverId}:`, error);
+        throw new Error("Database query for fetching driver's completed loads failed.");
+    }
+};
+
+export const getMyLastCompletedLoad = async (driverId: number): Promise<ILoadListItem | null> => {
+    let queryText = `
+        SELECT
+            k.kuorma_id,
+            TO_CHAR(k.pvm, 'YYYY-MM-DD') AS pvm,
+            a.asiakkaan_nimi,
+            COALESCE(p.nimi, k.lahto, 'N/A') AS lahto,
+            COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
+            kal.rek_nro,
+            kul.nimi AS kuljettajan_nimi,
+            k.status
+        FROM
+            public.kuorma k
+        LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+        LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
+        LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+        LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+        LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
+        LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
+        WHERE 
+            k.kulj_id = $1
+            AND k.status = 'Completed'
+        ORDER BY 
+            k.completion_timestamp DESC, k.pvm DESC
+        LIMIT 1;
+    `;
+    
+    try {
+        const result = await pool.query(queryText, [driverId]);
+        return result.rows.length > 0 ? camelcaseKeys(result.rows[0]) : null;
+    } catch (error) {
+        console.error(`Error fetching last completed load for driver ID ${driverId}:`, error);
+        throw error;
+    }
+};
+
+export const getActiveTripsForMap = async (): Promise<IMapTrip[]> => {
+    const query = `
+        SELECT
+            k.kuorma_id AS trip_id,
+            kul.nimi AS driver_name,
+            kal.rek_nro AS vehicle_reg_no,
+            COALESCE(p.nimi, k.lahto) AS origin_name,
+            COALESCE(pp.purkupaikka, k.kohde) AS destination_name,
+            k.status,
+            p.sijainti_lat AS origin_lat,
+            p.sijainti_long AS origin_lng,
+            pp.sijainti_lat AS destination_lat,
+            pp.sijainti_long AS destination_lng
+        FROM
+            public.kuorma k
+        LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
+        LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
+        LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
+        
+        -- --- THIS IS THE FIX ---
+        -- The column name in the 'kuorma' table is 'kulj_id', not 'kul_id'.
+        LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+        
+        LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+        WHERE
+            k.is_active = TRUE
+            AND k.status != 'Completed'
+            AND p.sijainti_lat IS NOT NULL 
+            AND p.sijainti_long IS NOT NULL
+            AND pp.sijainti_lat IS NOT NULL
+            AND pp.sijainti_long IS NOT NULL;
+    `;
+    
+    try {
+        const result = await pool.query(query);
+        const trips = result.rows.map(row => ({
+            tripId: row.trip_id,
+            driverName: row.driver_name,
+            vehicleRegNo: row.vehicle_reg_no,
+            originName: row.origin_name,
+            destinationName: row.destination_name,
+            status: row.status,
+            originCoords: { lat: parseFloat(row.origin_lat), lng: parseFloat(row.origin_lng) },
+            destinationCoords: { lat: parseFloat(row.destination_lat), lng: parseFloat(row.destination_lng) }
+        }));
+        return trips;
+    } catch (error) {
+        console.error("Error executing getActiveTripsForMap query:", error);
+        throw new Error("Database query for fetching active trips failed.");
     }
 };
