@@ -28,23 +28,26 @@ export const getLoadByIdHandler = async (req: AuthenticatedRequest, res: Respons
             return res.status(400).json({ message: "Invalid Load ID format." });
         }
 
-        const load = await loadService.getLoadById(id);
-        if (!load) {
-            return res.status(404).json({ message: `Resource not found at /api/loads/${id}` });
+        // We now call the new service function that fetches the entire trip
+        const trip = await loadService.getTripByLoadId(id);
+
+        if (!trip) {
+            return res.status(404).json({ message: `Trip details could not be found for load ID ${id}` });
         }
 
-        // --- SECURITY CHECK ---
+        // --- SECURITY CHECK is now done in the CONTROLLER ---
         const user = req.user!;
         const isDriver = user.roles.includes('Kuljettaja');
 
-        // If the user is a driver, we must verify they own this load.
-        if (isDriver && load.kuljId !== user.driverNumericId) {
-            console.warn(`SECURITY ALERT: Driver ${user.driverNumericId} tried to access load ${id} owned by driver ${load.kuljId}.`);
-            return res.status(403).json({ message: "Forbidden: You are not authorized to view this specific load." });
+        // If the user is a driver, we must verify they are the driver assigned to this trip.
+        // We check against the first leg's driver ID.
+        if (isDriver && trip.legs[0].kuljId !== user.driverNumericId) {
+            console.warn(`SECURITY ALERT: Driver ${user.driverNumericId} tried to access a trip owned by another driver.`);
+            return res.status(403).json({ message: "Forbidden: You are not authorized to view this trip." });
         }
         
         // If the user is not a driver, or if they are the correct driver, allow access.
-        res.status(200).json(load);
+        res.status(200).json(trip);
 
     } catch (error) {
         next(error);
@@ -229,6 +232,32 @@ export const getActiveTripsForMapHandler = async (req: AuthenticatedRequest, res
         const trips = await loadService.getActiveTripsForMap();
         res.status(200).json(trips);
     } catch (error) {
+        next(error);
+    }
+};
+
+export const updateTripHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const user = req.user!;
+        const { initialLoadId } = req.params;
+        const tripData = req.body; // This will contain the list of new legs and other trip info
+
+        if (!user.driverNumericId) {
+            return res.status(403).json({ message: "Forbidden: User is not a valid driver." });
+        }
+        
+        const updatedTrip = await loadService.updateTripByLoadId(
+            parseInt(initialLoadId, 10), 
+            tripData, 
+            user.driverNumericId
+        );
+        
+        res.status(200).json(updatedTrip);
+
+    } catch (error: any) {
+        if (error.message.includes('not found') || error.message.includes('not in Assigned state') || error.message.includes('not authorized')) {
+            return res.status(400).json({ message: error.message });
+        }
         next(error);
     }
 };

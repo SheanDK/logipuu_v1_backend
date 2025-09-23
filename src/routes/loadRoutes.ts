@@ -101,6 +101,13 @@ router.put('/:id',
     loadController.updateLoadHandler
 );
 
+// It uses the initial load ID as a parameter to find the trip
+router.put('/trip/:initialLoadId',
+    protect,
+    authorize(driverRoles), // Only drivers can edit their trips
+    loadController.updateTripHandler
+);
+
 // Update a load's status
 router.patch('/:id/status', 
     protect, 

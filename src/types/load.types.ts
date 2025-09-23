@@ -105,3 +105,41 @@ export interface IMapTrip {
     originCoords: { lat: number, lng: number };
     destinationCoords: { lat: number, lng: number };
 } 
+
+export interface ITripDetails {
+    tripId: string;
+    asiakasId: number;
+    asiakkaanNimi: string;
+    rekNro: string;
+    kuljettajanNimi: string;
+    legs: {
+        kuormaId: number;
+        pvm: Date;
+        status: string;
+        m3: number;
+        // --- THIS IS THE FIX ---
+        // Add the missing property to the leg's type definition
+        kuljId: number | null; 
+        
+        originName: string;
+        destinationName: string;
+        originLat: number | null;
+        originLng: number | null;
+        destinationLat: number | null;
+        destinationLng: number | null;
+        taskTimberTypeName: string;
+    }[];
+}
+
+// A simple type for other trips on the map
+export interface IOtherTripOnMap {
+    kuormaId: number;
+    originName: string;
+    originCoords: { lat: number, lng: number };
+}
+
+// The new data structure for the Trip Details Page
+export interface ITripDetailsPageData {
+    mainTrip: ITripDetails;
+    otherActiveTrips: IOtherTripOnMap[];
+}

@@ -1,7 +1,7 @@
 // backend/src/services/loadService.ts
 import pool from '../config/db';
 import camelcaseKeys from 'camelcase-keys';
-import { ILoad, ILoadDetails, ILoadListItem, IMapTrip } from '../types/load.types';
+import { ILoad, ILoadDetails, ILoadListItem, IMapTrip, ITripDetails } from '../types/load.types';
 import { CreateLoadDto, UpdateLoadDto, CompleteLoadDto } from '../dto/load.dto';
 import { UserPayload } from '../middlewares/authMiddleware';
 
@@ -9,30 +9,16 @@ export interface ILoadListFilters {
     asiakasId?: string;
     kalustoNro?: string;
     kuljId?: string;
-    // --- NEW: Add status to the filters interface ---
     status?: 'active' | 'pending_inspection' | 'all';
 }
 
 export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILoadListItem[]> => {
     let queryText = `
         SELECT
-            k.kuorma_id,
-            TO_CHAR(k.pvm, 'DD.MM.YYYY') AS pvm,
-            k.ajomaarays_nro,
-            k.vastaanotto_nro,
-            kal.rek_nro,
-            kul.nimi AS kuljettajan_nimi,
-            p.nimi AS puulaani_nimi,
-            a.asiakkaan_nimi,
-            pt.puutavara AS timber_type,
-            k.reitti,
-            k.m3,
-            k.km,
-            k.tunnit,
-            k.kpl,
-            k.lisatiedot,
-            k.status,
-            k.is_active
+            k.kuorma_id, TO_CHAR(k.pvm, 'DD.MM.YYYY') AS pvm, k.ajomaarays_nro,
+            k.vastaanotto_nro, kal.rek_nro, kul.nimi AS kuljettajan_nimi,
+            p.nimi AS puulaani_nimi, a.asiakkaan_nimi, pt.puutavara AS timber_type,
+            k.reitti, k.m3, k.km, k.tunnit, k.kpl, k.lisatiedot, k.status, k.is_active
         FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
         LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
@@ -41,44 +27,24 @@ export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILo
         LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
         LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
     `;
-
     const conditions: string[] = [];
     const queryParams: (string | number)[] = [];
     let paramIndex = 1;
 
-    // --- THIS IS THE FIX FOR FILTERING LOGIC ---
-     if (filters.status === 'active') {
+    if (filters.status === 'active') {
         conditions.push(`k.status != 'Completed'`);
         conditions.push(`k.is_active = TRUE`);
-    } 
-    // Change 'inspection' to 'pending_inspection' to match the interface
-    else if (filters.status === 'pending_inspection') { 
+    } else if (filters.status === 'pending_inspection') { 
         conditions.push(`k.status = 'Completed'`);
         conditions.push(`k.laskutukseen = 0`);
         conditions.push(`k.is_active = TRUE`);
     } else {
-        // "All" just filters by is_active = TRUE
         conditions.push(`k.is_active = TRUE`);
     }
-
-    // Add other filters
-    if (filters.asiakasId) {
-        conditions.push(`k.asiakas_id = $${paramIndex++}`);
-        queryParams.push(parseInt(filters.asiakasId, 10));
-    }
-    if (filters.kalustoNro) {
-        conditions.push(`k.kalusto_nro = $${paramIndex++}`);
-        queryParams.push(parseInt(filters.kalustoNro, 10));
-    }
-    if (filters.kuljId) {
-        conditions.push(`k.kulj_id = $${paramIndex++}`); 
-        queryParams.push(parseInt(filters.kuljId, 10));
-    }
-
-    if (conditions.length > 0) {
-        queryText += ` WHERE ${conditions.join(' AND ')}`;
-    }
-
+    if (filters.asiakasId) { conditions.push(`k.asiakas_id = $${paramIndex++}`); queryParams.push(parseInt(filters.asiakasId, 10)); }
+    if (filters.kalustoNro) { conditions.push(`k.kalusto_nro = $${paramIndex++}`); queryParams.push(parseInt(filters.kalustoNro, 10)); }
+    if (filters.kuljId) { conditions.push(`k.kulj_id = $${paramIndex++}`); queryParams.push(parseInt(filters.kuljId, 10)); }
+    if (conditions.length > 0) { queryText += ` WHERE ${conditions.join(' AND ')}`; }
     queryText += ` ORDER BY k.pvm DESC, k.kuorma_id DESC;`;
     
     try {
@@ -91,45 +57,15 @@ export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILo
 };
 
 export const getLoadById = async (id: number): Promise<ILoadDetails | null> => {
+    // This function is now mainly for the OFFICE side to edit a single kuorma record
     const query = `
-        SELECT
-            k.kuorma_id,
-            k.pvm,
-            k.ajomaarays_nro,
-            k.status,
-            k.lisatiedot,
-            k.m3, -- Select the raw m3 value
-            k.km,
-            k.tunnit,
-            k.kpl,
-            k.vastaanotto_nro,
-            k.reitti,
-            k.kulj_id,
-            k.asiakas_id,
-            k.puulaani_id,
-            k.puutavara_id,
-            k.kalusto_nro,
-            k.tyyppi,
-
-            a.asiakkaan_nimi,
-            kal.rek_nro,
-            kul.nimi AS kuljettajan_nimi,
-
-            p.nimi AS origin_name,
-            p.nimi AS origin_address, 
-            p.sijainti_lat AS origin_lat,
-            p.sijainti_long AS origin_lng,
-            p.lisatiedot AS origin_instructions,
-
-            pt.puutavara AS task_timber_type_name,
-            pl.jaljella AS task_remaining_volume_before_this_trip,
-
-            pp.purkupaikka AS destination_name,
-            pp.purkupaikka AS destination_address,
-            pp.sijainti_lat AS destination_lat,
-            pp.sijainti_long AS destination_lng
-        FROM
-            public.kuorma k
+        SELECT k.*, a.asiakkaan_nimi, kal.rek_nro, kul.nimi AS kuljettajan_nimi,
+            p.nimi AS origin_name, p.nimi AS origin_address, p.sijainti_lat AS origin_lat,
+            p.sijainti_long AS origin_lng, p.lisatiedot AS origin_instructions,
+            pt.puutavara AS task_timber_type_name, pl.jaljella AS task_remaining_volume_before_this_trip,
+            pp.purkupaikka AS destination_name, pp.purkupaikka AS destination_address,
+            pp.sijainti_lat AS destination_lat, pp.sijainti_long AS destination_lng
+        FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
         LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
         LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
@@ -139,28 +75,62 @@ export const getLoadById = async (id: number): Promise<ILoadDetails | null> => {
         LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
         WHERE k.kuorma_id = $1;
     `;
-    
     try {
         const result = await pool.query(query, [id]);
-        if (result.rowCount === 0) {
-            return null;
-        }
-        
-        // --- THIS IS THE FIX ---
-        // Manually create the object to match ILoadDetails perfectly,
-        // especially to map 'm3' from the query to 'taskVolume' in the type.
+        if (result.rowCount === 0) return null;
         const row = camelcaseKeys(result.rows[0]);
-        const detailedLoad: ILoadDetails = {
-            ...row,
-            taskVolume: row.m3, // Map the 'm3' column to the 'taskVolume' property
-        };
-
-        return detailedLoad;
-
+        return { ...row, taskVolume: row.m3 };
     } catch (error) {
         console.error(`Error fetching detailed load with ID ${id}:`, error);
         throw new Error(`Database query for fetching detailed load with ID ${id} failed.`);
     }
+};
+
+export const getTripByLoadId = async (id: number): Promise<ITripDetails | null> => {
+    const initialLoadQuery = 'SELECT ajomaarays_nro, asiakas_id, kulj_id, kalusto_nro FROM public.kuorma WHERE kuorma_id = $1';
+    const initialLoadResult = await pool.query(initialLoadQuery, [id]);
+    
+    if (initialLoadResult.rowCount === 0) {
+        console.error(`[getTripById] Initial load with ID ${id} not found.`);
+        return null;
+    }
+
+    const { ajomaarays_nro, asiakas_id, kulj_id, kalusto_nro } = initialLoadResult.rows[0];
+    const drivingOrderNumber = ajomaarays_nro;
+
+    const tripLegsQuery = `
+        SELECT
+            k.kuorma_id, k.pvm, k.status, k.m3, k.kulj_id,
+            p.nimi AS origin_name, pp.purkupaikka AS destination_name,
+            p.sijainti_lat AS origin_lat, p.sijainti_long AS origin_lng,
+            pp.sijainti_lat AS destination_lat, pp.sijainti_long AS destination_lng,
+            pt.puutavara AS task_timber_type_name,
+            a.asiakkaan_nimi, kal.rek_nro, kul.nimi AS kuljettajan_nimi
+        FROM public.kuorma k
+        LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+        LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+        LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+        LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
+        LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
+        LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
+        LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
+        WHERE (k.ajomaarays_nro = $1 AND k.kulj_id = $2 AND k.kalusto_nro = $3) OR (k.kuorma_id = $4 AND ($1 IS NULL OR $1 = ''))
+        ORDER BY k.kuorma_id ASC;
+    `;
+    const tripLegsResult = await pool.query(tripLegsQuery, [drivingOrderNumber, kulj_id, kalusto_nro, id]);
+    
+    if (tripLegsResult.rowCount === 0) return null;
+
+    const firstLeg = tripLegsResult.rows[0];
+    const tripDetails: ITripDetails = {
+        tripId: drivingOrderNumber || `Trip #${id}`,
+        asiakasId: firstLeg.asiakas_id,
+        asiakkaanNimi: firstLeg.asiakkaan_nimi,
+        rekNro: firstLeg.rek_nro,
+        kuljettajanNimi: firstLeg.kuljettajan_nimi,
+        legs: camelcaseKeys(tripLegsResult.rows)
+    };
+    return tripDetails;
 };
 
 export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
@@ -327,7 +297,14 @@ export const getMyLoadsForList = async (driverId: number): Promise<ILoadListItem
                 ELSE 'Unknown'
             END AS tyyppi,
             k.is_active,
-            k.status
+            k.status,
+
+            -- --- THIS IS THE FIX ---
+            -- We must select the latitude and longitude from the joined puulaani table.
+            -- Without these, the frontend map cannot create markers.
+            p.sijainti_lat AS origin_lat,
+            p.sijainti_long AS origin_lng
+
         FROM
             public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
@@ -336,8 +313,6 @@ export const getMyLoadsForList = async (driverId: number): Promise<ILoadListItem
         LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
         LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
         LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
-        -- --- THIS IS THE FIX ---
-        -- Filter for loads that are ACTIVE, assigned to THIS driver, AND are NOT COMPLETED.
         WHERE 
             k.is_active = TRUE 
             AND k.kulj_id = $1
@@ -348,6 +323,7 @@ export const getMyLoadsForList = async (driverId: number): Promise<ILoadListItem
     
     try {
         const result = await pool.query(queryText, [driverId]);
+        // The camelcaseKeys function will automatically convert origin_lat to originLat
         return camelcaseKeys(result.rows);
     } catch (error) {
         console.error(`Error fetching active loads for driver ID ${driverId}:`, error);
@@ -629,5 +605,61 @@ export const getActiveTripsForMap = async (): Promise<IMapTrip[]> => {
     } catch (error) {
         console.error("Error executing getActiveTripsForMap query:", error);
         throw new Error("Database query for fetching active trips failed.");
+    }
+};
+
+// THIS IS THE NEW SERVICE FUNCTION WITH TRANSACTION LOGIC
+export const updateTripByLoadId = async (initialLoadId: number, tripData: any, driverId: number): Promise<any> => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN'); // Start a database transaction
+
+        // Step 1: Find the driving order number from the initial load ID
+        const initialLoadResult = await client.query('SELECT ajomaarays_nro, kulj_id, status FROM public.kuorma WHERE kuorma_id = $1', [initialLoadId]);
+        if (initialLoadResult.rowCount === 0) {
+            throw new Error('Trip not found.');
+        }
+
+        const { ajomaarays_nro, kulj_id, status } = initialLoadResult.rows[0];
+        
+        // Step 2: Security Checks
+        if (kulj_id !== driverId) {
+            throw new Error('You are not authorized to edit this trip.');
+        }
+        if (status !== 'Assigned') {
+            throw new Error(`This trip is already in progress and cannot be edited. Status is: ${status}`);
+        }
+
+        // Step 3: Delete all old legs for this trip using the driving order number
+        await client.query('DELETE FROM public.kuorma WHERE ajomaarays_nro = $1 AND kulj_id = $2', [ajomaarays_nro, driverId]);
+        
+        // Step 4: Insert all the new legs from the request body
+        const newLegs = tripData.legs;
+        const insertPromises = newLegs.map((leg: any) => {
+            const insertQuery = `
+                INSERT INTO public.kuorma (tyyppi, asiakas_id, puulaani_id, puutavara_id, kulj_id, pvm, ajomaarays_nro, kohde, lahto, m3, km, lisatiedot, kalusto_nro, status, is_active) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Assigned', TRUE)
+            `;
+            const params = [
+                leg.type, tripData.asiakasId, leg.puulaaniId ?? null, leg.puutavaraId ?? null, driverId,
+                tripData.pvm, ajomaarays_nro, leg.kohde ?? leg.purkupaikkaName, leg.lahto ?? leg.puulaaniName,
+                leg.m3 ?? 0, leg.km ?? 0, tripData.lisatiedot ?? null, tripData.kalustoNro
+            ];
+            return client.query(insertQuery, params);
+        });
+
+        await Promise.all(insertPromises);
+
+        await client.query('COMMIT'); // Commit all changes
+        
+        console.log(`--- Trip ${ajomaarays_nro} updated successfully by driver ${driverId} ---`);
+        return { message: `Trip ${ajomaarays_nro} updated successfully.` };
+
+    } catch (error) {
+        await client.query('ROLLBACK'); // If any step fails, undo everything
+        console.error(`Error updating trip with initial load ID ${initialLoadId}:`, error);
+        throw error;
+    } finally {
+        client.release();
     }
 };
