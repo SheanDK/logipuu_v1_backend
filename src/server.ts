@@ -26,11 +26,13 @@ import locationRoutes from './routes/locationRoutes'; // locations
 import otherMarkerRoutes from './routes/otherMarkerRoutes'; 
 import puutavaralajiRoutes from './routes/timberLogRoutes';
 import loadRoutes from './routes/loadRoutes';
+import invoicingRoutes from './routes/invoicingRoutes'
+import consignmentRoutes from './routes/consignmentRoutes';
+import driverViewRoutes from './routes/driverViewRoutes';
+import woodCategoryRoutes from './routes/woodCategoryRoutes';
 
 
 import { globalErrorHandler } from './middlewares/errorHandler';
-import woodCategoryRoutes from './routes/woodCategoryRoutes';
-import driverViewRoutes from './routes/driverViewRoutes';
 
 dotenv.config();
 
@@ -77,6 +79,8 @@ apiRouter.use('/other-markers', otherMarkerRoutes);
 apiRouter.use('/timber-logs', puutavaralajiRoutes); 
 apiRouter.use('/loads', loadRoutes);
 apiRouter.use('/wood-categories', woodCategoryRoutes);
+apiRouter.use('/invoicing', invoicingRoutes);
+apiRouter.use('/consignments', consignmentRoutes);
 
 // --- THIS IS THE NEWLY ADDED ROUTE ---
 // A dedicated route group for driver-specific views and data
