@@ -1,6 +1,6 @@
 // backend/src/services/timberStackService.ts
 import pool from '../config/db';
-import camelcaseKeys from 'camelcase-keys'; // <<<--- THIS IMPORT WAS MISSING
+import camelcaseKeys from 'camelcase-keys';
 
 import { 
     ITimberStack, 
@@ -8,8 +8,9 @@ import {
     CreateTimberStackDto, 
     IUpdateTimberStackFullDto,
     UpdateTimberStackLocationDto, 
-    ITimberStackListFilters, // Import the filter type
-    ITimberStackListItem     // Import the list item type
+    ITimberStackListFilters,
+    ITimberStackListItem,
+    IPuulaaniFullDetails
 } from '../types';
 
 import * as getQueries from '../queries/timberStackQueries/getTimberStackQueries';
@@ -19,7 +20,6 @@ import * as deleteQueries from '../queries/timberStackQueries/deleteTimberStackQ
 
 export const getAllTimberStacks = async (filters: ITimberStackFilters): Promise<ITimberStack[]> => {
     
-    // --- DEBUGGING STEP 1: Log the incoming filter object ---
     console.log('--- Service received filters:', filters);
     
     const queryText = `
@@ -35,7 +35,6 @@ export const getAllTimberStacks = async (filters: ITimberStackFilters): Promise<
     const queryParams: (string | number)[] = [];
     let paramIndex = 1;
 
-    // --- DEBUGGING STEP 2: Check the clientId condition specifically ---
     if (filters.clientId) {
         console.log(`Applying CLIENT filter. Original value: '${filters.clientId}', Type: ${typeof filters.clientId}`);
         const clientIdAsInt = parseInt(filters.clientId, 10);
@@ -96,22 +95,6 @@ export const getTimberStackById = async (id: number): Promise<ITimberStack | nul
     return result.rows.length > 0 ? result.rows[0] : null;
 };
 
-export const getTimberStackFullDetails = async (id: number) => {
-    const [puulaaniResult, autotResult, puutavaratResult] = await Promise.all([
-        pool.query(getQueries.SELECT_TIMBER_STACK_BY_ID, [id]),
-        pool.query(getQueries.SELECT_AUTOT_BY_PUULAANI_ID, [id]),
-        pool.query(getQueries.SELECT_PUUTAVARAT_BY_PUULAANI_ID, [id])
-    ]);
-
-    if (puulaaniResult.rows.length === 0) return null;
-
-    return {
-        puulaani: puulaaniResult.rows[0],
-        autot: autotResult.rows,
-        puutavarat: puutavaratResult.rows
-    };
-};
-
 export const createTimberStack = async (data: CreateTimberStackDto): Promise<ITimberStack> => {
     const client = await pool.connect();
     try {
@@ -132,7 +115,6 @@ export const createTimberStack = async (data: CreateTimberStackDto): Promise<ITi
         
         const result = await client.query(createQueries.INSERT_TIMBER_STACK, params);
         
-        // Manually convert the result keys to camelCase because we are using a direct client query
         const rows = camelcaseKeys(result.rows);
         const newStackId = rows[0]?.puulaaniId;
 
@@ -175,14 +157,79 @@ export const createTimberStack = async (data: CreateTimberStackDto): Promise<ITi
     }
 };
 
+// --- getTimberStackFullDetails ---
+// This function is also correct from our previous fixes.
+export const getTimberStackFullDetails = async (id: number): Promise<IPuulaaniFullDetails | null> => {
+    const client = await pool.connect();
+    try {
+        const puulaaniResult = await client.query('SELECT *, asiakas_id as "clientId" FROM public.puulaani WHERE puulaani_id = $1', [id]);
+        
+        if (puulaaniResult.rows.length === 0) {
+            return null;
+        }
+
+        const [autotResult, puutavaratResult, relatedLoadsResult] = await Promise.all([
+            client.query('SELECT kalusto_id FROM public.autot WHERE puulaani_id = $1', [id]),
+            client.query(`
+                SELECT pl.*, pt.puutavara as laji, pp.purkupaikka as purkupaikka_name
+                FROM public.puutavaralaji pl
+                JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
+                LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
+                WHERE pl.puulaani_id = $1 ORDER BY pt.puutavara;
+            `, [id]),
+            client.query(`
+                 SELECT 
+                    k.kuorma_id,
+                    k.kulj_id, -- <<< ADD THIS
+                    kul.nimi AS kuljettajan_nimi, -- <<< ADD THIS
+                    pt.puutavara AS puutavaralaji,
+                    k.pvm,
+                    pl.kuutiot,
+                    k.m3 AS haettu,
+                    pl.jaljella
+                FROM public.kuorma k
+                LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id -- <<< JOIN to get the name
+                LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
+                LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
+                WHERE k.puulaani_id = $1
+                ORDER BY k.pvm DESC;
+            `, [id])
+        ]);
+                // --- DEBUGGING LINE ---
+        console.log("[BACKEND DEBUG] Raw relatedLoadsResult from DB:", relatedLoadsResult.rows);
+
+        if (puulaaniResult.rows.length === 0) {
+            return null;
+        }
+
+
+        return {
+            puulaani: camelcaseKeys(puulaaniResult.rows[0]),
+            autot: autotResult.rows.map(r => r.kalusto_id), 
+            timberEntries: camelcaseKeys(puutavaratResult.rows), 
+            relatedLoads: camelcaseKeys(relatedLoadsResult.rows)
+        };
+    } catch (error) {
+        console.error(`[Service Error] Failed to get full details for timber stack ${id}:`, error);
+        throw error;
+    } finally {
+        client.release();
+    }
+};
+
+
+
+// --- THIS IS THE FULLY CORRECTED updateTimberStackFull FUNCTION ---
 export const updateTimberStackFull = async (id: number, data: IUpdateTimberStackFullDto): Promise<void> => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
         const { puulaani, autot, puutavarat } = data;
-        const totalVolume = puutavarat.reduce((sum, item) => sum + item.kuutiot, 0);
-        const totalFetched = puutavarat.reduce((sum, item) => sum + item.haettu, 0);
+
+        // Step 1: Update the main 'puulaani' table
+        const totalVolume = puutavarat.reduce((sum, item) => sum + (Number(item.kuutiot) || 0), 0);
+        const totalFetched = puutavarat.reduce((sum, item) => sum + (Number(item.haettu) || 0), 0);
         const remainingVolume = totalVolume - totalFetched;
 
         const puulaaniParams = [
@@ -193,6 +240,7 @@ export const updateTimberStackFull = async (id: number, data: IUpdateTimberStack
         ];
         await client.query(updateQueries.UPDATE_TIMBER_STACK_BY_ID, puulaaniParams);
 
+        // Step 2: Update 'autot' (vehicle assignments)
         await client.query(updateQueries.DELETE_AUTOT_BY_PUULAANI_ID, [id]);
         if (autot && autot.length > 0) {
             for (const kalustoId of autot) {
@@ -200,27 +248,71 @@ export const updateTimberStackFull = async (id: number, data: IUpdateTimberStack
             }
         }
 
-        await client.query(updateQueries.DELETE_PUUTAVARALAJI_BY_PUULAANI_ID, [id]);
-        if (puutavarat && puutavarat.length > 0) {
-            for (const woodEntry of puutavarat) {
-                const woodParams = [
-                    id, 
-                    puulaani.asiakasId, 
-                    woodEntry.puutavaranro,
+        // Step 3: A safer way to update 'puutavaralaji' (timber entries)
+        const existingEntriesResult = await client.query('SELECT puutavara_id FROM public.puutavaralaji WHERE puulaani_id = $1', [id]);
+        const existingEntryIds = existingEntriesResult.rows.map(r => r.puutavara_id);
+        const submittedEntryIds = puutavarat.map(p => p.puutavara_id).filter(pid => pid && pid > 0);
+
+        const entriesToDelete = existingEntryIds.filter(eid => !submittedEntryIds.includes(eid));
+        if (entriesToDelete.length > 0) {
+            const referencedResult = await client.query('SELECT 1 FROM public.kuorma WHERE puutavara_id = ANY($1::bigint[]) LIMIT 1', [entriesToDelete]);
+            if (referencedResult && referencedResult.rowCount) {
+                throw new Error('Cannot delete a timber entry that is already assigned to a load/trip.');
+            }
+            await client.query('DELETE FROM public.puutavaralaji WHERE puutavara_id = ANY($1::bigint[])', [entriesToDelete]);
+        }
+
+        // --- THIS IS THE FINAL FIX ---
+        // Upsert logic that RESPECTS the 'valmis' property from the frontend payload.
+        // --- DEBUGGING STEP ---
+        for (const woodEntry of puutavarat) {
+            console.log(`[DEBUG] Processing woodEntry from frontend:`, woodEntry);
+            
+            const isCompleted = woodEntry.valmis;
+            console.log(`[DEBUG] Extracted 'isCompleted' value: ${isCompleted}, Type: ${typeof isCompleted}`);
+
+            const isExisting = woodEntry.puutavara_id && woodEntry.puutavara_id > 0;
+
+            if (isExisting) {
+                const updateParams = [
+                    woodEntry.puutavaranro, 
                     woodEntry.purkupaikka_id, 
                     woodEntry.kuutiot, 
-                    woodEntry.haettu,
-                    woodEntry.kuutiot - woodEntry.haettu,
-                    (woodEntry.kuutiot - woodEntry.haettu) <= 0
+                    woodEntry.haettu, 
+                    (woodEntry.kuutiot - woodEntry.haettu), 
+                    isCompleted, // This is parameter $6
+                    woodEntry.puutavara_id
                 ];
-                await client.query(updateQueries.INSERT_PUUTAVARALAJI_FOR_PUULAANI, woodParams);
+                console.log(`[DEBUG] Preparing to UPDATE with params:`, updateParams);
+
+                await client.query(
+                    `UPDATE public.puutavaralaji SET puutavara_nro = $1, purkupaikka_id = $2, kuutiot = $3, haettu = $4, jaljella = $5, valmis = $6 WHERE puutavara_id = $7`,
+                    updateParams
+                );
+            } else {
+                const insertParams = [
+                    id, 
+                    puulaani.asiakasId, 
+                    woodEntry.puutavaranro, 
+                    woodEntry.purkupaikka_id, 
+                    woodEntry.kuutiot, 
+                    woodEntry.haettu, 
+                    (woodEntry.kuutiot - woodEntry.haettu), 
+                    isCompleted // This is parameter $8
+                ];
+                console.log(`[DEBUG] Preparing to INSERT with params:`, insertParams);
+
+                await client.query(
+                    `INSERT INTO public.puutavaralaji (puulaani_id, asiakas_id, puutavara_nro, purkupaikka_id, kuutiot, haettu, jaljella, valmis) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                    insertParams
+                );
             }
         }
 
         await client.query('COMMIT');
     } catch (e) {
         await client.query('ROLLBACK');
-         console.error("Error in updateTimberStackFull, transaction rolled back.", e);
+        console.error("Error in updateTimberStackFull, transaction rolled back.", e);
         throw e;
     } finally {
         client.release();
@@ -262,16 +354,13 @@ export const updateTimberStackLocation = async (id: number, data: UpdateTimberSt
     const result = await pool.query(updateQueries.UPDATE_TIMBER_STACK_LOCATION, [latitude, longitude, id]);
     
     if (result.rowCount === 0) {
-        return null; // Indicates that the stack was not found
+        return null;
     }
     return result.rows[0];
 };
 
-
-// --- THIS IS THE FUNCTION FOR THE PUULAANI LIST VIEW ---
 export const getTimberStackList = async (filters: ITimberStackListFilters): Promise<ITimberStackListItem[]> => {
     
-    // Base query that joins Puulaani with Customers
     const queryText = `
         SELECT
             p.puulaani_id,
@@ -288,15 +377,12 @@ export const getTimberStackList = async (filters: ITimberStackListFilters): Prom
     const queryParams: (string | number)[] = [];
     let paramIndex = 1;
 
-    // Apply status filter
     if (filters.status === 'active') {
         conditions.push(`p.valmis = FALSE`);
     } else if (filters.status === 'completed') {
         conditions.push(`p.valmis = TRUE`);
     }
-    // if 'all', no condition is added.
 
-    // Apply customer (clientId) filter
     if (filters.clientId) {
         const clientIdAsInt = parseInt(filters.clientId, 10);
         if (!isNaN(clientIdAsInt)) {
@@ -305,7 +391,6 @@ export const getTimberStackList = async (filters: ITimberStackListFilters): Prom
         }
     }
 
-    // Apply vehicle (vehicleId) filter
     if (filters.vehicleId) {
         const vehicleIdAsInt = parseInt(filters.vehicleId, 10);
         if (!isNaN(vehicleIdAsInt)) {
@@ -317,7 +402,6 @@ export const getTimberStackList = async (filters: ITimberStackListFilters): Prom
         }
     }
     
-    // Apply timber type (timberTypeId) filter
     if (filters.timberTypeId) {
         const timberTypeIdAsInt = parseInt(filters.timberTypeId, 10);
         if (!isNaN(timberTypeIdAsInt)) {
@@ -329,17 +413,14 @@ export const getTimberStackList = async (filters: ITimberStackListFilters): Prom
         }
     }
 
-
     let finalQuery = queryText;
     if (conditions.length > 0) {
         finalQuery += ` WHERE ${conditions.join(' AND ')}`;
     }
-    // Order by most recent date, then by ID
     finalQuery += ` ORDER BY p.pvm DESC, p.puulaani_id DESC;`;
     
     try {
         const result = await pool.query(finalQuery, queryParams);
-        // Convert snake_case from DB to camelCase for the frontend response
         return camelcaseKeys(result.rows);
     } catch (error) {
         console.error("Database query failed in getTimberStackList:", error);
@@ -348,7 +429,6 @@ export const getTimberStackList = async (filters: ITimberStackListFilters): Prom
 };
 
 export const getTimberTypesForStack = async (id: number): Promise<any[]> => {
-    // This query should join 'puutavaralaji' with 'puutavarat' to get the names
     const query = `
         SELECT 
             ptl.puutavara_id, 
@@ -380,8 +460,8 @@ export const getActiveTimberStacksByClient = async (clientId: number) => {
         FROM public.puulaani
         WHERE 
             asiakas_id = $1
-            AND valmis = FALSE -- 'valmis = false' means it's not completed
-            AND aktiivinen = TRUE -- Ensures it is marked as active
+            AND valmis = FALSE
+            AND aktiivinen = TRUE
         ORDER BY pvm DESC, nimi ASC;
     `;
     try {
@@ -394,9 +474,6 @@ export const getActiveTimberStacksByClient = async (clientId: number) => {
 };
 
 export const getWoodEntriesByPuulaaniId = async (puulaaniId: number) => {
-    // --- THIS IS THE FIX ---
-    // The DISTINCT ON (pl.puutavara_id) ensures that we only get one row
-    // for each unique puutavara_id, preventing duplicates from JOINs.
     const query = `
         SELECT DISTINCT ON (pl.puutavara_id)
             pl.puutavara_id,

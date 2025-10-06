@@ -33,7 +33,7 @@ export const SELECT_ALL_LOADS_FOR_LIST = `
     LEFT JOIN 
         public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
     LEFT JOIN
-        public.kuljettajat kul ON k.kul_id = kul.kul_id
+        public.kuljettajat kul ON k.kulj_id = kul.kulj_id
     -- --- ADD THESE TWO CRITICAL JOINS ---
     LEFT JOIN
         public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id

@@ -28,28 +28,32 @@ export const getLoadByIdHandler = async (req: AuthenticatedRequest, res: Respons
             return res.status(400).json({ message: "Invalid Load ID format." });
         }
 
-        // We now call the new service function that fetches the entire trip
+        // --- DEBUGGING CONSOLE LOG ---
+        console.log(`[Controller] getLoadByIdHandler called for ID: ${id}. Now calling getTripByLoadId...`);
+
+        // We are explicitly calling the service function to get the full trip structure
         const trip = await loadService.getTripByLoadId(id);
 
         if (!trip) {
             return res.status(404).json({ message: `Trip details could not be found for load ID ${id}` });
         }
 
-        // --- SECURITY CHECK is now done in the CONTROLLER ---
+        // Security check for driver role
         const user = req.user!;
         const isDriver = user.roles.includes('Kuljettaja');
-
-        // If the user is a driver, we must verify they are the driver assigned to this trip.
-        // We check against the first leg's driver ID.
         if (isDriver && trip.legs[0].kuljId !== user.driverNumericId) {
             console.warn(`SECURITY ALERT: Driver ${user.driverNumericId} tried to access a trip owned by another driver.`);
             return res.status(403).json({ message: "Forbidden: You are not authorized to view this trip." });
         }
         
-        // If the user is not a driver, or if they are the correct driver, allow access.
+        // --- DEBUGGING CONSOLE LOG ---
+        console.log(`[Controller] Successfully fetched trip data. Sending response to client...`);
+        
         res.status(200).json(trip);
 
     } catch (error) {
+        // --- DEBUGGING CONSOLE LOG ---
+        console.error(`[Controller] ERROR in getLoadByIdHandler:`, error);
         next(error);
     }
 };
@@ -72,14 +76,24 @@ export const updateLoadHandler = async (req: AuthenticatedRequest, res: Response
         }
 
         const dto = req.body as UpdateLoadDto;
-        const user = req.user!;
+        
+        // --- THIS IS THE FIX ---
+        // We must pass the 'req.user' object to the service function
+        // so it can perform the security check.
+        const user = req.user!; // The '!' asserts that user is not null/undefined
         
         const updatedLoad = await loadService.updateLoad(id, dto, user);
         
+        // The 'if (!updatedLoad)' check is handled inside the service now,
+        // so we don't need it here.
+        
         res.status(200).json(updatedLoad);
+
     } catch (error: any) {
+        // Handle specific errors thrown by the service layer
         if (error.message.includes('not found') || error.message.includes('not authorized')) {
-            return res.status(404).json({ message: error.message });
+            // Return a 403 Forbidden or 404 Not Found status
+            return res.status(403).json({ message: error.message });
         }
         next(error);
     }

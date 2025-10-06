@@ -32,9 +32,10 @@ export interface ITimberStackFilters {
 }
 
 export interface IPuulaaniFullDetails {
-    puulaani: ITimberStack;
-    autot: any[]; // Define a proper type if needed
-    puutavarat: any[]; // Define a proper type if needed
+    puulaani: any;      // We keep this flexible for now
+    autot: number[];    // This MUST be an array of numbers
+    timberEntries: any[]; // THIS IS THE FIX: Ensure this property exists
+    relatedLoads: any[];  // This property should also exist
 }
 
 // --- CORRECTION: Define the shape for the puulaani object within the DTO ---
@@ -59,6 +60,7 @@ export interface IUpdateTimberStackFullDto {
         purkupaikka_id: number;
         kuutiot: number;
         haettu: number;
+        valmis: boolean;
     }[];
 }
 

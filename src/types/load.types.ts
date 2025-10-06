@@ -107,20 +107,22 @@ export interface IMapTrip {
 } 
 
 export interface ITripDetails {
-    tripId: string;
+    tripId: string | null;
+    ajomaaraysNro: string | null; // Add the missing property
     asiakasId: number;
     asiakkaanNimi: string;
     rekNro: string;
+    kalustoNro: number | null;
     kuljettajanNimi: string;
     legs: {
         kuormaId: number;
         pvm: Date;
         status: string;
         m3: number;
-        // --- THIS IS THE FIX ---
-        // Add the missing property to the leg's type definition
         kuljId: number | null; 
-        
+        puulaaniId: number | null; // Ensure these are also present
+        puutavaraId: number | null; // Ensure these are also present
+        lisatiedot: string | null; // Ensure these are also present
         originName: string;
         destinationName: string;
         originLat: number | null;
@@ -143,3 +145,22 @@ export interface ITripDetailsPageData {
     mainTrip: ITripDetails;
     otherActiveTrips: IOtherTripOnMap[];
 }
+
+export interface ITripLeg {
+    kuormaId: number;
+    pvm: Date;
+    status: string;
+    m3: number;
+    kuljId: number | null;
+    puulaaniId: number | null;
+    puutavaraId: number | null;
+    lisatiedot: string | null;
+    originName: string;
+    destinationName: string;
+    originLat: number | null;
+    originLng: number | null;
+    destinationLat: number | null;
+    destinationLng: number | null;
+    taskTimberTypeName: string;
+}
+

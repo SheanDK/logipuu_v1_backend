@@ -1,4 +1,5 @@
 // backend/src/server.ts
+
 import 'reflect-metadata'; 
 import express, { Application, Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
@@ -19,15 +20,13 @@ import userRoutes from './routes/userRoutes';
 import rolePermissionRoutes from './routes/rolePermissionRoutes'; 
 import adminUserRoutes from './routes/adminUserRoutes';
 import unloadingSiteRoutes from './routes/unloadingSiteRoutes';
-// REMOVED: import otherInfoRoutes from './routes/otherInfoRoutes';
 import waybillRoutes from './routes/waybillRoutes';
 import puutavaraRoutes from './routes/puutavaraRoutes'; // wood-types
 import locationRoutes from './routes/locationRoutes'; // locations
-// Ensure this import statement exists and the path is correct.
 import otherMarkerRoutes from './routes/otherMarkerRoutes'; 
 import puutavaralajiRoutes from './routes/timberLogRoutes';
 import loadRoutes from './routes/loadRoutes';
-
+import driverViewRoutes from './routes/driverViewRoutes'; // <-- Import the new driver view routes
 
 import { globalErrorHandler } from './middlewares/errorHandler';
 
@@ -39,6 +38,7 @@ const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
 const httpServer = http.createServer(app);
 
+// Initialize Socket.IO service
 socketService.initialize(httpServer, frontendUrl);
 
 // Middlewares
@@ -46,13 +46,17 @@ app.use(cors({ origin: frontendUrl }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Simple request logger middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
     next();
 });
 
 // --- API Routes ---
+// A main router for the /api path for better organization
 const apiRouter = express.Router();
+
+// Register all the individual route handlers
 apiRouter.use('/auth', authRoutes);       
 apiRouter.use('/users', userRoutes);      
 apiRouter.use('/clients', clientRoutes);
@@ -71,21 +75,29 @@ apiRouter.use('/other-markers', otherMarkerRoutes);
 apiRouter.use('/timber-logs', puutavaralajiRoutes); 
 apiRouter.use('/loads', loadRoutes);
 
+// --- THIS IS THE NEWLY ADDED ROUTE ---
+// A dedicated route group for driver-specific views and data
+apiRouter.use('/driver', driverViewRoutes);
 
+// Mount the main API router under the /api path
 app.use('/api', apiRouter);
 
+// Root path handler
 app.get('/', (req: Request, res: Response) => {
     res.send('WoodMaster LogiApp Backend is running!');
 });
 
+// 404 Handler for requests that don't match any route
 app.use((req: Request, res: Response, next: NextFunction) => {
     res.status(404).json({ message: `Resource not found at ${req.originalUrl}` });
 });
 
+// Global error handler (must be the last middleware)
 app.use(globalErrorHandler);
 
 const startServer = async () => {
     try {
+        // Test the database connection before starting the server
         await db.query('SELECT NOW()');
         console.log("✅ Successfully connected to the database.");
 

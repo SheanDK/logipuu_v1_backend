@@ -152,12 +152,17 @@ export const getTimberTypesForStackHandler = async (req: AuthenticatedRequest, r
 
 export const getActiveTimberStacksByClientHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const clientId = parseInt(req.params.clientId, 10);
-        if (isNaN(clientId)) {
+        const clientIdString = req.params.clientId;
+        const clientId = parseInt(clientIdString, 10);
+
+        if (isNaN(clientId) || clientId <= 0) {
+            console.error(`[Controller Error] Invalid Client ID received: '${clientIdString}'`);
             return res.status(400).json({ message: "Invalid Client ID format." });
         }
+
         const stacks = await timberStackService.getActiveTimberStacksByClient(clientId);
         res.status(200).json(stacks);
+
     } catch (error) {
         next(error);
     }

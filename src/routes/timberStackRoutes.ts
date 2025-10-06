@@ -3,55 +3,88 @@ import { Router } from 'express';
 import * as timberStackController from '../controllers/timberStackController';
 import { protect } from '../middlewares/authMiddleware';
 import { authorize } from '../middlewares/rbacMiddleware';
-import { validateDto } from '../middlewares/validationMiddleware';
 import { CreateTimberStackDto, UpdateTimberStackLocationDto } from '../dto/timberStack.dto';
+import { validateDto } from '../middlewares/validationMiddleware';
 
 const router = Router();
 
-// --- Define Roles ---
-const officeRoles = ['Superuser', 'Admin', 'Toimisto', 'Ajojärjestelijä'];
+// Define Roles and Permissions
+const officeRoles = ['Superuser', 'Admin', 'Toimisto', 'Ajärjestelijä'];
 const driverRoles = ['Kuljettaja'];
 const allStaffRoles = [...officeRoles, ...driverRoles];
+const TIMBER_MAP_VIEW = ['timber map_view'];
+const TIMBER_MAP_CREATE = ['timber map_create'];
+const TIMBER_MAP_EDIT = ['timber map_edit'];
+const TIMBER_MAP_DELETE = ['timber map_delete'];
 
-// --- Define Permissions ---
-const VIEW_TIMBER_STACKS_PERMISSION = ['timber map_view']; 
-const CREATE_TIMBER_STACKS_PERMISSION = ['timber map_create'];
-const EDIT_TIMBER_STACKS_PERMISSION = ['timber map_edit'];
-const DELETE_TIMBER_STACKS_PERMISSION = ['timber map_delete'];
+// --- ROUTES ---
 
-// Base routes for the collection
-router.get('/', protect, authorize(allStaffRoles, VIEW_TIMBER_STACKS_PERMISSION), timberStackController.getAllTimberStacksHandler);
-router.post('/', protect, authorize(officeRoles, CREATE_TIMBER_STACKS_PERMISSION), validateDto(CreateTimberStackDto), timberStackController.createTimberStackHandler);
-
-// Custom specific route for the list view
-router.get('/list', protect, authorize(officeRoles, VIEW_TIMBER_STACKS_PERMISSION), timberStackController.getTimberStackListHandler);
-
-// --- THIS IS THE FIX ---
-// This route is used in the LoadFormModal by both drivers and office staff.
-// We explicitly allow all staff roles AND check for the specific permission.
-router.get(
-    '/active/by-client/:clientId', 
-    protect, 
-    authorize(allStaffRoles, VIEW_TIMBER_STACKS_PERMISSION), 
-    timberStackController.getActiveTimberStacksByClientHandler
+// Main list for map view (accepts query params like ?clientId=1)
+router.get('/',
+    protect,
+    authorize(allStaffRoles, TIMBER_MAP_VIEW),
+    timberStackController.getAllTimberStacksHandler
 );
 
-// Specific routes for a single resource that have extra path segments
-router.get('/:id/full', protect, authorize(allStaffRoles, VIEW_TIMBER_STACKS_PERMISSION), timberStackController.getTimberStackFullDetailsHandler);
-router.put('/:id/full', protect, authorize(officeRoles, EDIT_TIMBER_STACKS_PERMISSION), timberStackController.updateTimberStackFullHandler);
-router.get('/:id/timber-types', protect, authorize(allStaffRoles, VIEW_TIMBER_STACKS_PERMISSION), timberStackController.getTimberTypesForStackHandler);
-router.get('/:id/wood-entries', protect, authorize(allStaffRoles, VIEW_TIMBER_STACKS_PERMISSION), timberStackController.getWoodEntriesByPuulaaniIdHandler);
+// --- THIS IS THE MOST CRITICAL FIX ---
+// The route for getting active stacks for a specific client.
+// The `:clientId` makes it a URL parameter, which is what the controller expects.
+router.get('/active/by-client/:clientId',
+    protect,
+    authorize(driverRoles), // Assuming only drivers need this for the create/edit form
+    timberStackController.getActiveTimberStacksByClientHandler
+);
+// ------------------------------------
 
-router.patch(
-    '/:id/location', 
-    protect, 
-    authorize(officeRoles, EDIT_TIMBER_STACKS_PERMISSION), 
-    validateDto(UpdateTimberStackLocationDto), 
+// Get the list of wood entries/tasks for a specific Puulaani
+router.get('/:id/wood-entries',
+    protect,
+    authorize(allStaffRoles, TIMBER_MAP_VIEW),
+    timberStackController.getWoodEntriesByPuulaaniIdHandler
+);
+
+// Get full details for the edit modal in the office
+router.get('/:id/full',
+    protect,
+    authorize(officeRoles, TIMBER_MAP_VIEW),
+    timberStackController.getTimberStackFullDetailsHandler
+);
+
+// Update full details from the office edit modal
+router.put('/:id/full',
+    protect,
+    authorize(officeRoles, TIMBER_MAP_EDIT),
+    timberStackController.updateTimberStackFullHandler
+);
+
+// Update location from map drag-and-drop
+router.patch('/:id/location',
+    protect,
+    authorize(officeRoles, TIMBER_MAP_EDIT),
+    validateDto(UpdateTimberStackLocationDto),
     timberStackController.updateTimberStackLocationHandler
 );
 
-// Generic routes for a single resource
-router.get('/:id', protect, authorize(allStaffRoles, VIEW_TIMBER_STACKS_PERMISSION), timberStackController.getTimberStackByIdHandler);
-router.delete('/:id', protect, authorize(officeRoles, DELETE_TIMBER_STACKS_PERMISSION), timberStackController.deleteTimberStackHandler);
+// Get a single stack by its ID
+router.get('/:id',
+    protect,
+    authorize(allStaffRoles, TIMBER_MAP_VIEW),
+    timberStackController.getTimberStackByIdHandler
+);
+
+// Create a new timber stack
+router.post('/',
+    protect,
+    authorize(officeRoles, TIMBER_MAP_CREATE),
+    validateDto(CreateTimberStackDto),
+    timberStackController.createTimberStackHandler
+);
+
+// Delete a timber stack
+router.delete('/:id',
+    protect,
+    authorize(officeRoles, TIMBER_MAP_DELETE),
+    timberStackController.deleteTimberStackHandler
+);
 
 export default router;

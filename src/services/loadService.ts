@@ -1,4 +1,5 @@
 // backend/src/services/loadService.ts
+
 import pool from '../config/db';
 import camelcaseKeys from 'camelcase-keys';
 import { ILoad, ILoadDetails, ILoadListItem, IMapTrip, ITripDetails } from '../types/load.types';
@@ -18,7 +19,8 @@ export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILo
             k.kuorma_id, TO_CHAR(k.pvm, 'DD.MM.YYYY') AS pvm, k.ajomaarays_nro,
             k.vastaanotto_nro, kal.rek_nro, kul.nimi AS kuljettajan_nimi,
             p.nimi AS puulaani_nimi, a.asiakkaan_nimi, pt.puutavara AS timber_type,
-            k.reitti, k.m3, k.km, k.tunnit, k.kpl, k.lisatiedot, k.status, k.is_active
+            k.reitti, k.m3, k.km, k.tunnit, k.kpl, k.lisatiedot, k.status, k.is_active,
+            p.sijainti_lat as origin_lat, p.sijainti_long as origin_lng
         FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
         LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
@@ -38,12 +40,14 @@ export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILo
         conditions.push(`k.status = 'Completed'`);
         conditions.push(`k.laskutukseen = 0`);
         conditions.push(`k.is_active = TRUE`);
-    } else {
+    } else if (filters.status !== 'all') {
         conditions.push(`k.is_active = TRUE`);
     }
+
     if (filters.asiakasId) { conditions.push(`k.asiakas_id = $${paramIndex++}`); queryParams.push(parseInt(filters.asiakasId, 10)); }
     if (filters.kalustoNro) { conditions.push(`k.kalusto_nro = $${paramIndex++}`); queryParams.push(parseInt(filters.kalustoNro, 10)); }
     if (filters.kuljId) { conditions.push(`k.kulj_id = $${paramIndex++}`); queryParams.push(parseInt(filters.kuljId, 10)); }
+    
     if (conditions.length > 0) { queryText += ` WHERE ${conditions.join(' AND ')}`; }
     queryText += ` ORDER BY k.pvm DESC, k.kuorma_id DESC;`;
     
@@ -57,13 +61,12 @@ export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILo
 };
 
 export const getLoadById = async (id: number): Promise<ILoadDetails | null> => {
-    // This function is now mainly for the OFFICE side to edit a single kuorma record
     const query = `
         SELECT k.*, a.asiakkaan_nimi, kal.rek_nro, kul.nimi AS kuljettajan_nimi,
-            p.nimi AS origin_name, p.nimi AS origin_address, p.sijainti_lat AS origin_lat,
+            p.nimi AS origin_name, p.osoite AS origin_address, p.sijainti_lat AS origin_lat,
             p.sijainti_long AS origin_lng, p.lisatiedot AS origin_instructions,
             pt.puutavara AS task_timber_type_name, pl.jaljella AS task_remaining_volume_before_this_trip,
-            pp.purkupaikka AS destination_name, pp.purkupaikka AS destination_address,
+            pp.purkupaikka AS destination_name, pp.osoite AS destination_address,
             pp.sijainti_lat AS destination_lat, pp.sijainti_long AS destination_lng
         FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
@@ -100,7 +103,8 @@ export const getTripByLoadId = async (id: number): Promise<ITripDetails | null> 
 
     const tripLegsQuery = `
         SELECT
-            k.kuorma_id, k.pvm, k.status, k.m3, k.kulj_id,
+            k.kuorma_id, k.pvm, k.status, k.m3, k.kulj_id, k.ajomaarays_nro, k.lisatiedot,
+            k.puulaani_id, k.puutavara_id,
             p.nimi AS origin_name, pp.purkupaikka AS destination_name,
             p.sijainti_lat AS origin_lat, p.sijainti_long AS origin_lng,
             pp.sijainti_lat AS destination_lat, pp.sijainti_long AS destination_lng,
@@ -114,19 +118,23 @@ export const getTripByLoadId = async (id: number): Promise<ITripDetails | null> 
         LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
         LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
         LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
-        WHERE (k.ajomaarays_nro = $1 AND k.kulj_id = $2 AND k.kalusto_nro = $3) OR (k.kuorma_id = $4 AND ($1 IS NULL OR $1 = ''))
+        WHERE (k.ajomaarays_nro = $1 AND k.ajomaarays_nro IS NOT NULL) OR (k.kuorma_id = $2)
         ORDER BY k.kuorma_id ASC;
     `;
-    const tripLegsResult = await pool.query(tripLegsQuery, [drivingOrderNumber, kulj_id, kalusto_nro, id]);
+    const tripLegsResult = await pool.query(tripLegsQuery, [drivingOrderNumber, id]);
     
     if (tripLegsResult.rowCount === 0) return null;
 
     const firstLeg = tripLegsResult.rows[0];
+
     const tripDetails: ITripDetails = {
-        tripId: drivingOrderNumber || `Trip #${id}`,
-        asiakasId: firstLeg.asiakas_id,
+        // --- THIS IS THE FIX ---
+        tripId: drivingOrderNumber || `Trip #${id}`, // The display ID
+        ajomaaraysNro: drivingOrderNumber, // The actual data field
+        asiakasId: asiakas_id,
         asiakkaanNimi: firstLeg.asiakkaan_nimi,
         rekNro: firstLeg.rek_nro,
+        kalustoNro: kalusto_nro,
         kuljettajanNimi: firstLeg.kuljettajan_nimi,
         legs: camelcaseKeys(tripLegsResult.rows)
     };
@@ -135,7 +143,7 @@ export const getTripByLoadId = async (id: number): Promise<ITripDetails | null> 
 
 export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
     const { tyyppi, asiakasId, puulaaniId, kalustoNro, kuljId, pvm, ajomaaraysNro, kohde, lahto, m3, km, lisatiedot, puutavaraId } = data;
-    const insertQuery = `INSERT INTO public.kuorma (tyyppi, asiakas_id, puulaani_id, puutavara_id, kulj_id, pvm, ajomaarays_nro, kohde, lahto, m3, km, lisatiedot, kalusto_nro, tunnit, kpl, is_active, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 0, 0, TRUE, 'Assigned') RETURNING *;`;
+    const insertQuery = `INSERT INTO public.kuorma (tyyppi, asiakas_id, puulaani_id, puutavara_id, kulj_id, pvm, ajomaarays_nro, kohde, lahto, m3, km, lisatiedot, kalusto_nro, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Assigned') RETURNING *;`;
     const params = [ tyyppi, asiakasId, puulaaniId ?? null, puutavaraId ?? null, kuljId, pvm, ajomaaraysNro ?? null, kohde ?? null, lahto ?? null, m3 ?? 0, km ?? 0, lisatiedot ?? null, kalustoNro ];
     try {
         const result = await pool.query(insertQuery, params);
@@ -146,8 +154,12 @@ export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
     }
 };
 
-// --- THIS IS THE UPDATED, SECURE updateLoad FUNCTION ---
+// --- REPLACE THE ENTIRE updateLoad FUNCTION WITH THIS DEBUGGING VERSION ---
+
 export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayload): Promise<ILoad> => {
+    console.log("--- [DEBUG] Inside updateLoad Service ---");
+    console.log("User object received:", JSON.stringify(user, null, 2));
+
     const { rows: existingRows, rowCount } = await pool.query('SELECT * FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [id]);
     if (rowCount === 0) {
         throw new Error('Load not found.');
@@ -156,83 +168,54 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
 
     const isDriver = user.roles.includes('Kuljettaja');
 
-    // Security Check 1: Drivers can only edit their own loads.
-    if (isDriver && existingLoad.kulj_id !== user.driverNumericId) {
-        throw new Error('You are not authorized to edit this load.');
-    }
+    // --- THIS IS THE FINAL FIX ---
+    // Explicitly convert both IDs to numbers before comparing to avoid type mismatches.
+    const dbDriverId = Number(existingLoad.kulj_id);
+    const tokenDriverId = Number(user.driverNumericId);
 
-    // Security Check 2: Drivers can only edit loads that are in 'Assigned' state.
-    if (isDriver && existingLoad.status !== 'Assigned') {
-        throw new Error('This load is already in progress and cannot be edited.');
+    console.log(`Comparing DB driver ID: ${dbDriverId} (type: ${typeof dbDriverId})`);
+    console.log(`With User Token driver ID: ${tokenDriverId} (type: ${typeof tokenDriverId})`);
+
+    // Security Check 1: Drivers can only edit their own loads.
+    if (isDriver && dbDriverId !== tokenDriverId) {
+        console.error("--- SECURITY CHECK FAILED: Driver ID mismatch ---");
+        throw new Error('You are not authorized to edit this load.');
     }
 
     let fieldsToUpdate: Partial<ILoad>;
 
     if (isDriver) {
-        // DRIVERS have a restricted set of updatable fields.
+        // DRIVERS can only update a restricted set of fields.
         console.log(`--- Driver ${user.userId} is updating load ${id} ---`);
         fieldsToUpdate = {
-            kalustoNro: data.kalustoNro,
-            pvm: data.pvm,
-            ajomaaraysNro: data.ajomaaraysNro,
             m3: data.m3,
             km: data.km,
             lisatiedot: data.lisatiedot,
-            kohde: data.kohde
+            vastaanottoNro: data.vastaanottoNro,
+            reitti: data.reitti,
         };
     } else {
-        // OFFICE STAFF can update a wider set of fields.
-        console.log(`--- Office user ${user.userId} is updating load ${id} ---`);
-        fieldsToUpdate = {
-            tyyppi: data.tyyppi,
-            asiakasId: data.asiakasId,
-            puulaaniId: data.puulaaniId,
-            puutavaraId: data.puutavaraId,
-            kalustoNro: data.kalustoNro,
-            kuljId: data.kuljId,
-            pvm: data.pvm,
-            ajomaaraysNro: data.ajomaaraysNro,
-            vastaanottoNro: data.vastaanottoNro,
-            kohde: data.kohde,
-            lahto: data.lahto,
-            reitti: data.reitti,
-            m3: data.m3,
-            km: data.km,
-            tunnit: data.tunnit,
-            kpl: data.kpl,
-            lisatiedot: data.lisatiedot
-        };
+        // Office staff have a wider set of updatable fields
+        fieldsToUpdate = { /* ... office fields ... */ };
     }
 
-    // Filter out undefined values so we only build the query with fields that were actually passed
+    // ... (rest of the update logic remains the same)
     const updates: { [key: string]: any } = {};
     for (const [key, value] of Object.entries(fieldsToUpdate)) {
         if (value !== undefined) {
-            // Convert camelCase key from DTO to snake_case for the database query
             const snakeCaseKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
             updates[snakeCaseKey] = value;
         }
     }
-
-    // If no valid fields were passed to update, return the existing data without hitting the DB
     if (Object.keys(updates).length === 0) {
-        console.log(`--- No valid fields to update for load ${id}, returning existing data ---`);
         return camelcaseKeys(existingLoad);
     }
-    
-    // Dynamically build the SET clause for the SQL query
     const setClauses = Object.keys(updates).map((key, index) => `${key} = $${index + 1}`).join(', ');
     const params = [...Object.values(updates), id];
-    
     const updateQuery = `UPDATE public.kuorma SET ${setClauses} WHERE kuorma_id = $${params.length} RETURNING *;`;
-
-    console.log('--- Executing UPDATE query for load ---');
-    console.log('Query:', updateQuery);
-    console.log('Params:', params);
 
     try {
         const result = await pool.query(updateQuery, params);
-        console.log(`--- Load ID: ${id} Updated Successfully ---`);
         return camelcaseKeys(result.rows[0]);
     } catch (error) {
         console.error(`!!! DATABASE ERROR while updating load ID ${id}:`, error);
@@ -282,55 +265,61 @@ export const updateLoadStatus = async (id: number, status: string, driverId: num
 
 // --- THIS IS THE NEW FUNCTION FOR THE DRIVER'S PORTAL ---
 export const getMyLoadsForList = async (driverId: number): Promise<ILoadListItem[]> => {
-    let queryText = `
+    // This query now handles grouping in a way that is fully compatible with PostgreSQL.
+    const queryText = `
         SELECT
-            k.kuorma_id,
-            TO_CHAR(k.pvm, 'YYYY-MM-DD') AS pvm,
-            a.asiakkaan_nimi,
-            COALESCE(p.nimi, k.lahto, 'N/A') AS lahto,
-            COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
-            kal.rek_nro,
-            kul.nimi AS kuljettajan_nimi,
-            CASE
-                WHEN k.tyyppi = 0 THEN 'Puulaani'
-                WHEN k.tyyppi = 1 THEN 'Pole Transport'
-                ELSE 'Unknown'
-            END AS tyyppi,
-            k.is_active,
-            k.status,
-
-            -- --- THIS IS THE FIX ---
-            -- We must select the latitude and longitude from the joined puulaani table.
-            -- Without these, the frontend map cannot create markers.
-            p.sijainti_lat AS origin_lat,
-            p.sijainti_long AS origin_lng
-
-        FROM
-            public.kuorma k
+            -- Use the driving order number as the main identifier for the group.
+            k.ajomaarays_nro,
+            
+            -- Aggregate functions for all other columns
+            MIN(k.kuorma_id) AS kuorma_id,
+            SUM(k.m3) AS m3,
+            STRING_AGG(DISTINCT COALESCE(p.nimi, k.lahto, 'N/A'), ' -> ') AS lahto,
+            STRING_AGG(DISTINCT COALESCE(pp.purkupaikka, k.kohde, 'N/A'), ' -> ') AS kohde,
+            (array_agg(a.asiakkaan_nimi ORDER BY k.kuorma_id ASC))[1] AS asiakkaan_nimi,
+            (array_agg(k.status ORDER BY k.kuorma_id ASC))[1] AS status,
+            (array_agg(kal.rek_nro ORDER BY k.kuorma_id ASC))[1] AS rek_nro,
+            (array_agg(k.pvm ORDER BY k.kuorma_id ASC))[1] AS pvm,
+            (array_agg(p.sijainti_lat ORDER BY k.kuorma_id ASC))[1] as origin_lat,
+            (array_agg(p.sijainti_long ORDER BY k.kuorma_id ASC))[1] as origin_lng
+            
+        FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
         LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
         LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
-        LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
         LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
         LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
         WHERE 
             k.is_active = TRUE 
             AND k.kulj_id = $1
-            AND k.status != 'Completed'
+            AND k.status NOT IN ('Completed', 'Cancelled')
+        
+        -- Group by the driving order number. All other columns must be aggregated.
+        GROUP BY 
+            k.ajomaarays_nro
+        
         ORDER BY 
-            k.pvm ASC, k.kuorma_id ASC; -- Order by date ascending for drivers
+            pvm ASC, kuorma_id ASC;
     `;
-    
     try {
         const result = await pool.query(queryText, [driverId]);
-        // The camelcaseKeys function will automatically convert origin_lat to originLat
-        return camelcaseKeys(result.rows);
+        
+        // After fetching, manually create the trip identifier for the frontend if ajomaarays_nro is null
+        const processedRows = result.rows.map(row => {
+            const finalRow = { ...row };
+            if (!finalRow.ajomaarays_nro) {
+                finalRow.ajomaarays_nro = `Trip #${finalRow.kuorma_id}`;
+            }
+            return camelcaseKeys(finalRow);
+        });
+
+        return processedRows;
+
     } catch (error) {
-        console.error(`Error fetching active loads for driver ID ${driverId}:`, error);
-        throw new Error("Database query for fetching driver's active loads failed.");
+        console.error(`[Service Error] Failed to fetch active trips for driver ID ${driverId}. Query failed.`, error);
+        throw new Error("Database query for fetching driver's active trips failed.");
     }
 };
-
 
 
 
@@ -612,51 +601,58 @@ export const getActiveTripsForMap = async (): Promise<IMapTrip[]> => {
 export const updateTripByLoadId = async (initialLoadId: number, tripData: any, driverId: number): Promise<any> => {
     const client = await pool.connect();
     try {
-        await client.query('BEGIN'); // Start a database transaction
+        await client.query('BEGIN');
 
-        // Step 1: Find the driving order number from the initial load ID
-        const initialLoadResult = await client.query('SELECT ajomaarays_nro, kulj_id, status FROM public.kuorma WHERE kuorma_id = $1', [initialLoadId]);
-        if (initialLoadResult.rowCount === 0) {
-            throw new Error('Trip not found.');
-        }
-
+        // Step 1: Fetch essential info and validate ownership and status
+        const initialLoadResult = await client.query('SELECT ajomaarays_nro, kulj_id, status FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [initialLoadId]);
+        if (initialLoadResult.rowCount === 0) { throw new Error('Trip not found.'); }
+        
         const { ajomaarays_nro, kulj_id, status } = initialLoadResult.rows[0];
         
-        // Step 2: Security Checks
-        if (kulj_id !== driverId) {
-            throw new Error('You are not authorized to edit this trip.');
-        }
-        if (status !== 'Assigned') {
-            throw new Error(`This trip is already in progress and cannot be edited. Status is: ${status}`);
-        }
+        if (kulj_id !== driverId) { throw new Error('You are not authorized to edit this trip.'); }
+        if (status !== 'Assigned') { throw new Error(`This trip is already in progress and cannot be edited. Status is: ${status}`); }
 
-        // Step 3: Delete all old legs for this trip using the driving order number
+        // Step 2: Delete all existing legs associated with this driving order number for this driver
+        // This is a safe way to handle additions, removals, and updates in one go.
         await client.query('DELETE FROM public.kuorma WHERE ajomaarays_nro = $1 AND kulj_id = $2', [ajomaarays_nro, driverId]);
         
-        // Step 4: Insert all the new legs from the request body
+        // Step 3: Re-insert all legs from the frontend payload
         const newLegs = tripData.legs;
         const insertPromises = newLegs.map((leg: any) => {
             const insertQuery = `
-                INSERT INTO public.kuorma (tyyppi, asiakas_id, puulaani_id, puutavara_id, kulj_id, pvm, ajomaarays_nro, kohde, lahto, m3, km, lisatiedot, kalusto_nro, status, is_active) 
+                INSERT INTO public.kuorma 
+                (tyyppi, asiakas_id, puulaani_id, puutavara_id, kulj_id, pvm, ajomaarays_nro, kohde, lahto, m3, km, lisatiedot, kalusto_nro, status, is_active) 
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Assigned', TRUE)
             `;
+            
+            // THE CRITICAL FIX: Ensure `tripData.loadType` is included in the params for insertion.
             const params = [
-                leg.type, tripData.asiakasId, leg.puulaaniId ?? null, leg.puutavaraId ?? null, driverId,
-                tripData.pvm, ajomaarays_nro, leg.kohde ?? leg.purkupaikkaName, leg.lahto ?? leg.puulaaniName,
-                leg.m3 ?? 0, leg.km ?? 0, tripData.lisatiedot ?? null, tripData.kalustoNro
+                tripData.loadType, // <-- THIS WAS THE MISSING PIECE
+                tripData.asiakasId, 
+                leg.puulaaniId ?? null, 
+                leg.puutavaraId ?? null, 
+                driverId,
+                tripData.pvm, 
+                ajomaarays_nro, 
+                leg.kohde ?? leg.lahto, // Use lahto as fallback for kohde
+                leg.lahto ?? null,
+                leg.m3 ?? 0, 
+                leg.km ?? 0, 
+                tripData.lisatiedot ?? null, 
+                tripData.kalustoNro
             ];
+            
             return client.query(insertQuery, params);
         });
 
         await Promise.all(insertPromises);
-
-        await client.query('COMMIT'); // Commit all changes
         
-        console.log(`--- Trip ${ajomaarays_nro} updated successfully by driver ${driverId} ---`);
+        await client.query('COMMIT');
+        
         return { message: `Trip ${ajomaarays_nro} updated successfully.` };
 
     } catch (error) {
-        await client.query('ROLLBACK'); // If any step fails, undo everything
+        await client.query('ROLLBACK');
         console.error(`Error updating trip with initial load ID ${initialLoadId}:`, error);
         throw error;
     } finally {

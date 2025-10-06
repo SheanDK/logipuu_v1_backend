@@ -27,7 +27,7 @@ const allStaffRoles = [...officeRoles, ...driverRoles];
 // ===================================================
 
 // --- DRIVER PORTAL ---
-router.get('/my-loads/completed',
+router.get('/my-loads/completed-trips',
     protect,
     authorize(driverRoles),
     loadController.getMyCompletedLoadsHandler
