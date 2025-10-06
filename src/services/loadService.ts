@@ -154,72 +154,93 @@ export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
     }
 };
 
-// --- REPLACE THE ENTIRE updateLoad FUNCTION WITH THIS DEBUGGING VERSION ---
-
+// --- THIS IS THE UPDATED, SECURE updateLoad FUNCTION ---
 export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayload): Promise<ILoad> => {
-    console.log("--- [DEBUG] Inside updateLoad Service ---");
-    console.log("User object received:", JSON.stringify(user, null, 2));
-
-    const { rows: existingRows, rowCount } = await pool.query('SELECT * FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [id]);
-    if (rowCount === 0) {
-        throw new Error('Load not found.');
-    }
-    const existingLoad = existingRows[0];
-
-    const isDriver = user.roles.includes('Kuljettaja');
-
-    // --- THIS IS THE FINAL FIX ---
-    // Explicitly convert both IDs to numbers before comparing to avoid type mismatches.
-    const dbDriverId = Number(existingLoad.kulj_id);
-    const tokenDriverId = Number(user.driverNumericId);
-
-    console.log(`Comparing DB driver ID: ${dbDriverId} (type: ${typeof dbDriverId})`);
-    console.log(`With User Token driver ID: ${tokenDriverId} (type: ${typeof tokenDriverId})`);
-
-    // Security Check 1: Drivers can only edit their own loads.
-    if (isDriver && dbDriverId !== tokenDriverId) {
-        console.error("--- SECURITY CHECK FAILED: Driver ID mismatch ---");
-        throw new Error('You are not authorized to edit this load.');
-    }
-
-    let fieldsToUpdate: Partial<ILoad>;
-
-    if (isDriver) {
-        // DRIVERS can only update a restricted set of fields.
-        console.log(`--- Driver ${user.userId} is updating load ${id} ---`);
-        fieldsToUpdate = {
-            m3: data.m3,
-            km: data.km,
-            lisatiedot: data.lisatiedot,
-            vastaanottoNro: data.vastaanottoNro,
-            reitti: data.reitti,
-        };
-    } else {
-        // Office staff have a wider set of updatable fields
-        fieldsToUpdate = { /* ... office fields ... */ };
-    }
-
-    // ... (rest of the update logic remains the same)
-    const updates: { [key: string]: any } = {};
-    for (const [key, value] of Object.entries(fieldsToUpdate)) {
-        if (value !== undefined) {
-            const snakeCaseKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-            updates[snakeCaseKey] = value;
-        }
-    }
-    if (Object.keys(updates).length === 0) {
-        return camelcaseKeys(existingLoad);
-    }
-    const setClauses = Object.keys(updates).map((key, index) => `${key} = $${index + 1}`).join(', ');
-    const params = [...Object.values(updates), id];
-    const updateQuery = `UPDATE public.kuorma SET ${setClauses} WHERE kuorma_id = $${params.length} RETURNING *;`;
-
+    const client = await pool.connect();
     try {
-        const result = await pool.query(updateQuery, params);
-        return camelcaseKeys(result.rows[0]);
+        await client.query('BEGIN');
+        
+        const { rows, rowCount } = await client.query('SELECT * FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [id]);
+
+        if (rowCount === 0) {
+            throw new Error(`Load with ID ${id} not found.`);
+        }
+        
+        const existingLoad = rows[0];
+
+        console.log(`[DEBUG] updateLoad: User ID=${user.driverNumericId} vs Load's Driver ID=${existingLoad.kulj_id}`);
+        console.log(`[DEBUG] updateLoad: Load's current status is '${existingLoad.status}'`);
+        
+        const isDriver = user.roles.includes('Kuljettaja');
+
+        if (isDriver && existingLoad.kulj_id !== user.driverNumericId) {
+            throw new Error('You are not authorized to edit this load.');
+        }
+
+        if (isDriver && existingLoad.status !== 'Assigned') {
+            throw new Error('This load is already in progress and cannot be edited.');
+        }
+
+        let fieldsToUpdate: Partial<any>;
+
+        if (isDriver) {
+            fieldsToUpdate = {
+                vastaanotto_nro: data.vastaanottoNro,
+                m3: data.m3,
+                km: data.km,
+                reitti: data.reitti,
+                lisatiedot: data.lisatiedot
+            };
+        } else {
+            // Office users can update a wider set of fields
+            fieldsToUpdate = {
+                tyyppi: data.tyyppi,
+                asiakas_id: data.asiakasId,
+                puulaani_id: data.puulaaniId,
+                puutavara_id: data.puutavaraId,
+                kalusto_nro: data.kalustoNro,
+                kulj_id: data.kuljId,
+                pvm: data.pvm,
+                ajomaarays_nro: data.ajomaaraysNro,
+                vastaanotto_nro: data.vastaanottoNro,
+                kohde: data.kohde,
+                lahto: data.lahto,
+                reitti: data.reitti,
+                m3: data.m3,
+                km: data.km,
+                tunnit: data.tunnit,
+                kpl: data.kpl,
+                lisatiedot: data.lisatiedot
+            };
+        }
+
+        const updates: { [key: string]: any } = {};
+        for (const [key, value] of Object.entries(fieldsToUpdate)) {
+            // Keys should already be in snake_case
+            if (value !== undefined) {
+                updates[key] = value;
+            }
+        }
+
+        if (Object.keys(updates).length === 0) {
+            return camelcaseKeys(existingLoad) as ILoad;
+        }
+        
+        const setClauses = Object.keys(updates).map((key, index) => `${key} = $${index + 1}`).join(', ');
+        const params = [...Object.values(updates), id];
+        const updateQuery = `UPDATE public.kuorma SET ${setClauses} WHERE kuorma_id = $${params.length} RETURNING *;`;
+
+        const result = await client.query(updateQuery, params);
+        
+        await client.query('COMMIT');
+        return camelcaseKeys(result.rows[0]) as ILoad;
+
     } catch (error) {
-        console.error(`!!! DATABASE ERROR while updating load ID ${id}:`, error);
-        throw new Error("Database query for updating the load failed.");
+        await client.query('ROLLBACK');
+        console.error(`Error in updateLoad transaction for ID ${id}:`, error);
+        throw error;
+    } finally {
+        client.release();
     }
 };
 

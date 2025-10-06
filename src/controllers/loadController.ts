@@ -71,6 +71,9 @@ export const createLoadHandler = async (req: AuthenticatedRequest, res: Response
 export const updateLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id, 10);
+        // --- DEBUGGING LINE ---
+        console.log(`[CONTROLLER DEBUG] updateLoadHandler received request to update ID: ${id}`);
+        
         if (isNaN(id)) {
             return res.status(400).json({ message: "Invalid Load ID format." });
         }
