@@ -26,7 +26,7 @@ import locationRoutes from './routes/locationRoutes'; // locations
 import otherMarkerRoutes from './routes/otherMarkerRoutes'; 
 import puutavaralajiRoutes from './routes/timberLogRoutes';
 import loadRoutes from './routes/loadRoutes';
-import driverViewRoutes from './routes/driverViewRoutes'; // <-- Import the new driver view routes
+
 
 import { globalErrorHandler } from './middlewares/errorHandler';
 
@@ -74,6 +74,7 @@ apiRouter.use('/locations', locationRoutes);
 apiRouter.use('/other-markers', otherMarkerRoutes);
 apiRouter.use('/timber-logs', puutavaralajiRoutes); 
 apiRouter.use('/loads', loadRoutes);
+apiRouter.use('/wood-categories', woodCategoryRoutes);
 
 // --- THIS IS THE NEWLY ADDED ROUTE ---
 // A dedicated route group for driver-specific views and data
