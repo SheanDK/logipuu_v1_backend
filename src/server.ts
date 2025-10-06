@@ -29,6 +29,8 @@ import loadRoutes from './routes/loadRoutes';
 
 
 import { globalErrorHandler } from './middlewares/errorHandler';
+import woodCategoryRoutes from './routes/woodCategoryRoutes';
+import driverViewRoutes from './routes/driverViewRoutes';
 
 dotenv.config();
 
