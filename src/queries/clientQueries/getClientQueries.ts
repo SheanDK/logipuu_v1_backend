@@ -12,6 +12,9 @@ export const SELECT_CLIENT_BY_ID = `
 `;
 
 export const CHECK_IF_COLOR_IS_IN_USE = `
-    SELECT asiakkaan_id FROM public.asiakkaat
-    WHERE kohteen_vari = $1 AND asiakkaan_id != $2;
+  SELECT 1
+  FROM public.asiakkaat
+  WHERE kohteen_vari = $1
+    AND ( $2::bigint IS NULL OR asiakkaan_id != $2::bigint )
+  LIMIT 1;
 `;
