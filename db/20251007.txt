@@ -1,0 +1,2459 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 17.5
+-- Dumped by pg_dump version 17.5
+
+-- Started on 2025-09-10 11:13:21
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- TOC entry 4 (class 2615 OID 2200)
+-- Name: public; Type: SCHEMA; Schema: -; Owner: pg_database_owner
+--
+
+CREATE SCHEMA public;
+
+
+ALTER SCHEMA public OWNER TO pg_database_owner;
+
+--
+-- TOC entry 5155 (class 0 OID 0)
+-- Dependencies: 4
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: pg_database_owner
+--
+
+COMMENT ON SCHEMA public IS 'standard public schema';
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- TOC entry 217 (class 1259 OID 19232)
+-- Name: asiakkaat; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.asiakkaat (
+    asiakkaan_id bigint NOT NULL,
+    asiakkaan_nimi character varying(50) DEFAULT ''::character varying NOT NULL,
+    osoite character varying(100) DEFAULT ''::character varying NOT NULL,
+    posti_nro character varying(10) DEFAULT ''::character varying NOT NULL,
+    paikkakunta character varying(20) DEFAULT ''::character varying NOT NULL,
+    puhelin_nro character varying(20) DEFAULT ''::character varying NOT NULL,
+    ytunnus character varying(10) DEFAULT ''::character varying NOT NULL,
+    kohteen_vari character(20) DEFAULT ''::bpchar NOT NULL,
+    tyyppi smallint DEFAULT 0 NOT NULL,
+    aktiivinen boolean DEFAULT true,
+    yhteyshenkilo character varying(50),
+    sahkoposti character varying(100),
+    lisatietoja text
+);
+
+
+ALTER TABLE public.asiakkaat OWNER TO postgres;
+
+--
+-- TOC entry 218 (class 1259 OID 19246)
+-- Name: asiakkaat_AsiakkaanID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."asiakkaat_AsiakkaanID_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."asiakkaat_AsiakkaanID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5156 (class 0 OID 0)
+-- Dependencies: 218
+-- Name: asiakkaat_AsiakkaanID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."asiakkaat_AsiakkaanID_seq" OWNED BY public.asiakkaat.asiakkaan_id;
+
+
+--
+-- TOC entry 219 (class 1259 OID 19247)
+-- Name: autot; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.autot (
+    auto_id bigint NOT NULL,
+    puulaani_id bigint NOT NULL,
+    kalusto_id smallint NOT NULL
+);
+
+
+ALTER TABLE public.autot OWNER TO postgres;
+
+--
+-- TOC entry 5157 (class 0 OID 0)
+-- Dependencies: 219
+-- Name: TABLE autot; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.autot IS 'Autovalinnat';
+
+
+--
+-- TOC entry 220 (class 1259 OID 19250)
+-- Name: autot_AutoID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."autot_AutoID_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."autot_AutoID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5158 (class 0 OID 0)
+-- Dependencies: 220
+-- Name: autot_AutoID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."autot_AutoID_seq" OWNED BY public.autot.auto_id;
+
+
+--
+-- TOC entry 221 (class 1259 OID 19251)
+-- Name: kalusto; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.kalusto (
+    kalusto_nro smallint NOT NULL,
+    rek_nro character varying(15) NOT NULL,
+    ed_katsastus date NOT NULL,
+    katsastus_aik date NOT NULL,
+    aktiivinen boolean DEFAULT true,
+    viim_sijainti_lat numeric(9,6),
+    viim_sijainti_long numeric(9,6),
+    viim_sijainti_aika timestamp with time zone
+);
+
+
+ALTER TABLE public.kalusto OWNER TO postgres;
+
+--
+-- TOC entry 5159 (class 0 OID 0)
+-- Dependencies: 221
+-- Name: TABLE kalusto; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.kalusto IS 'Auton perustiedot';
+
+
+--
+-- TOC entry 5160 (class 0 OID 0)
+-- Dependencies: 221
+-- Name: COLUMN kalusto.kalusto_nro; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kalusto.kalusto_nro IS 'Auton numero';
+
+
+--
+-- TOC entry 5161 (class 0 OID 0)
+-- Dependencies: 221
+-- Name: COLUMN kalusto.rek_nro; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kalusto.rek_nro IS 'Rekisteritunnus';
+
+
+--
+-- TOC entry 5162 (class 0 OID 0)
+-- Dependencies: 221
+-- Name: COLUMN kalusto.viim_sijainti_lat; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kalusto.viim_sijainti_lat IS 'Last known latitude of the vehicle.';
+
+
+--
+-- TOC entry 5163 (class 0 OID 0)
+-- Dependencies: 221
+-- Name: COLUMN kalusto.viim_sijainti_long; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kalusto.viim_sijainti_long IS 'Last known longitude of the vehicle.';
+
+
+--
+-- TOC entry 5164 (class 0 OID 0)
+-- Dependencies: 221
+-- Name: COLUMN kalusto.viim_sijainti_aika; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kalusto.viim_sijainti_aika IS 'Timestamp of the last location update.';
+
+
+--
+-- TOC entry 222 (class 1259 OID 19255)
+-- Name: kalusto_KalustoNro_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."kalusto_KalustoNro_seq"
+    AS smallint
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."kalusto_KalustoNro_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5165 (class 0 OID 0)
+-- Dependencies: 222
+-- Name: kalusto_KalustoNro_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."kalusto_KalustoNro_seq" OWNED BY public.kalusto.kalusto_nro;
+
+
+--
+-- TOC entry 223 (class 1259 OID 19256)
+-- Name: kayttaja_roolit; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.kayttaja_roolit (
+    kayttaja_tunnus character varying(20) NOT NULL,
+    rooli_id integer NOT NULL
+);
+
+
+ALTER TABLE public.kayttaja_roolit OWNER TO postgres;
+
+--
+-- TOC entry 224 (class 1259 OID 19259)
+-- Name: kayttajat; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.kayttajat (
+    tunnus character varying(20) NOT NULL,
+    nimi character varying(50) NOT NULL,
+    taso smallint NOT NULL,
+    salasana character varying(60) DEFAULT ''::character varying NOT NULL,
+    aktiivinen boolean,
+    kulj_id smallint
+);
+
+
+ALTER TABLE public.kayttajat OWNER TO postgres;
+
+--
+-- TOC entry 5166 (class 0 OID 0)
+-- Dependencies: 224
+-- Name: COLUMN kayttajat.aktiivinen; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kayttajat.aktiivinen IS 'Active-Inactive';
+
+
+--
+-- TOC entry 225 (class 1259 OID 19263)
+-- Name: kuljettajat; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.kuljettajat (
+    kulj_id smallint NOT NULL,
+    nimi character varying(50) NOT NULL,
+    puhelin_nro character varying(20) NOT NULL,
+    email character varying(100) NOT NULL,
+    halytys boolean DEFAULT true NOT NULL
+);
+
+
+ALTER TABLE public.kuljettajat OWNER TO postgres;
+
+--
+-- TOC entry 5167 (class 0 OID 0)
+-- Dependencies: 225
+-- Name: COLUMN kuljettajat.kulj_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kuljettajat.kulj_id IS 'Kuljettajanumero';
+
+
+--
+-- TOC entry 5168 (class 0 OID 0)
+-- Dependencies: 225
+-- Name: COLUMN kuljettajat.nimi; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kuljettajat.nimi IS 'Kuljettajan nimi';
+
+
+--
+-- TOC entry 226 (class 1259 OID 19267)
+-- Name: kuljettajat_KuljID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."kuljettajat_KuljID_seq"
+    AS smallint
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."kuljettajat_KuljID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5169 (class 0 OID 0)
+-- Dependencies: 226
+-- Name: kuljettajat_KuljID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."kuljettajat_KuljID_seq" OWNED BY public.kuljettajat.kulj_id;
+
+
+--
+-- TOC entry 227 (class 1259 OID 19268)
+-- Name: kuorma; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.kuorma (
+    kuorma_id bigint NOT NULL,
+    tyyppi smallint DEFAULT 0 NOT NULL,
+    asiakas_id bigint DEFAULT 0,
+    puulaani_id bigint,
+    puutavara_id bigint,
+    auto_id bigint,
+    kulj_id smallint,
+    pvm date,
+    pvm_laskutus date,
+    ajomaarays_nro character varying(45) DEFAULT ''::character varying,
+    vastaanotto_nro character varying(45) DEFAULT ''::character varying,
+    kohde character varying(45) DEFAULT ''::character varying,
+    lahto character varying(45) DEFAULT ''::character varying,
+    reitti character varying(100) DEFAULT ''::character varying,
+    m3 numeric(8,2) DEFAULT 0.00,
+    km numeric(8,2) DEFAULT 0.00,
+    tunnit numeric(8,2) DEFAULT 0.00,
+    kpl numeric(8,2) DEFAULT 0.00,
+    lisatiedot text,
+    laskutukseen smallint DEFAULT 0,
+    m3_hinta numeric(8,2) DEFAULT 0.00 NOT NULL,
+    km_hinta numeric(8,2) DEFAULT 0.00 NOT NULL,
+    tunnit_hinta numeric(8,2) DEFAULT 0.00 NOT NULL,
+    kpl_hinta numeric(8,2) DEFAULT 0.00 NOT NULL,
+    kokohinta numeric(8,2) DEFAULT 0.00 NOT NULL,
+    kalusto_nro smallint,
+    is_active boolean DEFAULT true NOT NULL,
+    status character varying(50) DEFAULT 'Assigned'::character varying NOT NULL,
+    actual_m3 numeric(8,2),
+    actual_km numeric(8,2),
+    completion_timestamp timestamp with time zone
+);
+
+
+ALTER TABLE public.kuorma OWNER TO postgres;
+
+--
+-- TOC entry 5170 (class 0 OID 0)
+-- Dependencies: 227
+-- Name: TABLE kuorma; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.kuorma IS 'Kuormatiedot';
+
+
+--
+-- TOC entry 5171 (class 0 OID 0)
+-- Dependencies: 227
+-- Name: COLUMN kuorma.tyyppi; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kuorma.tyyppi IS '0=Puulaani; 1=Pylvas';
+
+
+--
+-- TOC entry 5172 (class 0 OID 0)
+-- Dependencies: 227
+-- Name: COLUMN kuorma.status; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kuorma.status IS 'The current status of the load (e.g., Assigned, In Progress, At Origin, Loaded, En Route to Destination, Completed).';
+
+
+--
+-- TOC entry 5173 (class 0 OID 0)
+-- Dependencies: 227
+-- Name: COLUMN kuorma.actual_m3; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kuorma.actual_m3 IS 'The actual volume (m³) unloaded by the driver.';
+
+
+--
+-- TOC entry 5174 (class 0 OID 0)
+-- Dependencies: 227
+-- Name: COLUMN kuorma.actual_km; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kuorma.actual_km IS 'The actual kilometers driven for the trip.';
+
+
+--
+-- TOC entry 5175 (class 0 OID 0)
+-- Dependencies: 227
+-- Name: COLUMN kuorma.completion_timestamp; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.kuorma.completion_timestamp IS 'The exact timestamp when the driver marked the trip as completed.';
+
+
+--
+-- TOC entry 228 (class 1259 OID 19292)
+-- Name: kuorma_KuormaID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."kuorma_KuormaID_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."kuorma_KuormaID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5176 (class 0 OID 0)
+-- Dependencies: 228
+-- Name: kuorma_KuormaID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."kuorma_KuormaID_seq" OWNED BY public.kuorma.kuorma_id;
+
+
+--
+-- TOC entry 229 (class 1259 OID 19293)
+-- Name: muutieto; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.muutieto (
+    muutieto_id bigint NOT NULL,
+    tyyppi character varying(50) DEFAULT ''::character varying NOT NULL,
+    lisatieto character varying(200) DEFAULT ''::character varying,
+    sijainti_lat numeric(10,6) DEFAULT NULL::numeric,
+    sijainti_long numeric(10,6) DEFAULT NULL::numeric,
+    nimi character varying(50),
+    vari character varying(7)
+);
+
+
+ALTER TABLE public.muutieto OWNER TO postgres;
+
+--
+-- TOC entry 230 (class 1259 OID 19300)
+-- Name: muutieto_MuutietoID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."muutieto_MuutietoID_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."muutieto_MuutietoID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5177 (class 0 OID 0)
+-- Dependencies: 230
+-- Name: muutieto_MuutietoID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."muutieto_MuutietoID_seq" OWNED BY public.muutieto.muutieto_id;
+
+
+--
+-- TOC entry 231 (class 1259 OID 19301)
+-- Name: permissions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.permissions (
+    permission_id integer NOT NULL,
+    permission_name character varying(100) NOT NULL,
+    description text,
+    category character varying
+);
+
+
+ALTER TABLE public.permissions OWNER TO postgres;
+
+--
+-- TOC entry 232 (class 1259 OID 19306)
+-- Name: permissions_PermissionID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."permissions_PermissionID_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."permissions_PermissionID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5178 (class 0 OID 0)
+-- Dependencies: 232
+-- Name: permissions_PermissionID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."permissions_PermissionID_seq" OWNED BY public.permissions.permission_id;
+
+
+--
+-- TOC entry 233 (class 1259 OID 19307)
+-- Name: permissions_permission_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.permissions_permission_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.permissions_permission_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 5179 (class 0 OID 0)
+-- Dependencies: 233
+-- Name: permissions_permission_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.permissions_permission_id_seq OWNED BY public.permissions.permission_id;
+
+
+--
+-- TOC entry 234 (class 1259 OID 19308)
+-- Name: purkupaikka; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.purkupaikka (
+    purkupaikka_id bigint NOT NULL,
+    asiakas_id bigint,
+    purkupaikka character varying(50) DEFAULT ''::character varying NOT NULL,
+    sijainti_lat numeric(10,6) DEFAULT NULL::numeric,
+    sijainti_long numeric(10,6) DEFAULT NULL::numeric,
+    is_visible_on_map boolean DEFAULT true NOT NULL,
+    is_active boolean DEFAULT true NOT NULL
+);
+
+
+ALTER TABLE public.purkupaikka OWNER TO postgres;
+
+--
+-- TOC entry 5180 (class 0 OID 0)
+-- Dependencies: 234
+-- Name: COLUMN purkupaikka.is_active; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.purkupaikka.is_active IS 'Indicates if the unloading site is active (true) or soft-deleted (false).';
+
+
+--
+-- TOC entry 235 (class 1259 OID 19316)
+-- Name: purkupaikka_PurkupaikkaID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."purkupaikka_PurkupaikkaID_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."purkupaikka_PurkupaikkaID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5181 (class 0 OID 0)
+-- Dependencies: 235
+-- Name: purkupaikka_PurkupaikkaID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."purkupaikka_PurkupaikkaID_seq" OWNED BY public.purkupaikka.purkupaikka_id;
+
+
+--
+-- TOC entry 236 (class 1259 OID 19317)
+-- Name: puulaani; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.puulaani (
+    puulaani_id bigint NOT NULL,
+    asiakas_id bigint DEFAULT 0 NOT NULL,
+    pvm date NOT NULL,
+    nimi character varying(200) DEFAULT ' '::character varying NOT NULL,
+    auto_nro character varying(500) DEFAULT ''::character varying,
+    lisatiedot text,
+    kok numeric(8,2) DEFAULT 0.00 NOT NULL,
+    jaljella numeric(8,2) DEFAULT 0.00 NOT NULL,
+    km numeric(8,2) DEFAULT 0.00 NOT NULL,
+    aktiivinen boolean DEFAULT false NOT NULL,
+    valmis boolean DEFAULT false NOT NULL,
+    sijainti_lat numeric(10,6) DEFAULT NULL::numeric,
+    sijainti_long numeric(10,6) DEFAULT NULL::numeric,
+    ajomaaraysnro character varying(45) DEFAULT NULL::character varying,
+    marker_style character varying(50) DEFAULT 'default'::character varying
+);
+
+
+ALTER TABLE public.puulaani OWNER TO postgres;
+
+--
+-- TOC entry 5182 (class 0 OID 0)
+-- Dependencies: 236
+-- Name: COLUMN puulaani.pvm; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.puulaani.pvm IS 'Pvm';
+
+
+--
+-- TOC entry 5183 (class 0 OID 0)
+-- Dependencies: 236
+-- Name: COLUMN puulaani.nimi; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.puulaani.nimi IS 'Puulaanin nimi';
+
+
+--
+-- TOC entry 5184 (class 0 OID 0)
+-- Dependencies: 236
+-- Name: COLUMN puulaani.lisatiedot; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.puulaani.lisatiedot IS 'Ohjeitten vapaatekstiosuus';
+
+
+--
+-- TOC entry 5185 (class 0 OID 0)
+-- Dependencies: 236
+-- Name: COLUMN puulaani.kok; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.puulaani.kok IS 'Kokonaiskuutiot';
+
+
+--
+-- TOC entry 5186 (class 0 OID 0)
+-- Dependencies: 236
+-- Name: COLUMN puulaani.aktiivinen; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.puulaani.aktiivinen IS 'Onko laani aktiivinen';
+
+
+--
+-- TOC entry 5187 (class 0 OID 0)
+-- Dependencies: 236
+-- Name: COLUMN puulaani.sijainti_lat; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.puulaani.sijainti_lat IS 'Lähtöpaikan latitudi';
+
+
+--
+-- TOC entry 5188 (class 0 OID 0)
+-- Dependencies: 236
+-- Name: COLUMN puulaani.sijainti_long; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.puulaani.sijainti_long IS 'Lähtöpaikan longitudi';
+
+
+--
+-- TOC entry 237 (class 1259 OID 19334)
+-- Name: puulaani_PuulaaniID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."puulaani_PuulaaniID_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."puulaani_PuulaaniID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5189 (class 0 OID 0)
+-- Dependencies: 237
+-- Name: puulaani_PuulaaniID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."puulaani_PuulaaniID_seq" OWNED BY public.puulaani.puulaani_id;
+
+
+--
+-- TOC entry 238 (class 1259 OID 19335)
+-- Name: puutavaralaji; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.puutavaralaji (
+    puutavara_id bigint NOT NULL,
+    puulaani_id bigint NOT NULL,
+    asiakas_id bigint NOT NULL,
+    puutavara_nro bigint DEFAULT 0 NOT NULL,
+    purkupaikka_id bigint DEFAULT 0 NOT NULL,
+    kuutiot numeric(8,2) DEFAULT 0.00 NOT NULL,
+    haettu numeric(8,2) DEFAULT 0.00 NOT NULL,
+    jaljella numeric(8,2) DEFAULT 0.00 NOT NULL,
+    valmis boolean
+);
+
+
+ALTER TABLE public.puutavaralaji OWNER TO postgres;
+
+--
+-- TOC entry 239 (class 1259 OID 19343)
+-- Name: puutavaralaji_PuutavaraID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."puutavaralaji_PuutavaraID_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."puutavaralaji_PuutavaraID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5190 (class 0 OID 0)
+-- Dependencies: 239
+-- Name: puutavaralaji_PuutavaraID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."puutavaralaji_PuutavaraID_seq" OWNED BY public.puutavaralaji.puutavara_id;
+
+
+--
+-- TOC entry 240 (class 1259 OID 19344)
+-- Name: puutavarat; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.puutavarat (
+    puutavara_nro bigint NOT NULL,
+    puutavara character varying(50) DEFAULT ''::character varying NOT NULL,
+    lisatiedot text NOT NULL,
+    aktiivinen boolean DEFAULT true
+);
+
+
+ALTER TABLE public.puutavarat OWNER TO postgres;
+
+--
+-- TOC entry 241 (class 1259 OID 19351)
+-- Name: puutavarat_PuutavaraNro_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."puutavarat_PuutavaraNro_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."puutavarat_PuutavaraNro_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5191 (class 0 OID 0)
+-- Dependencies: 241
+-- Name: puutavarat_PuutavaraNro_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."puutavarat_PuutavaraNro_seq" OWNED BY public.puutavarat.puutavara_nro;
+
+
+--
+-- TOC entry 242 (class 1259 OID 19352)
+-- Name: pylvaskuljetukset; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.pylvaskuljetukset (
+    pylvaan_id bigint DEFAULT 0 NOT NULL,
+    asiakas_id bigint DEFAULT 0 NOT NULL,
+    kuljettaja_id smallint DEFAULT 0 NOT NULL,
+    kohteen_nimi character varying(50) DEFAULT ''::character varying NOT NULL,
+    kuljetusreitti character varying(50) DEFAULT ''::character varying NOT NULL,
+    pvm date NOT NULL,
+    km numeric(8,2) DEFAULT 0.00 NOT NULL,
+    m3 numeric(8,2) DEFAULT 0.00 NOT NULL,
+    lisatiedot text NOT NULL
+);
+
+
+ALTER TABLE public.pylvaskuljetukset OWNER TO postgres;
+
+--
+-- TOC entry 243 (class 1259 OID 19364)
+-- Name: rahtikirja; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.rahtikirja (
+    rahti_id bigint NOT NULL,
+    pvm date NOT NULL,
+    kuorma_id bigint DEFAULT 0 NOT NULL,
+    rahtikirjan_nro character varying(100) DEFAULT '0'::character varying NOT NULL,
+    reitti character varying(100) DEFAULT ''::character varying NOT NULL,
+    m3 numeric(8,2) DEFAULT 0.00 NOT NULL,
+    m3_hinta numeric(8,2) DEFAULT 0.00 NOT NULL,
+    km numeric(8,2) DEFAULT 0.00 NOT NULL,
+    km_hinta numeric(8,2) DEFAULT 0.00 NOT NULL,
+    kpl numeric(8,2) DEFAULT 0.00 NOT NULL,
+    kpl_hinta numeric(8,2) DEFAULT 0.00 NOT NULL,
+    jako numeric(8,2) DEFAULT 0.00 NOT NULL,
+    jako_hinta numeric(8,2) DEFAULT 0.00 NOT NULL,
+    tievero numeric(8,2) DEFAULT 0.00 NOT NULL,
+    koko_hinta numeric(8,2) DEFAULT 0.00 NOT NULL,
+    lisatiedot text NOT NULL
+);
+
+
+ALTER TABLE public.rahtikirja OWNER TO postgres;
+
+--
+-- TOC entry 244 (class 1259 OID 19382)
+-- Name: rahtikirja_RahtiID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."rahtikirja_RahtiID_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."rahtikirja_RahtiID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5192 (class 0 OID 0)
+-- Dependencies: 244
+-- Name: rahtikirja_RahtiID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."rahtikirja_RahtiID_seq" OWNED BY public.rahtikirja.rahti_id;
+
+
+--
+-- TOC entry 245 (class 1259 OID 19383)
+-- Name: role_permissions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.role_permissions (
+    rooli_id integer NOT NULL,
+    permission_id integer NOT NULL
+);
+
+
+ALTER TABLE public.role_permissions OWNER TO postgres;
+
+--
+-- TOC entry 246 (class 1259 OID 19386)
+-- Name: roolit; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.roolit (
+    rooli_id integer NOT NULL,
+    roolin_nimi character varying(50) NOT NULL
+);
+
+
+ALTER TABLE public.roolit OWNER TO postgres;
+
+--
+-- TOC entry 247 (class 1259 OID 19389)
+-- Name: roolit_RooliID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."roolit_RooliID_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."roolit_RooliID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5193 (class 0 OID 0)
+-- Dependencies: 247
+-- Name: roolit_RooliID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."roolit_RooliID_seq" OWNED BY public.roolit.rooli_id;
+
+
+--
+-- TOC entry 248 (class 1259 OID 19390)
+-- Name: sessiot; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.sessiot (
+    id bigint NOT NULL,
+    sid bytea NOT NULL,
+    nimi character varying(50) NOT NULL,
+    aika timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+ALTER TABLE public.sessiot OWNER TO postgres;
+
+--
+-- TOC entry 249 (class 1259 OID 19396)
+-- Name: sessiot_ID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."sessiot_ID_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."sessiot_ID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5194 (class 0 OID 0)
+-- Dependencies: 249
+-- Name: sessiot_ID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."sessiot_ID_seq" OWNED BY public.sessiot.id;
+
+
+--
+-- TOC entry 250 (class 1259 OID 19397)
+-- Name: valikko; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.valikko (
+    id integer NOT NULL,
+    nimi character varying(50) NOT NULL,
+    taso integer DEFAULT 123456789 NOT NULL,
+    jarjestys integer NOT NULL,
+    tyyppi smallint DEFAULT 1 NOT NULL,
+    linkki character varying(50) NOT NULL
+);
+
+
+ALTER TABLE public.valikko OWNER TO postgres;
+
+--
+-- TOC entry 251 (class 1259 OID 19402)
+-- Name: valikko_ID_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public."valikko_ID_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."valikko_ID_seq" OWNER TO postgres;
+
+--
+-- TOC entry 5195 (class 0 OID 0)
+-- Dependencies: 251
+-- Name: valikko_ID_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public."valikko_ID_seq" OWNED BY public.valikko.id;
+
+
+--
+-- TOC entry 4782 (class 2604 OID 19403)
+-- Name: asiakkaat asiakkaan_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.asiakkaat ALTER COLUMN asiakkaan_id SET DEFAULT nextval('public."asiakkaat_AsiakkaanID_seq"'::regclass);
+
+
+--
+-- TOC entry 4792 (class 2604 OID 19404)
+-- Name: autot auto_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.autot ALTER COLUMN auto_id SET DEFAULT nextval('public."autot_AutoID_seq"'::regclass);
+
+
+--
+-- TOC entry 4793 (class 2604 OID 19405)
+-- Name: kalusto kalusto_nro; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kalusto ALTER COLUMN kalusto_nro SET DEFAULT nextval('public."kalusto_KalustoNro_seq"'::regclass);
+
+
+--
+-- TOC entry 4796 (class 2604 OID 19406)
+-- Name: kuljettajat kulj_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kuljettajat ALTER COLUMN kulj_id SET DEFAULT nextval('public."kuljettajat_KuljID_seq"'::regclass);
+
+
+--
+-- TOC entry 4798 (class 2604 OID 19407)
+-- Name: kuorma kuorma_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kuorma ALTER COLUMN kuorma_id SET DEFAULT nextval('public."kuorma_KuormaID_seq"'::regclass);
+
+
+--
+-- TOC entry 4818 (class 2604 OID 19408)
+-- Name: muutieto muutieto_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.muutieto ALTER COLUMN muutieto_id SET DEFAULT nextval('public."muutieto_MuutietoID_seq"'::regclass);
+
+
+--
+-- TOC entry 4823 (class 2604 OID 19409)
+-- Name: permissions permission_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.permissions ALTER COLUMN permission_id SET DEFAULT nextval('public.permissions_permission_id_seq'::regclass);
+
+
+--
+-- TOC entry 4824 (class 2604 OID 19410)
+-- Name: purkupaikka purkupaikka_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.purkupaikka ALTER COLUMN purkupaikka_id SET DEFAULT nextval('public."purkupaikka_PurkupaikkaID_seq"'::regclass);
+
+
+--
+-- TOC entry 4830 (class 2604 OID 19411)
+-- Name: puulaani puulaani_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.puulaani ALTER COLUMN puulaani_id SET DEFAULT nextval('public."puulaani_PuulaaniID_seq"'::regclass);
+
+
+--
+-- TOC entry 4843 (class 2604 OID 19412)
+-- Name: puutavaralaji puutavara_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.puutavaralaji ALTER COLUMN puutavara_id SET DEFAULT nextval('public."puutavaralaji_PuutavaraID_seq"'::regclass);
+
+
+--
+-- TOC entry 4849 (class 2604 OID 19413)
+-- Name: puutavarat puutavara_nro; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.puutavarat ALTER COLUMN puutavara_nro SET DEFAULT nextval('public."puutavarat_PuutavaraNro_seq"'::regclass);
+
+
+--
+-- TOC entry 4859 (class 2604 OID 19414)
+-- Name: rahtikirja rahti_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.rahtikirja ALTER COLUMN rahti_id SET DEFAULT nextval('public."rahtikirja_RahtiID_seq"'::regclass);
+
+
+--
+-- TOC entry 4873 (class 2604 OID 19415)
+-- Name: roolit rooli_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.roolit ALTER COLUMN rooli_id SET DEFAULT nextval('public."roolit_RooliID_seq"'::regclass);
+
+
+--
+-- TOC entry 4874 (class 2604 OID 19416)
+-- Name: sessiot id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.sessiot ALTER COLUMN id SET DEFAULT nextval('public."sessiot_ID_seq"'::regclass);
+
+
+--
+-- TOC entry 4876 (class 2604 OID 19417)
+-- Name: valikko id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.valikko ALTER COLUMN id SET DEFAULT nextval('public."valikko_ID_seq"'::regclass);
+
+
+--
+-- TOC entry 5115 (class 0 OID 19232)
+-- Dependencies: 217
+-- Data for Name: asiakkaat; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.asiakkaat (asiakkaan_id, asiakkaan_nimi, osoite, posti_nro, paikkakunta, puhelin_nro, ytunnus, kohteen_vari, tyyppi, aktiivinen, yhteyshenkilo, sahkoposti, lisatietoja) FROM stdin;
+4	Metsäyhtiö Oy	Puukuja 12	90100	Oulu	08-5556677	5566778-8	#8B4513             	0	t	Satu Korpela	satu@example.com	Large forest company.
+7	Energiapuun Korjuu	Hakkuuaukio 1	70100	Kuopio	017-334455	9900112-2	#FF4500             	0	t	Eeva Puu	eeva@example.com	Specialized in energy wood harvesting.
+8	Rakennusliike Tiili	Rakentajantie 3	00500	Helsinki	09-667788	7788990-0	#de7d7d             	2	t	Matti Muurari	matti@example.com	Construction material transport.
+3	Kuljetus Ketonen	Rahtikatu 10	33100	Tampere	050-1112233	1122334-4	#7a7575             	2	t	Ville Virtanen	ville@example.com	Client for consignment notes (Rahtikirja).
+5	Logistiikka Virtanen	Satamatie 2	20100	Turku	02-4445566	3344556-6	#0ec496             	2	t	Heikki Virtanen	heikki@example.com	Major logistics partner.
+10	Pylväsvalmistus Oy	Tolpankuja 1	60100	Seinäjoki	06-9898989	4564564-4	#0bb727             	2	t	Markku Tolppa	markku@example.com	Client for pole transports.
+12	gg	Ndjdkldoko	78200	varkaus	0417297067	fdfdf	#941e1e             	0	t	fsdfsdfjhyty	nanufla@gmail.com	\N
+1	Testiasiakas Oy	Porukankuja 1	78200	Varkaus	0442467157	1234567-8	#857a7a             	2	t	Nayanajith Rathnayake	testi@example.com	Initial test client for all types.
+13	gggxc	Ndjdkldoko	78200	varkaus	0417297067	21244	#703333             	0	t	fsdfsdfjhyty	nanufla@gmail.com	\N
+6	Betonivalu Oy	Teollisuustie 7	40100	Jyväskylä	014-778899	6677889-9	#a44c4c             	2	t	Kari Betoni	kari@example.com	Client needing both services.
+14	Team Softrain01	Porukankuja	78200	varkaus	0442467151	21244	#c11a1a             	0	t	Nayanajith Rathnayake	nanuflashdk@gmail.com	\N
+9	Puuteollisuus Oy	Saha-alue 4	53100	Lappeenranta	05-121212	1231231-1	#0081d1             	0	t	Liisa Sahuri	liisa@example.com	Timber industry client.
+2	Puufirma Oy	Metsätie 5	00100	Helsinki	09-1234567	9876543-2	#2ebda5             	2	t	Antti Metsuri	puu@example.com	Special client for timber loads (Puulaani).
+11	gggxsvdadasds	Porukankuja	78200	varkaus	0442467151	cczczs	#4c4848             	0	t	Nayanajith Rathnayake	nanuflashdk@gmail.com	\N
+15	gggxcv	Porukankuja	78200	varkaus	0442467151	21244	#e01a1a             	0	t	Nayanajith C K Rathnayake	nanuflashdk@gmail.com	\N
+\.
+
+
+--
+-- TOC entry 5117 (class 0 OID 19247)
+-- Dependencies: 219
+-- Data for Name: autot; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.autot (auto_id, puulaani_id, kalusto_id) FROM stdin;
+149	103	101
+150	103	2
+151	103	102
+152	103	103
+153	103	104
+75	63	110
+76	63	105
+77	63	107
+78	63	101
+154	103	105
+157	41	110
+158	41	109
+172	111	2
+173	111	101
+174	111	102
+175	111	103
+179	127	101
+180	127	102
+181	127	103
+182	131	2
+183	106	5
+\.
+
+
+--
+-- TOC entry 5119 (class 0 OID 19251)
+-- Dependencies: 221
+-- Data for Name: kalusto; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.kalusto (kalusto_nro, rek_nro, ed_katsastus, katsastus_aik, aktiivinen, viim_sijainti_lat, viim_sijainti_long, viim_sijainti_aika) FROM stdin;
+101	ABC-123	2024-01-15	2025-01-15	t	\N	\N	\N
+102	XYZ-789	2024-03-20	2025-03-20	t	\N	\N	\N
+106	MNO-678	2024-02-28	2025-02-28	t	\N	\N	\N
+107	PQR-902	2023-10-04	2024-10-04	t	\N	\N	\N
+110	YZA-890	2024-08-01	2025-08-01	t	60.170000	24.941000	2025-07-29 13:34:16.384+03
+105	JKL-345	2024-07-23	2025-07-23	t	\N	\N	\N
+104	GHI-012	2024-05-07	2025-05-07	t	\N	\N	\N
+108	STU-234	2024-04-10	2025-04-10	t	\N	\N	\N
+109	VWX-567	2024-06-29	2025-06-29	t	\N	\N	\N
+5	ABC-229	2025-08-01	2026-01-28	t	\N	\N	\N
+6	asd	2025-09-10	2025-09-13	t	\N	\N	\N
+2	ABC-225	2025-07-11	2025-07-22	t	\N	\N	\N
+103	DEF-456	2023-10-31	2024-10-31	f	\N	\N	\N
+\.
+
+
+--
+-- TOC entry 5121 (class 0 OID 19256)
+-- Dependencies: 223
+-- Data for Name: kayttaja_roolit; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.kayttaja_roolit (kayttaja_tunnus, rooli_id) FROM stdin;
+superuser01	1
+office01	3
+dispatch01	4
+driver01	5
+driver03	5
+driver04	5
+ali01	6
+guest01	5
+driver02	2
+Mike	5
+Admin002	2
+asd	2
+admin01	5
+\.
+
+
+--
+-- TOC entry 5122 (class 0 OID 19259)
+-- Dependencies: 224
+-- Data for Name: kayttajat; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.kayttajat (tunnus, nimi, taso, salasana, aktiivinen, kulj_id) FROM stdin;
+office01	Office User One	3	$2a$12$nbh8UsWl7SGdlc53I.buyOjsLi/Ay17IDl4YX3AR2P8S.vOh3XcsC	t	\N
+dispatch01	Dispatch User	4	$2a$12$nbh8UsWl7SGdlc53I.buyOjsLi/Ay17IDl4YX3AR2P8S.vOh3XcsC	t	\N
+driver03	Pekka Driver	4	$2a$12$nbh8UsWl7SGdlc53I.buyOjsLi/Ay17IDl4YX3AR2P8S.vOh3XcsC	t	3
+driver04	Maija Driver	4	$2a$12$nbh8UsWl7SGdlc53I.buyOjsLi/Ay17IDl4YX3AR2P8S.vOh3XcsC	t	4
+ali01	Subcontractor One	6	$2a$12$nbh8UsWl7SGdlc53I.buyOjsLi/Ay17IDl4YX3AR2P8S.vOh3XcsC	t	\N
+guest01	Guest User	5	$2a$12$nbh8UsWl7SGdlc53I.buyOjsLi/Ay17IDl4YX3AR2P8S.vOh3XcsC	f	\N
+driver02	Testi Kuljettaja	4	$2a$12$nbh8UsWl7SGdlc53I.buyOjsLi/Ay17IDl4YX3AR2P8S.vOh3XcsC	t	2
+superuser01	Super User	1	$2a$10$3xiOPfnoo7VMPB5LgdSXrO/N9LiqINgEhcB1WNBYy8DlOt5vhigLW	t	\N
+driver01	Matti Driver	4	$2a$12$nbh8UsWl7SGdlc53I.buyOjsLi/Ay17IDl4YX3AR2P8S.vOh3XcsC	t	1
+Admin002	superuser01	2	$2a$10$EXBP5jt2wFLTZv.gs1zc6Ot3Kw9mp1RWGZeRAkZCPvnR4RhNP1GPm	t	\N
+asd	asd	2	$2a$10$UWVQYBz4Y..oxnIBy3op7OYu6JBQnY.UwH.YVBJcirvIprbvo9szy	t	\N
+admin01	Admin Userasd	2	$2a$12$nbh8UsWl7SGdlc53I.buyOjsLi/Ay17IDl4YX3AR2P8S.vOh3XcsC	t	\N
+Mike	john	2	$2a$10$3xg2erplr1Q9RF1Bik9.euBTrATcsfNzW.5U986Jy1VcuU7FOCGAe	t	12
+\.
+
+
+--
+-- TOC entry 5123 (class 0 OID 19263)
+-- Dependencies: 225
+-- Data for Name: kuljettajat; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.kuljettajat (kulj_id, nimi, puhelin_nro, email, halytys) FROM stdin;
+6	Liisa Saarinen	040-1234567	liisa.saarinen@example.com	t
+9	Tomi Mäkinen	040-5566778	tomi.makinen@example.com	t
+7	Jari Koskinen	050-9876543	jari.koskinen@example.com	f
+1	Matti Meikäläinens	040-1112233	nanuflafsfd@gmail.com	t
+10	Minna Laaksonen	050-2233445	minna.laaksonen@example.com	t
+5	Olli Lehtonen	040-9990011	olli.lehtonen@example.com	t
+2	Testikuljettaja	050-2222233	testi@example.com	t
+11	Nayanajith C K Rathnayake	0442467151	nanuflashdk@gmail.com	t
+3	Pekka Virtanen	045-3334455	pekka.virtanen@example.com	t
+8	Elina Jokinen	044-1122334	elina.jokinen@example.com	t
+13	Nayanajith C K Rathnayake	0442467151	nanuflashdk@gmail.com	t
+12	Softrain Driver	0442467157	nayanajith@softrain.fi	t
+4	Maija Nieminen	044-6667788	maija.nieminen@example.com	t
+\.
+
+
+--
+-- TOC entry 5125 (class 0 OID 19268)
+-- Dependencies: 227
+-- Data for Name: kuorma; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.kuorma (kuorma_id, tyyppi, asiakas_id, puulaani_id, puutavara_id, auto_id, kulj_id, pvm, pvm_laskutus, ajomaarays_nro, vastaanotto_nro, kohde, lahto, reitti, m3, km, tunnit, kpl, lisatiedot, laskutukseen, m3_hinta, km_hinta, tunnit_hinta, kpl_hinta, kokohinta, kalusto_nro, is_active, status, actual_m3, actual_km, completion_timestamp) FROM stdin;
+9	0	7	111	\N	\N	\N	2025-08-21	\N	\N					511.68	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	101	f	Assigned	\N	\N	\N
+3	1	3	\N	\N	\N	3	2025-07-03	2025-07-07	AJM-003	V-003	Tampere	Varasto A	Pitkä reitti	0.00	150.00	6.00	10.00	Pylväskuljetus	1	0.00	0.90	30.00	5.00	365.00	103	t	Assigned	\N	\N	\N
+5	1	5	\N	\N	\N	5	2025-07-05	2025-07-09	AJM-005	V-005	Turku	Satama	Lyhyt reitti	0.00	40.00	1.50	5.00	Erikoiskuljetus	1	0.00	1.20	32.00	8.00	136.00	106	t	Assigned	\N	\N	\N
+10	0	14	115	\N	\N	4	2025-08-21	\N	test			Kuusimetsä		120.00	0.00	0.00	0.00		0	0.00	0.00	0.00	0.00	0.00	2	t	Assigned	\N	\N	\N
+12	0	14	115	\N	\N	12	2025-08-30	\N	\N			Kuusimetsä		253.00	0.00	0.00	0.00		0	0.00	0.00	0.00	0.00	0.00	101	f	In Progress	\N	\N	\N
+11	0	14	115	\N	\N	7	2025-08-22	\N	221		\N	Kuusimetsä	\N	3.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	t	Assigned	\N	\N	\N
+30	0	14	115	162	\N	8	2025-09-01	\N			\N	\N		0.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	f	Assigned	\N	\N	\N
+7	0	4	3	\N	\N	8	2025-08-20	\N						2500.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	t	Assigned	\N	\N	\N
+6	0	14	115	\N	\N	8	2025-08-20	\N						200.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	101	t	Assigned	\N	\N	\N
+40	0	14	115	162	\N	12	2025-09-02	\N			\N	\N		0.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	t	Assigned	\N	\N	\N
+14	0	14	131	\N	\N	6	2025-08-25	\N	\N			Nayanajith Rathnayake		100.00	0.00	0.00	0.00		0	0.00	0.00	0.00	0.00	0.00	2	t	Assigned	\N	\N	\N
+13	0	14	131	\N	\N	4	2025-08-28	\N	\N			Nayanajith Rathnayake		200.00	0.00	0.00	0.00		0	0.00	0.00	0.00	0.00	0.00	2	t	Assigned	\N	\N	\N
+29	0	7	135	190	\N	7	2025-09-01	\N	0003		\N	\N		0.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	f	Assigned	\N	\N	\N
+4	0	4	3	3	\N	6	2025-07-04	\N	AJM-004	V-004	Oulu	Puulaani 3	Pohjoisreitti	60.00	200.00	8.00	0.00	Männyn kuitua	0	11.00	0.70	26.00	0.00	1008.00	105	t	Assigned	\N	\N	\N
+28	0	14	115	162	\N	8	2025-09-01	\N			\N	\N		0.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	f	Assigned	\N	\N	\N
+15	0	14	131	\N	\N	7	2025-08-28	\N	221			Nayanajith Rathnayake		130.00	0.00	0.00	0.00		0	0.00	0.00	0.00	0.00	0.00	102	t	Assigned	\N	\N	\N
+19	0	6	127	179	\N	8	2025-08-28	\N		005			\N	750.00	2.00	2.00	2.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	t	Assigned	\N	\N	\N
+23	0	14	115	\N	\N	7	2025-08-30	\N	001		\N	\N		0.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	f	Assigned	\N	\N	\N
+18	0	6	127	180	\N	\N	2025-08-29	\N	\N	002			Kuopio	300.00	2.00	2.00	2.00	\N	0	0.00	0.00	0.00	0.00	0.00	\N	f	Assigned	\N	\N	\N
+22	0	7	137	\N	\N	7	2025-08-29	\N	221		\N	\N		0.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	5	f	Assigned	\N	\N	\N
+1	0	1	1	1	\N	1	2025-07-01	2025-07-05	AJM-001	V-001	Varkaus	Puulaani 1	Lyhyt reitti	25.00	50.00	2.00	0.00	Testikuorma	1	10.00	1.00	25.00	0.00	350.00	101	t	Assigned	\N	\N	\N
+26	0	14	115	162	\N	12	2025-08-29	\N	221		Kuusimetsä0001	Kuusimetsä		0.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	f	Assigned	\N	\N	\N
+42	0	14	109	141	\N	12	2025-09-03	\N	221		Testi0001	\N		200.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	102	f	Assigned	\N	\N	\N
+16	0	7	111	173	\N	\N	2025-08-27	\N	12345	005			Kuopio	180.00	4.00	1.00	2.00	\N	0	0.00	0.00	0.00	0.00	0.00	\N	f	Assigned	\N	\N	\N
+17	0	7	111	172	\N	\N	2025-08-27	\N	12345	\N			\N	400.00	5.00	2.00	2.00	\N	0	0.00	0.00	0.00	0.00	0.00	\N	f	Assigned	\N	\N	\N
+8	0	6	127	\N	\N	\N	2025-08-20	\N	\N					40.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	101	f	Assigned	\N	\N	\N
+41	0	14	108	118	\N	12	2025-09-03	\N	221		testi00002	\N		1000.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	102	f	Assigned	\N	\N	\N
+27	0	14	115	118	\N	8	2025-08-29	\N			Kuusimetsä0001	Kuusimetsä		0.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	5	f	Assigned	\N	\N	\N
+25	0	14	115	162	\N	7	2025-08-29	\N			Kuusimetsä0001	Kuusimetsä		0.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	f	Assigned	\N	\N	\N
+44	0	14	108	118	\N	12	2025-09-05	\N			testi00002	\N		1500.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	101	t	Assigned	\N	\N	\N
+45	0	14	109	141	\N	12	2025-09-05	\N			Testi0001	\N		200.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	104	t	Assigned	\N	\N	\N
+24	0	14	115	190	\N	8	2025-08-29	\N			\N	\N		0.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	f	Assigned	\N	\N	\N
+21	0	7	137	\N	\N	12	2025-08-29	\N	005		\N	\N		0.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	5	f	Assigned	\N	\N	\N
+20	0	6	127	180	\N	8	2025-08-28	\N	005	\N			\N	500.00	2.00	\N	\N	\N	0	0.00	0.00	0.00	0.00	0.00	2	f	Assigned	\N	\N	\N
+38	0	14	115	162	\N	7	2025-09-02	\N	221		\N	\N		0.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	t	Assigned	\N	\N	\N
+2	0	6	127	\N	\N	\N	2025-08-24	\N	221					1179.68	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	f	Assigned	\N	\N	\N
+39	0	7	139	198	\N	12	2025-09-02	\N	300		Kuopio	\N		100.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	5	t	En Route to Destination	\N	\N	\N
+46	0	14	140	202	\N	12	2025-09-05	\N	229		Kuopio	\N		1000.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	t	Assigned	\N	\N	\N
+47	0	6	141	203	\N	8	2025-09-11	\N	1		Kuusimetsä0001	\N		5.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	f	Assigned	\N	\N	\N
+43	0	6	141	203	\N	12	2025-09-10	\N	1		Kuusimetsä0001	\N		5.00	0.00	0.00	0.00	\N	0	0.00	0.00	0.00	0.00	0.00	2	t	Assigned	\N	\N	\N
+\.
+
+
+--
+-- TOC entry 5127 (class 0 OID 19293)
+-- Dependencies: 229
+-- Data for Name: muutieto; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.muutieto (muutieto_id, tyyppi, lisatieto, sijainti_lat, sijainti_long, nimi, vari) FROM stdin;
+7	LocalParking	\N	60.673179	23.378906	Kuusimetsä	#b12525
+11	Dangerous	\N	61.773123	28.806152	Testi0002	#D32F2F
+13	Directions	\N	62.247466	25.367432	Kuusimetsä	#FBC02D
+14	Warehouse	\N	62.990084	28.926783	Testi002	#D32F2F
+15	PushPin	test	61.727750	26.271225	test	#D32F2F
+\.
+
+
+--
+-- TOC entry 5129 (class 0 OID 19301)
+-- Dependencies: 231
+-- Data for Name: permissions; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.permissions (permission_id, permission_name, description, category) FROM stdin;
+34	unloading site_view	Can view unloading sites	\N
+35	unloading site_create	Can create new unloading sites	\N
+36	unloading site_edit	Can edit existing unloading sites	\N
+37	unloading site_delete	Can delete unloading sites	\N
+17	driven & inspection_view	Can view the driven & inspection list	office
+39	puulaani invoicing_view	Can view the puulaani invoicing list	office
+40	puulaani invoicing_create	Can create new puulaani invoices	office
+41	puulaani invoicing_edit	can edit existing puulaani invoices	office
+43	consignment invoicing_view	Can view the consignment invoicing list	office
+44	consignment invoicing_create	Can create the consignment invoicing list entries	office
+45	consignment invoicing_edit	Can edit the consignment invoicing list entries	office
+46	consignment invoicing_delete	Can delete the consignment invoicing list entries	office
+42	puulaani invoicing_delete	Can delete existing puulaani invoices	office
+20	timber map_create	Can create new timber stacks	arrangement
+21	timber map_edit	Can edit existing timber stacks	arrangement
+22	timber map_delete	Can delete timber stacks	arrangement
+1	clients_view	Can view the client list	control
+2	clients_create	Can create new clients	control
+3	clients_edit	Can edit existing clients	control
+4	clients_delete	Can delete clients	control
+5	vehicles_view	Can view the vehicle list	control
+6	vehicles_create	Can create new vehicles	control
+7	vehicles_edit	Can edit existing vehicles	control
+8	vehicles_delete	Can delete vehicles	control
+9	drivers_view	Can view the driver list	control
+10	drivers_create	Can create new drivers	control
+11	drivers_edit	Can edit existing drivers	control
+12	drivers_delete	Can delete drivers	control
+13	driven & inspection_accept	Can accept/approve entries for invoicing	office
+14	driven & inspection_create	Can create new entries (via Create Load wizard)	office
+15	driven & inspection_edit	Can edit entries in the Driven/Inspection list	office
+16	driven & inspection_delete	Can delete entries from the Driven/Inspection list	office
+47	timber management_view	Can view timber management	arrangement
+19	reports_view	Can view reports	control
+23	application settings_manage	Can manage roles and their permissions	app settings
+24	application settings_view	Can view roles and their permissions	app settings
+25	users_view	Can view the user list	app settings
+26	users_create	Can create new users	app settings
+27	users_edit	Can edit existing users	app settings
+28	users_delete	Can delete users	app settings
+29	load management_view	Can view the load management list and details	arrangement
+30	load management_create	Can create new loads	arrangement
+31	load management_edit	Can edit existing loads	arrangement
+32	load management_delete	Can delete (soft delete) loads	arrangement
+18	timber map_view	Can view the timber stacks list	arrangement
+52	timber management_create	Can create timber management entries	arrangement
+53	timber management_edit	Can edit timber management entries	arrangement
+54	timber management_delete	Can delete timber management entries	arrangement
+56	reports_create	Can create new report	control
+57	reports_edit	Can edit the report	control
+58	reports_delete	Can delete the report	control
+\.
+
+
+--
+-- TOC entry 5132 (class 0 OID 19308)
+-- Dependencies: 234
+-- Data for Name: purkupaikka; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.purkupaikka (purkupaikka_id, asiakas_id, purkupaikka, sijainti_lat, sijainti_long, is_visible_on_map, is_active) FROM stdin;
+21	6	testiUpdated	62.557920	25.488281	t	f
+12	11	Kuusimetsä	60.844911	27.114258	t	f
+4	4	Oulun Satama	65.012300	25.468200	t	t
+1	1	Testipaikka 1	62.308000	27.165600	t	t
+11	6	Sammmoa	61.301902	22.390137	t	t
+36	7	Kuopio	63.208795	27.608443	t	t
+3	7	Terminaali A	61.499000	23.787000	t	f
+33	13	Kuusimetsä0001	61.486005	23.779907	t	f
+34	6	Kuusimetsä0001	61.488627	23.757935	t	t
+35	7	testio	61.506976	24.202881	t	f
+31	7	Testi0001	60.632796	24.878540	t	f
+22	7	testi00002	62.420903	24.147949	t	t
+\.
+
+
+--
+-- TOC entry 5134 (class 0 OID 19317)
+-- Dependencies: 236
+-- Data for Name: puulaani; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.puulaani (puulaani_id, asiakas_id, pvm, nimi, auto_nro, lisatiedot, kok, jaljella, km, aktiivinen, valmis, sijainti_lat, sijainti_long, ajomaaraysnro, marker_style) FROM stdin;
+1	1	2025-06-18	Koivikko Laani	ABC-123	Koivukuitupuuta	500.00	250.00	20.00	t	f	60.169500	24.935400	AJ-001	default
+2	2	2025-06-20	Kuusimetsä 1	XYZ-789	Kuusitukkeja	1200.00	1000.00	45.00	t	f	60.205500	24.962000	AJ-002	default
+3	4	2025-06-22	Mäntyharju	DEF-456	Männyn kuitua	800.00	800.00	15.00	t	f	60.250000	25.000000	AJ-003	default
+130	14	2025-08-20	Testi timber management 003			500.00	500.00	0.00	t	t	61.490593	23.777161	\N	default
+103	14	2025-08-11	Kuusimetsä	ABC-225, ABC-123, XYZ-789, DEF-456, GHI-012, JKL-345	\N	200.00	0.00	0.00	t	t	62.764783	22.719727	123456	default
+83	2	2025-08-07	Kuusimetsä		\N	230.00	80.00	0.00	t	t	61.757530	27.575684	3210	default
+41	14	2025-08-05	Testi driver	VWX-567, YZA-890	\N	250.00	50.00	0.00	f	t	62.088458	23.061676	12345	default
+133	6	2025-08-28	testi on driven			500.00	500.00	0.00	t	t	62.607334	29.756556	\N	default
+134	7	2025-08-28	testi on driven			250.00	250.00	0.00	t	t	62.572669	29.595560	\N	default
+132	12	2025-08-27	Testi0001			520.00	320.00	0.00	t	f	62.925150	25.543044	12345	default
+135	7	2025-08-28	testi on driven			2000.00	2000.00	0.00	t	f	63.014084	26.586565	\N	default
+131	14	2025-08-21	Nayanajith Rathnayake	ABC-225		500.00	150.00	0.00	t	t	62.486953	23.664551	12345	default
+106	14	2025-08-11	Kuusimetsä	ABC-229	\N	570.00	428.91	0.00	t	t	62.734601	24.060059	123456	default
+136	7	2025-08-28	testi on driven			200.00	200.00	0.00	t	t	62.337582	26.355943	\N	default
+115	14	2025-08-14	Kuusimetsä		\N	210.00	210.00	0.00	t	f	62.257696	23.675822	12345	default
+63	10	2025-08-06	Testi0001	ABC-123, JKL-345, PQR-902, YZA-890	\N	200.00	100.00	0.00	f	f	61.238531	27.531738	123456	default
+139	7	2025-09-05	testi0002			200.00	200.00	0.00	t	f	62.719411	23.664410	12345	default
+69	1	2025-08-06	Testi0001		\N	500.00	400.00	0.00	t	f	63.005134	29.575195	123456	default
+111	7	2025-08-14	Kuusimetsä	ABC-225, ABC-123, XYZ-789, DEF-456	\N	657.00	511.68	0.00	t	f	63.114638	25.004883	12345	default
+70	11	2025-08-06	Testi0001		\N	600.00	500.00	0.00	t	f	60.290215	25.039215	123456	default
+129	7	2025-08-20	Testi timber management 001			445.00	445.00	0.00	t	t	62.310389	29.333496	\N	default
+138	14	2025-09-02	Nayanajith Rathnayake		first driver duty check.	100.00	100.00	0.00	t	f	61.902660	25.213459	0001	default
+137	7	2025-08-29	testi on driven		hhklkl	650.00	650.00	0.00	t	f	62.047682	28.077500	\N	default
+127	6	2025-08-18	Testi driver	ABC-123, XYZ-789, DEF-456	\N	3840.00	3719.68	0.00	t	f	62.603453	29.772949	\N	default
+140	14	2025-09-05	New Testi002		gdsjdsajdhasj ikskflj	1200.00	1200.00	0.00	t	f	63.607136	25.279376	229	default
+112	7	2025-08-14	Kuusimetsä		\N	250.00	250.00	220.00	t	t	60.740371	24.320984	12345	default
+108	14	2025-08-13	Kuusimetsä			2012.00	2012.00	0.00	t	f	62.237233	25.993652	123456	default
+109	14	2025-08-13	Kuusimetsä		\N	210.00	210.00	0.00	t	f	63.845512	28.103027	123456	default
+25	11	2025-07-31	Kuusimetsä		\N	200.00	50.00	0.00	t	f	62.339492	29.157715	12345	default
+141	6	2025-09-08	testi		et	5.00	5.00	0.00	t	f	63.865544	25.820615	test	default
+\.
+
+
+--
+-- TOC entry 5136 (class 0 OID 19335)
+-- Dependencies: 238
+-- Data for Name: puutavaralaji; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.puutavaralaji (puutavara_id, puulaani_id, asiakas_id, puutavara_nro, purkupaikka_id, kuutiot, haettu, jaljella, valmis) FROM stdin;
+1	1	1	1	1	500.00	250.00	250.00	f
+3	3	4	3	4	800.00	0.00	800.00	f
+172	111	7	1	34	442.00	442.00	0.00	f
+173	111	7	2	34	215.00	215.00	0.00	f
+66	69	1	1	4	500.00	100.00	400.00	f
+68	70	11	1	3	600.00	100.00	500.00	f
+137	112	7	1	34	250.00	0.00	250.00	f
+162	115	14	1	34	210.00	205.00	5.00	f
+141	109	14	1	31	210.00	0.00	210.00	f
+81	63	10	1	4	200.00	100.00	100.00	f
+142	25	11	1	4	200.00	150.00	50.00	f
+146	103	14	1	34	200.00	200.00	0.00	t
+148	41	14	2	3	250.00	200.00	50.00	f
+118	108	14	2	22	2012.00	100.00	1912.00	f
+185	83	2	1	4	230.00	150.00	80.00	f
+187	133	6	1	34	500.00	0.00	500.00	f
+181	127	6	5	34	2540.00	2540.00	0.00	t
+188	134	7	1	34	250.00	0.00	250.00	f
+190	135	7	1	34	2000.00	0.00	2000.00	f
+191	131	14	1	34	500.00	350.00	150.00	f
+192	106	14	1	11	450.00	21.09	428.91	f
+193	106	14	1	34	120.00	120.00	0.00	t
+194	136	7	1	34	200.00	0.00	200.00	f
+189	132	12	1	34	520.00	200.00	320.00	t
+198	139	7	1	36	200.00	0.00	200.00	f
+199	138	14	1	36	100.00	0.00	100.00	f
+200	137	7	1	22	650.00	0.00	650.00	f
+174	129	7	1	34	230.00	0.00	230.00	f
+175	129	7	2	22	215.00	0.00	215.00	f
+202	140	14	1	36	1200.00	0.00	1200.00	f
+182	130	14	1	34	500.00	0.00	500.00	f
+179	127	6	1	34	750.00	750.00	0.00	f
+180	127	6	2	34	550.00	550.00	0.00	f
+203	141	6	1	34	5.00	0.00	5.00	f
+\.
+
+
+--
+-- TOC entry 5138 (class 0 OID 19344)
+-- Dependencies: 240
+-- Data for Name: puutavarat; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.puutavarat (puutavara_nro, puutavara, lisatiedot, aktiivinen) FROM stdin;
+1	Koivu	Koivukuitu	t
+2	Kuusi	Kuusitukki	t
+3	Mänty	Männyn kuitu	t
+4	Haapa	Haapapölkky	f
+5	Leppä	Leppäkuorike	t
+\.
+
+
+--
+-- TOC entry 5140 (class 0 OID 19352)
+-- Dependencies: 242
+-- Data for Name: pylvaskuljetukset; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.pylvaskuljetukset (pylvaan_id, asiakas_id, kuljettaja_id, kohteen_nimi, kuljetusreitti, pvm, km, m3, lisatiedot) FROM stdin;
+1	3	3	Voimalaitos X	Tampereelta Jyväskylään	2025-07-10	150.00	30.00	Ylisuuri kuorma, erikoislupa tarvitaan.
+2	10	5	Muurolan Sähköasema	Seinäjoelta Ouluun	2025-07-12	300.00	50.00	Pimeäajo sallittu.
+\.
+
+
+--
+-- TOC entry 5141 (class 0 OID 19364)
+-- Dependencies: 243
+-- Data for Name: rahtikirja; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.rahtikirja (rahti_id, pvm, kuorma_id, rahtikirjan_nro, reitti, m3, m3_hinta, km, km_hinta, kpl, kpl_hinta, jako, jako_hinta, tievero, koko_hinta, lisatiedot) FROM stdin;
+1	2025-07-05	1	RK-001	Varkaus-Jyväskylä	25.00	10.00	50.00	1.00	0.00	0.00	0.00	0.00	0.00	300.00	Testirahti 1
+2	2025-07-07	3	RK-002	Tampere-Helsinki	0.00	0.00	150.00	0.90	10.00	5.00	0.00	0.00	0.00	185.00	Testirahti 2
+3	2025-07-09	5	RK-003	Turku-Salo	0.00	0.00	40.00	1.20	5.00	8.00	0.00	0.00	0.00	88.00	Testirahti 3
+5	2025-07-08	4	RK-005	Oulu-Kemi	60.00	11.00	200.00	0.70	0.00	0.00	0.00	0.00	0.00	800.00	Testirahti 5
+\.
+
+
+--
+-- TOC entry 5143 (class 0 OID 19383)
+-- Dependencies: 245
+-- Data for Name: role_permissions; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.role_permissions (rooli_id, permission_id) FROM stdin;
+1	29
+1	31
+1	32
+1	30
+1	20
+1	27
+1	18
+1	26
+1	25
+1	22
+1	23
+1	4
+1	12
+1	1
+1	3
+1	6
+1	11
+1	10
+1	7
+1	28
+1	9
+1	2
+1	8
+1	5
+1	24
+1	21
+1	44
+1	46
+1	45
+1	43
+1	13
+5	21
+5	22
+5	20
+5	19
+5	18
+5	30
+5	32
+5	31
+5	29
+5	1
+4	18
+4	19
+4	5
+4	9
+4	20
+4	21
+4	22
+6	1
+6	18
+1	14
+1	16
+1	15
+1	17
+1	40
+1	42
+1	41
+1	39
+1	35
+1	37
+1	36
+1	34
+1	52
+1	54
+5	5
+5	9
+1	53
+1	47
+1	56
+1	58
+1	57
+1	19
+2	25
+2	23
+2	24
+2	5
+2	6
+2	7
+2	8
+2	9
+2	19
+2	2
+2	4
+2	3
+2	1
+2	13
+2	14
+2	16
+2	15
+2	30
+2	32
+2	31
+2	29
+2	10
+2	12
+2	11
+2	20
+2	22
+2	21
+2	18
+2	26
+2	28
+2	27
+2	17
+3	1
+3	16
+3	10
+3	9
+3	7
+3	6
+3	5
+3	3
+3	2
+3	15
+3	25
+3	24
+3	19
+3	18
+3	11
+3	13
+3	14
+3	4
+3	12
+3	30
+3	32
+3	31
+3	29
+3	23
+3	20
+3	22
+3	21
+3	26
+3	28
+3	27
+3	8
+3	17
+\.
+
+
+--
+-- TOC entry 5144 (class 0 OID 19386)
+-- Dependencies: 246
+-- Data for Name: roolit; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.roolit (rooli_id, roolin_nimi) FROM stdin;
+1	Superuser
+2	Admin
+3	Toimisto
+4	Dispatch
+5	Kuljettaja
+6	Alihankkija
+\.
+
+
+--
+-- TOC entry 5146 (class 0 OID 19390)
+-- Dependencies: 248
+-- Data for Name: sessiot; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.sessiot (id, sid, nimi, aika) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5148 (class 0 OID 19397)
+-- Dependencies: 250
+-- Data for Name: valikko; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.valikko (id, nimi, taso, jarjestys, tyyppi, linkki) FROM stdin;
+\.
+
+
+--
+-- TOC entry 5196 (class 0 OID 0)
+-- Dependencies: 218
+-- Name: asiakkaat_AsiakkaanID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."asiakkaat_AsiakkaanID_seq"', 17, true);
+
+
+--
+-- TOC entry 5197 (class 0 OID 0)
+-- Dependencies: 220
+-- Name: autot_AutoID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."autot_AutoID_seq"', 184, true);
+
+
+--
+-- TOC entry 5198 (class 0 OID 0)
+-- Dependencies: 222
+-- Name: kalusto_KalustoNro_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."kalusto_KalustoNro_seq"', 6, true);
+
+
+--
+-- TOC entry 5199 (class 0 OID 0)
+-- Dependencies: 226
+-- Name: kuljettajat_KuljID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."kuljettajat_KuljID_seq"', 14, true);
+
+
+--
+-- TOC entry 5200 (class 0 OID 0)
+-- Dependencies: 228
+-- Name: kuorma_KuormaID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."kuorma_KuormaID_seq"', 47, true);
+
+
+--
+-- TOC entry 5201 (class 0 OID 0)
+-- Dependencies: 230
+-- Name: muutieto_MuutietoID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."muutieto_MuutietoID_seq"', 15, true);
+
+
+--
+-- TOC entry 5202 (class 0 OID 0)
+-- Dependencies: 232
+-- Name: permissions_PermissionID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."permissions_PermissionID_seq"', 32, true);
+
+
+--
+-- TOC entry 5203 (class 0 OID 0)
+-- Dependencies: 233
+-- Name: permissions_permission_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.permissions_permission_id_seq', 58, true);
+
+
+--
+-- TOC entry 5204 (class 0 OID 0)
+-- Dependencies: 235
+-- Name: purkupaikka_PurkupaikkaID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."purkupaikka_PurkupaikkaID_seq"', 36, true);
+
+
+--
+-- TOC entry 5205 (class 0 OID 0)
+-- Dependencies: 237
+-- Name: puulaani_PuulaaniID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."puulaani_PuulaaniID_seq"', 142, true);
+
+
+--
+-- TOC entry 5206 (class 0 OID 0)
+-- Dependencies: 239
+-- Name: puutavaralaji_PuutavaraID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."puutavaralaji_PuutavaraID_seq"', 205, true);
+
+
+--
+-- TOC entry 5207 (class 0 OID 0)
+-- Dependencies: 241
+-- Name: puutavarat_PuutavaraNro_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."puutavarat_PuutavaraNro_seq"', 1, false);
+
+
+--
+-- TOC entry 5208 (class 0 OID 0)
+-- Dependencies: 244
+-- Name: rahtikirja_RahtiID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."rahtikirja_RahtiID_seq"', 1, false);
+
+
+--
+-- TOC entry 5209 (class 0 OID 0)
+-- Dependencies: 247
+-- Name: roolit_RooliID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."roolit_RooliID_seq"', 1, false);
+
+
+--
+-- TOC entry 5210 (class 0 OID 0)
+-- Dependencies: 249
+-- Name: sessiot_ID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."sessiot_ID_seq"', 1, false);
+
+
+--
+-- TOC entry 5211 (class 0 OID 0)
+-- Dependencies: 251
+-- Name: valikko_ID_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public."valikko_ID_seq"', 62, false);
+
+
+--
+-- TOC entry 4880 (class 2606 OID 19419)
+-- Name: asiakkaat UQ_AsiakkaanNimi; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.asiakkaat
+    ADD CONSTRAINT "UQ_AsiakkaanNimi" UNIQUE (asiakkaan_nimi);
+
+
+--
+-- TOC entry 4882 (class 2606 OID 19421)
+-- Name: asiakkaat asiakkaat_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.asiakkaat
+    ADD CONSTRAINT asiakkaat_pkey PRIMARY KEY (asiakkaan_id);
+
+
+--
+-- TOC entry 4887 (class 2606 OID 19423)
+-- Name: autot autot_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.autot
+    ADD CONSTRAINT autot_pkey PRIMARY KEY (auto_id);
+
+
+--
+-- TOC entry 4889 (class 2606 OID 19425)
+-- Name: kalusto kalusto_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kalusto
+    ADD CONSTRAINT kalusto_pkey PRIMARY KEY (kalusto_nro);
+
+
+--
+-- TOC entry 4891 (class 2606 OID 19427)
+-- Name: kalusto kalusto_rek_nro_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kalusto
+    ADD CONSTRAINT kalusto_rek_nro_unique UNIQUE (rek_nro);
+
+
+--
+-- TOC entry 4895 (class 2606 OID 19429)
+-- Name: kayttaja_roolit kayttaja_roolit_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kayttaja_roolit
+    ADD CONSTRAINT kayttaja_roolit_pkey PRIMARY KEY (kayttaja_tunnus, rooli_id);
+
+
+--
+-- TOC entry 4898 (class 2606 OID 19431)
+-- Name: kayttajat kayttajat_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kayttajat
+    ADD CONSTRAINT kayttajat_pkey PRIMARY KEY (tunnus);
+
+
+--
+-- TOC entry 4900 (class 2606 OID 19433)
+-- Name: kuljettajat kuljettajat_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kuljettajat
+    ADD CONSTRAINT kuljettajat_pkey PRIMARY KEY (kulj_id);
+
+
+--
+-- TOC entry 4908 (class 2606 OID 19435)
+-- Name: kuorma kuorma_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kuorma
+    ADD CONSTRAINT kuorma_pkey PRIMARY KEY (kuorma_id);
+
+
+--
+-- TOC entry 4910 (class 2606 OID 19437)
+-- Name: muutieto muutieto_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.muutieto
+    ADD CONSTRAINT muutieto_pkey PRIMARY KEY (muutieto_id);
+
+
+--
+-- TOC entry 4912 (class 2606 OID 19439)
+-- Name: permissions permissions_PermissionName_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.permissions
+    ADD CONSTRAINT "permissions_PermissionName_key" UNIQUE (permission_name);
+
+
+--
+-- TOC entry 4914 (class 2606 OID 19441)
+-- Name: permissions permissions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.permissions
+    ADD CONSTRAINT permissions_pkey PRIMARY KEY (permission_id);
+
+
+--
+-- TOC entry 4917 (class 2606 OID 19443)
+-- Name: purkupaikka purkupaikka_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.purkupaikka
+    ADD CONSTRAINT purkupaikka_pkey PRIMARY KEY (purkupaikka_id);
+
+
+--
+-- TOC entry 4922 (class 2606 OID 19445)
+-- Name: puulaani puulaani_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.puulaani
+    ADD CONSTRAINT puulaani_pkey PRIMARY KEY (puulaani_id);
+
+
+--
+-- TOC entry 4928 (class 2606 OID 19447)
+-- Name: puutavaralaji puutavaralaji_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.puutavaralaji
+    ADD CONSTRAINT puutavaralaji_pkey PRIMARY KEY (puutavara_id);
+
+
+--
+-- TOC entry 4930 (class 2606 OID 19449)
+-- Name: puutavarat puutavarat_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.puutavarat
+    ADD CONSTRAINT puutavarat_pkey PRIMARY KEY (puutavara_nro);
+
+
+--
+-- TOC entry 4934 (class 2606 OID 19451)
+-- Name: pylvaskuljetukset pylvaskuljetukset_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pylvaskuljetukset
+    ADD CONSTRAINT pylvaskuljetukset_pkey PRIMARY KEY (pylvaan_id);
+
+
+--
+-- TOC entry 4937 (class 2606 OID 19453)
+-- Name: rahtikirja rahtikirja_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.rahtikirja
+    ADD CONSTRAINT rahtikirja_pkey PRIMARY KEY (rahti_id);
+
+
+--
+-- TOC entry 4939 (class 2606 OID 19455)
+-- Name: role_permissions role_permissions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.role_permissions
+    ADD CONSTRAINT role_permissions_pkey PRIMARY KEY (rooli_id, permission_id);
+
+
+--
+-- TOC entry 4941 (class 2606 OID 19457)
+-- Name: roolit roolit_RoolinNimi_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.roolit
+    ADD CONSTRAINT "roolit_RoolinNimi_key" UNIQUE (roolin_nimi);
+
+
+--
+-- TOC entry 4943 (class 2606 OID 19459)
+-- Name: roolit roolit_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.roolit
+    ADD CONSTRAINT roolit_pkey PRIMARY KEY (rooli_id);
+
+
+--
+-- TOC entry 4945 (class 2606 OID 19461)
+-- Name: sessiot sessiot_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.sessiot
+    ADD CONSTRAINT sessiot_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 4919 (class 2606 OID 19463)
+-- Name: purkupaikka unique_site_per_customer_location; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.purkupaikka
+    ADD CONSTRAINT unique_site_per_customer_location UNIQUE (asiakas_id, purkupaikka, sijainti_lat, sijainti_long);
+
+
+--
+-- TOC entry 4893 (class 2606 OID 19465)
+-- Name: kalusto uq_reknro; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kalusto
+    ADD CONSTRAINT uq_reknro UNIQUE (rek_nro);
+
+
+--
+-- TOC entry 4947 (class 2606 OID 19467)
+-- Name: valikko valikko_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.valikko
+    ADD CONSTRAINT valikko_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 4884 (class 1259 OID 19468)
+-- Name: IDX_autot_KalustoID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_autot_KalustoID" ON public.autot USING btree (kalusto_id);
+
+
+--
+-- TOC entry 4885 (class 1259 OID 19469)
+-- Name: IDX_autot_PuulaaniID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_autot_PuulaaniID" ON public.autot USING btree (puulaani_id);
+
+
+--
+-- TOC entry 4901 (class 1259 OID 19470)
+-- Name: IDX_kuorma_AsiakasID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_kuorma_AsiakasID" ON public.kuorma USING btree (asiakas_id);
+
+
+--
+-- TOC entry 4902 (class 1259 OID 19471)
+-- Name: IDX_kuorma_AutoID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_kuorma_AutoID" ON public.kuorma USING btree (auto_id);
+
+
+--
+-- TOC entry 4903 (class 1259 OID 19472)
+-- Name: IDX_kuorma_KalustoNro; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_kuorma_KalustoNro" ON public.kuorma USING btree (kalusto_nro);
+
+
+--
+-- TOC entry 4904 (class 1259 OID 19473)
+-- Name: IDX_kuorma_KuljID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_kuorma_KuljID" ON public.kuorma USING btree (kulj_id);
+
+
+--
+-- TOC entry 4905 (class 1259 OID 19474)
+-- Name: IDX_kuorma_PuulaaniID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_kuorma_PuulaaniID" ON public.kuorma USING btree (puulaani_id);
+
+
+--
+-- TOC entry 4906 (class 1259 OID 19475)
+-- Name: IDX_kuorma_PuutavaraID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_kuorma_PuutavaraID" ON public.kuorma USING btree (puutavara_id);
+
+
+--
+-- TOC entry 4915 (class 1259 OID 19476)
+-- Name: IDX_purkupaikka_AsiakasID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_purkupaikka_AsiakasID" ON public.purkupaikka USING btree (asiakas_id);
+
+
+--
+-- TOC entry 4920 (class 1259 OID 19477)
+-- Name: IDX_puulaani_AsiakasID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_puulaani_AsiakasID" ON public.puulaani USING btree (asiakas_id);
+
+
+--
+-- TOC entry 4923 (class 1259 OID 19478)
+-- Name: IDX_puutavaralaji_AsiakasID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_puutavaralaji_AsiakasID" ON public.puutavaralaji USING btree (asiakas_id);
+
+
+--
+-- TOC entry 4924 (class 1259 OID 19479)
+-- Name: IDX_puutavaralaji_PurkupaikkaID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_puutavaralaji_PurkupaikkaID" ON public.puutavaralaji USING btree (purkupaikka_id);
+
+
+--
+-- TOC entry 4925 (class 1259 OID 19480)
+-- Name: IDX_puutavaralaji_PuulaaniID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_puutavaralaji_PuulaaniID" ON public.puutavaralaji USING btree (puulaani_id);
+
+
+--
+-- TOC entry 4926 (class 1259 OID 19481)
+-- Name: IDX_puutavaralaji_PuutavaraNro; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_puutavaralaji_PuutavaraNro" ON public.puutavaralaji USING btree (puutavara_nro);
+
+
+--
+-- TOC entry 4931 (class 1259 OID 19482)
+-- Name: IDX_pylvaskuljetukset_AsiakasID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_pylvaskuljetukset_AsiakasID" ON public.pylvaskuljetukset USING btree (asiakas_id);
+
+
+--
+-- TOC entry 4932 (class 1259 OID 19483)
+-- Name: IDX_pylvaskuljetukset_KuljettajaID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_pylvaskuljetukset_KuljettajaID" ON public.pylvaskuljetukset USING btree (kuljettaja_id);
+
+
+--
+-- TOC entry 4935 (class 1259 OID 19484)
+-- Name: IDX_rahtikirja_KuormaID; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "IDX_rahtikirja_KuormaID" ON public.rahtikirja USING btree (kuorma_id);
+
+
+--
+-- TOC entry 4896 (class 1259 OID 19485)
+-- Name: idx_kayttajat_kayttajakuljid; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_kayttajat_kayttajakuljid ON public.kayttajat USING btree (kulj_id);
+
+
+--
+-- TOC entry 4883 (class 1259 OID 19486)
+-- Name: uq_kohteenvari_not_empty; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX uq_kohteenvari_not_empty ON public.asiakkaat USING btree (kohteen_vari) WHERE ((kohteen_vari IS NOT NULL) AND (TRIM(BOTH FROM kohteen_vari) <> ''::text));
+
+
+--
+-- TOC entry 4948 (class 2606 OID 19487)
+-- Name: autot FK_Autot_Kalusto; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.autot
+    ADD CONSTRAINT "FK_Autot_Kalusto" FOREIGN KEY (kalusto_id) REFERENCES public.kalusto(kalusto_nro);
+
+
+--
+-- TOC entry 4949 (class 2606 OID 19492)
+-- Name: autot FK_Autot_Puulaani; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.autot
+    ADD CONSTRAINT "FK_Autot_Puulaani" FOREIGN KEY (puulaani_id) REFERENCES public.puulaani(puulaani_id);
+
+
+--
+-- TOC entry 4953 (class 2606 OID 19497)
+-- Name: kuorma FK_KuljID; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kuorma
+    ADD CONSTRAINT "FK_KuljID" FOREIGN KEY (kulj_id) REFERENCES public.kuljettajat(kulj_id);
+
+
+--
+-- TOC entry 4954 (class 2606 OID 19502)
+-- Name: kuorma FK_Kuorma_Asiakkaat; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kuorma
+    ADD CONSTRAINT "FK_Kuorma_Asiakkaat" FOREIGN KEY (asiakas_id) REFERENCES public.asiakkaat(asiakkaan_id);
+
+
+--
+-- TOC entry 4955 (class 2606 OID 19507)
+-- Name: kuorma FK_Kuorma_Autot; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kuorma
+    ADD CONSTRAINT "FK_Kuorma_Autot" FOREIGN KEY (auto_id) REFERENCES public.autot(auto_id);
+
+
+--
+-- TOC entry 4956 (class 2606 OID 19512)
+-- Name: kuorma FK_Kuorma_Kalusto; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kuorma
+    ADD CONSTRAINT "FK_Kuorma_Kalusto" FOREIGN KEY (kalusto_nro) REFERENCES public.kalusto(kalusto_nro);
+
+
+--
+-- TOC entry 4957 (class 2606 OID 19517)
+-- Name: kuorma FK_Kuorma_Puulaani; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kuorma
+    ADD CONSTRAINT "FK_Kuorma_Puulaani" FOREIGN KEY (puulaani_id) REFERENCES public.puulaani(puulaani_id);
+
+
+--
+-- TOC entry 4958 (class 2606 OID 19522)
+-- Name: kuorma FK_Kuorma_Puutavaralaji; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kuorma
+    ADD CONSTRAINT "FK_Kuorma_Puutavaralaji" FOREIGN KEY (puutavara_id) REFERENCES public.puutavaralaji(puutavara_id);
+
+
+--
+-- TOC entry 4959 (class 2606 OID 19527)
+-- Name: purkupaikka FK_Purkupaikka_Asiakkaat; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.purkupaikka
+    ADD CONSTRAINT "FK_Purkupaikka_Asiakkaat" FOREIGN KEY (asiakas_id) REFERENCES public.asiakkaat(asiakkaan_id);
+
+
+--
+-- TOC entry 4960 (class 2606 OID 19532)
+-- Name: puulaani FK_Puulaani_Asiakkaat; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.puulaani
+    ADD CONSTRAINT "FK_Puulaani_Asiakkaat" FOREIGN KEY (asiakas_id) REFERENCES public.asiakkaat(asiakkaan_id);
+
+
+--
+-- TOC entry 4961 (class 2606 OID 19537)
+-- Name: puutavaralaji FK_Puutavaralaji_Asiakkaat; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.puutavaralaji
+    ADD CONSTRAINT "FK_Puutavaralaji_Asiakkaat" FOREIGN KEY (asiakas_id) REFERENCES public.asiakkaat(asiakkaan_id);
+
+
+--
+-- TOC entry 4962 (class 2606 OID 19542)
+-- Name: puutavaralaji FK_Puutavaralaji_Purkupaikka; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.puutavaralaji
+    ADD CONSTRAINT "FK_Puutavaralaji_Purkupaikka" FOREIGN KEY (purkupaikka_id) REFERENCES public.purkupaikka(purkupaikka_id);
+
+
+--
+-- TOC entry 4963 (class 2606 OID 19547)
+-- Name: puutavaralaji FK_Puutavaralaji_Puulaani; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.puutavaralaji
+    ADD CONSTRAINT "FK_Puutavaralaji_Puulaani" FOREIGN KEY (puulaani_id) REFERENCES public.puulaani(puulaani_id);
+
+
+--
+-- TOC entry 4964 (class 2606 OID 19552)
+-- Name: puutavaralaji FK_Puutavaralaji_Puutavarat; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.puutavaralaji
+    ADD CONSTRAINT "FK_Puutavaralaji_Puutavarat" FOREIGN KEY (puutavara_nro) REFERENCES public.puutavarat(puutavara_nro);
+
+
+--
+-- TOC entry 4965 (class 2606 OID 19557)
+-- Name: pylvaskuljetukset FK_Pylvaskuljetukset_Asiakkaat; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pylvaskuljetukset
+    ADD CONSTRAINT "FK_Pylvaskuljetukset_Asiakkaat" FOREIGN KEY (asiakas_id) REFERENCES public.asiakkaat(asiakkaan_id);
+
+
+--
+-- TOC entry 4966 (class 2606 OID 19562)
+-- Name: pylvaskuljetukset FK_Pylvaskuljetukset_Kuljettajat; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pylvaskuljetukset
+    ADD CONSTRAINT "FK_Pylvaskuljetukset_Kuljettajat" FOREIGN KEY (kuljettaja_id) REFERENCES public.kuljettajat(kulj_id);
+
+
+--
+-- TOC entry 4967 (class 2606 OID 19567)
+-- Name: rahtikirja FK_Rahtikirja_Kuorma; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.rahtikirja
+    ADD CONSTRAINT "FK_Rahtikirja_Kuorma" FOREIGN KEY (kuorma_id) REFERENCES public.kuorma(kuorma_id);
+
+
+--
+-- TOC entry 4952 (class 2606 OID 19572)
+-- Name: kayttajat fk_kayttajat_kuljettajat; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kayttajat
+    ADD CONSTRAINT fk_kayttajat_kuljettajat FOREIGN KEY (kulj_id) REFERENCES public.kuljettajat(kulj_id) ON UPDATE CASCADE ON DELETE SET NULL;
+
+
+--
+-- TOC entry 4950 (class 2606 OID 19577)
+-- Name: kayttaja_roolit kayttaja_roolit_KayttajaTunnus_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kayttaja_roolit
+    ADD CONSTRAINT "kayttaja_roolit_KayttajaTunnus_fkey" FOREIGN KEY (kayttaja_tunnus) REFERENCES public.kayttajat(tunnus);
+
+
+--
+-- TOC entry 4951 (class 2606 OID 19582)
+-- Name: kayttaja_roolit kayttaja_roolit_RooliID_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kayttaja_roolit
+    ADD CONSTRAINT "kayttaja_roolit_RooliID_fkey" FOREIGN KEY (rooli_id) REFERENCES public.roolit(rooli_id);
+
+
+--
+-- TOC entry 4968 (class 2606 OID 19587)
+-- Name: role_permissions role_permissions_PermissionID_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.role_permissions
+    ADD CONSTRAINT "role_permissions_PermissionID_fkey" FOREIGN KEY (permission_id) REFERENCES public.permissions(permission_id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4969 (class 2606 OID 19592)
+-- Name: role_permissions role_permissions_RooliID_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.role_permissions
+    ADD CONSTRAINT "role_permissions_RooliID_fkey" FOREIGN KEY (rooli_id) REFERENCES public.roolit(rooli_id) ON DELETE CASCADE;
+
+
+-- Completed on 2025-09-10 11:13:21
+
+--
+-- PostgreSQL database dump complete
+--
+
