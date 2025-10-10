@@ -29,6 +29,7 @@ import loadRoutes from './routes/loadRoutes';
 import invoicingRoutes from './routes/invoicingRoutes'
 import consignmentRoutes from './routes/consignmentRoutes';
 import driverViewRoutes from './routes/driverViewRoutes';
+import consignmentDriverRoutes from './routes/consignmentDriverRoutes';
 import woodCategoryRoutes from './routes/woodCategoryRoutes';
 
 
@@ -85,6 +86,9 @@ apiRouter.use('/consignments', consignmentRoutes);
 // --- THIS IS THE NEWLY ADDED ROUTE ---
 // A dedicated route group for driver-specific views and data
 apiRouter.use('/driver', driverViewRoutes);
+
+// --- ROUTE FOR DRIVER CONSIGNMENTS ---
+apiRouter.use('/driver/consignments', consignmentDriverRoutes);
 
 // Mount the main API router under the /api path
 app.use('/api', apiRouter);

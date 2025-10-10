@@ -181,6 +181,7 @@ export const getTimberStackFullDetails = async (id: number): Promise<IPuulaaniFu
                  SELECT 
                     k.kuorma_id,
                     k.kulj_id, -- <<< ADD THIS
+                    k.status,
                     kul.nimi AS kuljettajan_nimi, -- <<< ADD THIS
                     pt.puutavara AS puutavaralaji,
                     k.pvm,
@@ -191,7 +192,8 @@ export const getTimberStackFullDetails = async (id: number): Promise<IPuulaaniFu
                 LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id -- <<< JOIN to get the name
                 LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
                 LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
-                WHERE k.puulaani_id = $1
+                WHERE k.puulaani_id = $1 AND
+                        k.is_active = TRUE
                 ORDER BY k.pvm DESC;
             `, [id])
         ]);

@@ -49,3 +49,55 @@ export const getLoadForEditHandler = async (req: AuthenticatedRequest, res: Resp
         next(error);
     }
 };
+
+// --- THIS IS THE NEW HANDLER ---
+export const getConsignmentsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const driverId = req.user?.driverNumericId;
+        if (typeof driverId !== 'number') {
+            return res.status(403).json({ message: "Forbidden: User is not a valid driver." });
+        }
+        
+        const consignments = await driverViewService.getConsignmentsForDriver(driverId);
+        res.status(200).json(consignments);
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getActiveTripHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const driverId = req.user?.driverNumericId;
+        if (typeof driverId !== 'number') {
+            return res.status(403).json({ message: "Forbidden: User is not a valid driver." });
+        }
+        
+        // Call the service function to get the single active trip
+        const activeTrip = await driverViewService.getActiveTripForDriver(driverId);
+
+        // It's okay if it's null (no active trip), the frontend will handle it.
+        res.status(200).json(activeTrip);
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+export const updateTimberEntryStatusHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const puulaaniId = parseInt(req.params.id, 10);
+        const timberEntries = req.body.timberEntries; // Expecting an array like [{ puutavaraId: 1, valmis: true }]
+
+        if (isNaN(puulaaniId) || !Array.isArray(timberEntries)) {
+            return res.status(400).json({ message: "Invalid request data." });
+        }
+        
+        await driverViewService.updateTimberEntryStatus(puulaaniId, timberEntries);
+        res.status(200).json({ message: 'Statuses updated successfully.' });
+
+    } catch (error) {
+        next(error);
+    }
+};

@@ -84,3 +84,88 @@ export const getSingleLoadForEdit = async (id: number): Promise<any | null> => {
         throw new Error(`DB query for fetching single load with ID ${id} failed.`);
     }
 };
+
+export const getConsignmentsForDriver = async (driverId: number): Promise<any[]> => {
+    // This query selects loads where the type is '1' (Pole Transport/Consignment)
+    // for the currently logged-in driver.
+    const queryText = `
+        SELECT 
+            k.kuorma_id,
+            k.pvm,
+            k.ajomaarays_nro,
+            k.status,
+            a.asiakkaan_nimi,
+            k.lahto,
+            k.kohde
+        FROM public.kuorma k
+        LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+        WHERE
+            k.kulj_id = $1 AND
+            k.tyyppi = 1 AND
+            k.is_active = TRUE AND
+            k.status NOT IN ('Completed', 'Cancelled')
+        ORDER BY k.pvm DESC;
+    `;
+    try {
+        const result = await pool.query(queryText, [driverId]);
+        return camelcaseKeys(result.rows);
+    } catch (error) {
+        console.error(`[Service Error] Failed to get consignments for driver ${driverId}:`, error);
+        throw new Error('Database query for consignments failed.');
+    }
+};
+
+// --- THIS IS THE NEW FUNCTION ---
+export const getActiveTripForDriver = async (driverId: number): Promise<any | null> => {
+    try {
+        const query = `
+            SELECT 
+                k.kuorma_id, k.status, k.puutavara_id,
+                p.nimi AS puulaani_name, p.sijainti_lat AS puulaani_lat, p.sijainti_long AS puulaani_lng,
+                pp.purkupaikka AS purkupaikka_name, pp.sijainti_lat AS purkupaikka_lat, pp.sijainti_long AS purkupaikka_lng,
+                pt.puutavara AS puutavaralaji
+            FROM public.kuorma k
+            LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
+            LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
+            LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
+            LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
+            WHERE
+                k.kulj_id = $1 AND
+                k.status NOT IN ('Assigned', 'Completed', 'Cancelled') AND
+                k.is_active = TRUE
+            ORDER BY k.pvm DESC, k.kuorma_id DESC
+            LIMIT 1;
+        `;
+        const result = await pool.query(query, [driverId]);
+        if (result.rowCount === 0) {
+            return null;
+        }
+        return camelcaseKeys(result.rows[0]);
+    } catch (error) {
+        console.error(`[Service Error] Failed to get active trip for driver ${driverId}:`, error);
+        throw new Error('Database query for active trip failed.');
+    }
+};
+
+// --- THIS IS THE NEW FUNCTION for the driver ---
+export const updateTimberEntryStatus = async (puulaaniId: number, timberEntries: { puutavaraId: number, valmis: boolean }[]): Promise<void> => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        for (const entry of timberEntries) {
+            await client.query(
+                'UPDATE public.puutavaralaji SET valmis = $1 WHERE puutavara_id = $2 AND puulaani_id = $3',
+                [entry.valmis, entry.puutavaraId, puulaaniId]
+            );
+        }
+
+        await client.query('COMMIT');
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error(`[Service Error] Failed to update timber entry statuses for puulaani ${puulaaniId}:`, error);
+        throw new Error('Database query for updating timber statuses failed.');
+    } finally {
+        client.release();
+    }
+};

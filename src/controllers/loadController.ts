@@ -109,12 +109,16 @@ export const deleteLoadHandler = async (req: AuthenticatedRequest, res: Response
             return res.status(400).json({ message: "Invalid Load ID format." });
         }
 
-        const result = await loadService.deleteLoad(id);
+        const result = await loadService.deleteLoad(id, req.user!);
         if (!result) {
             return res.status(404).json({ message: 'Load not found for deletion' });
         }
         res.status(200).json(result);
     } catch (error) {
+        // Handle specific "Forbidden" or "Cannot delete" errors
+        if (error instanceof Error && (error.message.includes('Forbidden') || error.message.includes('Cannot delete'))) {
+            return res.status(403).json({ message: error.message });
+        }
         next(error);
     }
 };

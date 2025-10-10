@@ -142,17 +142,119 @@ export const getTripByLoadId = async (id: number): Promise<ITripDetails | null> 
 };
 
 export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
-    const { tyyppi, asiakasId, puulaaniId, kalustoNro, kuljId, pvm, ajomaaraysNro, kohde, lahto, m3, km, lisatiedot, puutavaraId } = data;
-    const insertQuery = `INSERT INTO public.kuorma (tyyppi, asiakas_id, puulaani_id, puutavara_id, kulj_id, pvm, ajomaarays_nro, kohde, lahto, m3, km, lisatiedot, kalusto_nro, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'Assigned') RETURNING *;`;
-    const params = [ tyyppi, asiakasId, puulaaniId ?? null, puutavaraId ?? null, kuljId, pvm, ajomaaraysNro ?? null, kohde ?? null, lahto ?? null, m3 ?? 0, km ?? 0, lisatiedot ?? null, kalustoNro ];
+    const { 
+        tyyppi, asiakasId, puulaaniId, kalustoNro, kuljId, pvm, 
+        ajomaaraysNro, kohde, lahto, m3, km, lisatiedot, puutavaraId, vastaanottoNro 
+    } = data;
+    
+    const client = await pool.connect();
     try {
-        const result = await pool.query(insertQuery, params);
-        return camelcaseKeys(result.rows[0]);
+        await client.query('BEGIN');
+
+        let autoId: number | null = null;
+        if (puulaaniId && kalustoNro) {
+            const autoResult = await client.query(
+                'SELECT auto_id FROM public.autot WHERE puulaani_id = $1 AND kalusto_id = $2 LIMIT 1',
+                [puulaaniId, kalustoNro]
+            );
+
+            // --- THIS IS THE FIX ---
+            // Add a check to ensure autoResult is not null before accessing its properties
+            if (autoResult && (autoResult.rowCount ?? 0) > 0) {
+                autoId = autoResult.rows[0].auto_id;
+            } else {
+                console.warn(`No entry found in 'autot' table for puulaani_id=${puulaaniId} and kalusto_id=${kalustoNro}. 'auto_id' will be null.`);
+            }
+        }
+        
+        const insertQuery = `
+            INSERT INTO public.kuorma 
+            (tyyppi, asiakas_id, puulaani_id, puutavara_id, auto_id, kulj_id, pvm, ajomaarays_nro, kohde, lahto, m3, km, lisatiedot, kalusto_nro, status, vastaanotto_nro) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'Assigned', $15) 
+            RETURNING *;
+        `;
+        const params = [ 
+            tyyppi, asiakasId, puulaaniId ?? null, puutavaraId ?? null, autoId,
+            kuljId, pvm, ajomaaraysNro ?? null, kohde ?? null, lahto ?? null, 
+            m3 ?? 0, km ?? 0, lisatiedot ?? null, kalustoNro, vastaanottoNro ?? null
+        ];
+        const result = await client.query(insertQuery, params);
+        const newLoad = result.rows[0];
+
+        if (puutavaraId && m3 && m3 > 0) {
+            const updateTimberEntryQuery = `
+                UPDATE public.puutavaralaji
+                SET
+                    haettu = haettu + $1,
+                    jaljella = jaljella - $1
+                WHERE puutavara_id = $2;
+            `;
+            await client.query(updateTimberEntryQuery, [m3, puutavaraId]);
+        }
+
+        await client.query('COMMIT');
+        return camelcaseKeys(newLoad);
+
     } catch (error) {
+        await client.query('ROLLBACK');
         console.error("!!! DATABASE ERROR while creating new load:", error);
         throw new Error("Database query for creating a new load failed.");
+    } finally {
+        client.release();
     }
 };
+
+// export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
+//     // Destructure all required fields from data
+//     const { tyyppi, asiakasId, puulaaniId, kalustoNro, kuljId, pvm, ajomaaraysNro, kohde, lahto, m3, km, lisatiedot, puutavaraId } = data;
+    
+//     const client = await pool.connect();
+//      try {
+//         await client.query('BEGIN');
+
+//         // --- THIS IS THE NEW LOGIC WITH THE FIX ---
+//         // Step 1: Find the 'auto_id' from the 'autot' table using puulaaniId and kalustoNro
+//         let autoId: number | null = null;
+//         if (puulaaniId && kalustoNro) {
+//             const autoResult = await client.query(
+//                 'SELECT auto_id FROM public.autot WHERE puulaani_id = $1 AND kalusto_id = $2 LIMIT 1',
+//                 [puulaaniId, kalustoNro]
+//             );
+
+//             // Add a check to ensure autoResult is not null before accessing rowCount
+//             if (autoResult?.rowCount && autoResult.rowCount > 0) {
+//                 autoId = autoResult.rows[0].auto_id;
+//             } else {
+//                 console.warn(`No entry found in 'autot' table for puulaani_id=${puulaaniId} and kalusto_id=${kalustoNro}. 'auto_id' will be null.`);
+//             }
+//         }
+        
+//         // Step 2: Insert into 'kuorma' table, now including the 'auto_id'
+//         const insertQuery = `
+//             INSERT INTO public.kuorma 
+//             (tyyppi, asiakas_id, puulaani_id, puutavara_id, auto_id, kulj_id, pvm, ajomaarays_nro, kohde, lahto, m3, km, lisatiedot, kalusto_nro, status) 
+//             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'Assigned') 
+//             RETURNING *;
+//         `;
+//         const params = [ 
+//             tyyppi, asiakasId, puulaaniId ?? null, puutavaraId ?? null, autoId,
+//             kuljId, pvm, ajomaaraysNro ?? null, kohde ?? null, lahto ?? null, 
+//             m3 ?? 0, km ?? 0, lisatiedot ?? null, kalustoNro 
+//         ];
+        
+//         const result = await client.query(insertQuery, params);
+        
+//         await client.query('COMMIT');
+//         return camelcaseKeys(result.rows[0]);
+
+//     } catch (error) {
+//         await client.query('ROLLBACK');
+//         console.error("!!! DATABASE ERROR while creating new load:", error);
+//         throw new Error("Database query for creating a new load failed.");
+//     } finally {
+//         client.release();
+//     }
+// };
 
 // --- THIS IS THE UPDATED, SECURE updateLoad FUNCTION ---
 export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayload): Promise<ILoad> => {
@@ -244,29 +346,50 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
     }
 };
 
-export const deleteLoad = async (id: number): Promise<{ kuormaId: number; message: string } | null> => {
-    console.log(`--- Performing SOFT DELETE for load ID: ${id} ---`);
-
-    // This query ONLY updates the is_active flag.
-    const softDeleteQuery = 'UPDATE public.kuorma SET is_active = FALSE WHERE kuorma_id = $1 RETURNING kuorma_id;';
-    
+export const deleteLoad = async (id: number, user: UserPayload): Promise<{ kuormaId: number; message: string } | null> => {
+    const client = await pool.connect();
     try {
-        const result = await pool.query(softDeleteQuery, [id]);
-
-        if (result.rowCount === 0) {
-            console.log(`Soft delete failed: Load with ID ${id} not found.`);
-            return null;
-        }
+        await client.query('BEGIN');
         
-        console.log(`Successfully soft-deleted load with ID: ${id}`);
+        // First, get the load to perform checks
+        const loadResult = await client.query('SELECT kulj_id, status FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [id]);
+        if (loadResult.rowCount === 0) {
+            return null; // Not found
+        }
+        const existingLoad = loadResult.rows[0];
+
+        const isDriver = user.roles.includes('Kuljettaja');
+
+        // --- SECURITY CHECKS ---
+        if (isDriver) {
+            // 1. Driver must own the load
+            if (existingLoad.kulj_id !== user.driverNumericId) {
+                throw new Error('Forbidden: You are not authorized to delete this load.');
+            }
+            // 2. Driver can only delete loads that have not yet started
+            if (existingLoad.status !== 'Assigned') {
+                throw new Error(`Cannot delete a load that is already in progress (Status: ${existingLoad.status}).`);
+            }
+        }
+        // Office staff can delete (soft delete) any load (as per original logic).
+
+        const softDeleteQuery = 'UPDATE public.kuorma SET is_active = FALSE WHERE kuorma_id = $1 RETURNING kuorma_id;';
+        const result = await client.query(softDeleteQuery, [id]);
+
+        await client.query('COMMIT');
+        
+        console.log(`Successfully soft-deleted load with ID: ${id} by user: ${user.userId}`);
         return { 
             kuormaId: result.rows[0].kuorma_id, 
             message: 'Load marked as inactive successfully' 
         };
 
     } catch (error) {
+        await client.query('ROLLBACK');
         console.error(`Error during soft delete for load ID ${id}:`, error);
         throw error;
+    } finally {
+        client.release();
     }
 };
 

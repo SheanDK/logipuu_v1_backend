@@ -24,5 +24,19 @@ router.get(
     driverViewController.getLoadForEditHandler
 );
 
+// Add this route to the file
+router.get(
+    '/active-trip',
+    protect,
+    authorize(driverRoles),
+    driverViewController.getActiveTripHandler
+);
+
+router.put(
+    '/puulaani/:id/statuses',
+    protect,
+    authorize(driverRoles),
+    driverViewController.updateTimberEntryStatusHandler
+);
 
 export default router;
