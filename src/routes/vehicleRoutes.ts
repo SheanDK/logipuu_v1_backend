@@ -15,6 +15,9 @@ const EDIT_VEHICLE_PERMISSION = ['vehicles_edit'];
 const DELETE_VEHICLE_PERMISSION = ['vehicles_delete'];
 const officeRoles = ['Superuser', 'Admin', 'Toimisto']; // Roles that can use check-reg-no
 
+// This route can be restricted to office staff roles or a specific permission
+router.get('/check-reg-no', protect, authorize(officeRoles), vehicleController.checkRegistrationNoExistsHandler);
+
 // GET all vehicles: Requires 'vehicle_view' permission
 router.get('/', protect, authorize([], VIEW_VEHICLE_PERMISSION), vehicleController.getAllVehiclesHandler);
 
@@ -30,7 +33,5 @@ router.put('/:id', protect, authorize([], EDIT_VEHICLE_PERMISSION), validateDto(
 // DELETE a vehicle: Requires 'vehicle_delete' permission
 router.delete('/:id', protect, authorize([], DELETE_VEHICLE_PERMISSION), vehicleController.deleteVehicleHandler);
 
-// This route can be restricted to office staff roles or a specific permission
-router.get('/check-reg-no', protect, authorize(officeRoles), vehicleController.checkRegistrationNoExistsHandler);
 
 export default router;

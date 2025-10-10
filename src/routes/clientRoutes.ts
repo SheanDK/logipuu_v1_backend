@@ -20,6 +20,14 @@ const CREATE_CLIENT_PERMISSION = ['clients_create'];
 const EDIT_CLIENT_PERMISSION = ['clients_edit'];
 const DELETE_CLIENT_PERMISSION = ['clients_delete'];
 
+// Get check if color is already in use
+router.get(
+  '/check-color',
+  protect,
+  authorize(allStaffRoles, VIEW_CLIENT_PERMISSION),
+  clientController.checkColorExistsHandler
+);
+
 // GET all clients: Requires 'clients_view' permission, accessible by all staff
 router.get(
     '/',

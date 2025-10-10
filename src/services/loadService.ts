@@ -103,7 +103,8 @@ export const getTripByLoadId = async (id: number): Promise<ITripDetails | null> 
 
     const tripLegsQuery = `
         SELECT
-            k.kuorma_id, k.pvm, k.status, k.m3, k.kulj_id, k.ajomaarays_nro, k.lisatiedot,
+            k.kuorma_id, k.pvm, k.status, k.m3, k.km, k.tunnit, k.kpl, k.reitti, k.vastaanotto_nro,
+            k.kulj_id, k.ajomaarays_nro, k.lisatiedot,
             k.puulaani_id, k.puutavara_id,
             p.nimi AS origin_name, pp.purkupaikka AS destination_name,
             p.sijainti_lat AS origin_lat, p.sijainti_long AS origin_lng,

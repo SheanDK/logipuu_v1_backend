@@ -104,7 +104,7 @@ export interface IMapTrip {
     status: string;
     originCoords: { lat: number, lng: number };
     destinationCoords: { lat: number, lng: number };
-} 
+}
 
 export interface ITripDetails {
     tripId: string | null;
@@ -119,10 +119,15 @@ export interface ITripDetails {
         pvm: Date;
         status: string;
         m3: number;
-        kuljId: number | null; 
-        puulaaniId: number | null; // Ensure these are also present
-        puutavaraId: number | null; // Ensure these are also present
-        lisatiedot: string | null; // Ensure these are also present
+        km: number;
+        tunnit: number;
+        kpl: number;
+        reitti: string | null;
+        vastaanottoNro: string | null;
+        kuljId: number | null;
+        puulaaniId: number | null;
+        puutavaraId: number | null;
+        lisatiedot: string | null;
         originName: string;
         destinationName: string;
         originLat: number | null;
