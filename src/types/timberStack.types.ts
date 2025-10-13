@@ -29,6 +29,7 @@ export interface ITimberStackFilters {
     vehicleId: any;
     clientId?: string;
     status?: 'all' | 'active';
+    timberTypeId?: string;  
 }
 
 export interface IPuulaaniFullDetails {
