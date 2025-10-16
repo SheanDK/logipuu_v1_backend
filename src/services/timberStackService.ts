@@ -2,12 +2,12 @@
 import pool from '../config/db';
 import camelcaseKeys from 'camelcase-keys';
 
-import { 
-    ITimberStack, 
+import {
+    ITimberStack,
     ITimberStackFilters,
-    CreateTimberStackDto, 
+    CreateTimberStackDto,
     IUpdateTimberStackFullDto,
-    UpdateTimberStackLocationDto, 
+    UpdateTimberStackLocationDto,
     ITimberStackListFilters,
     ITimberStackListItem,
     IPuulaaniFullDetails
@@ -19,9 +19,9 @@ import * as updateQueries from '../queries/timberStackQueries/updateTimberStackQ
 import * as deleteQueries from '../queries/timberStackQueries/deleteTimberStackQueries';
 
 export const getAllTimberStacks = async (filters: ITimberStackFilters): Promise<ITimberStack[]> => {
-    
+
     console.log('--- Service received filters:', filters);
-    
+
     const queryText = `
         SELECT
             p.puulaani_id, p.asiakas_id, a.asiakkaan_nimi, a.kohteen_vari,
@@ -30,7 +30,7 @@ export const getAllTimberStacks = async (filters: ITimberStackFilters): Promise<
         FROM public.puulaani p
         LEFT JOIN public.asiakkaat a ON p.asiakas_id = a.asiakkaan_id
     `;
-    
+
     const conditions: string[] = [];
     const queryParams: (string | number)[] = [];
     let paramIndex = 1;
@@ -38,7 +38,7 @@ export const getAllTimberStacks = async (filters: ITimberStackFilters): Promise<
     if (filters.clientId) {
         console.log(`Applying CLIENT filter. Original value: '${filters.clientId}', Type: ${typeof filters.clientId}`);
         const clientIdAsInt = parseInt(filters.clientId, 10);
-        
+
         if (!isNaN(clientIdAsInt)) {
             conditions.push(`p.asiakas_id = $${paramIndex++}`);
             queryParams.push(clientIdAsInt);
@@ -56,7 +56,7 @@ export const getAllTimberStacks = async (filters: ITimberStackFilters): Promise<
         console.log(`Applying VEHICLE filter. Original value: '${filters.vehicleId}', Type: ${typeof filters.vehicleId}`);
         const vehicleIdAsInt = parseInt(filters.vehicleId, 10);
 
-        if(!isNaN(vehicleIdAsInt)) {
+        if (!isNaN(vehicleIdAsInt)) {
             conditions.push(`EXISTS (
                 SELECT 1 
                 FROM public.autot pa 
@@ -66,7 +66,29 @@ export const getAllTimberStacks = async (filters: ITimberStackFilters): Promise<
             queryParams.push(vehicleIdAsInt);
             console.log(`SUCCESS: Added vehicleId = ${vehicleIdAsInt} to query.`);
         } else {
-             console.error(`ERROR: vehicleId '${filters.vehicleId}' could not be parsed to an integer.`);
+            console.error(`ERROR: vehicleId '${filters.vehicleId}' could not be parsed to an integer.`);
+        }
+    }
+
+    if (
+        filters.timberTypeId !== undefined &&
+        filters.timberTypeId !== null &&
+        String(filters.timberTypeId).trim() !== ''
+    ) {
+        const timberTypeIdAsInt = parseInt(String(filters.timberTypeId), 10);
+        console.log(`[getAllTimberStacks] raw timberTypeId:`, filters.timberTypeId, '→ parsed:', timberTypeIdAsInt);
+
+        if (!isNaN(timberTypeIdAsInt)) {
+            conditions.push(`EXISTS (
+      SELECT 1
+      FROM public.puutavaralaji pl
+      WHERE pl.puulaani_id = p.puulaani_id
+        AND pl.puutavara_nro = $${paramIndex++}
+    )`);
+            queryParams.push(timberTypeIdAsInt);
+            console.log(`[getAllTimberStacks] Added timberTypeId filter =`, timberTypeIdAsInt);
+        } else {
+            console.warn(`[getAllTimberStacks] timberTypeId not a number, ignored`);
         }
     }
 
@@ -79,7 +101,7 @@ export const getAllTimberStacks = async (filters: ITimberStackFilters): Promise<
     console.log('--- EXECUTING FINAL QUERY ---');
     console.log('Query:', finalQuery);
     console.log('Params:', queryParams);
-    
+
     try {
         const result = await pool.query(finalQuery, queryParams);
         console.log(`--- Query returned ${result.rowCount} rows ---`);
@@ -105,16 +127,16 @@ export const createTimberStack = async (data: CreateTimberStackDto): Promise<ITi
             isActive, isCompleted, latitude, longitude, dispatchOrderNo, kilometers,
             selectedAutoIds, woodEntries
         } = data;
-        
+
         const params = [
             clientId, new Date(date), name, auto_nro ?? null, additionalInfo ?? '',
             totalVolume, totalVolume, kilometers ?? 0,
             isActive ?? true, isCompleted ?? false,
             latitude, longitude, dispatchOrderNo ?? null
         ];
-        
+
         const result = await client.query(createQueries.INSERT_TIMBER_STACK, params);
-        
+
         const rows = camelcaseKeys(result.rows);
         const newStackId = rows[0]?.puulaaniId;
 
@@ -145,7 +167,7 @@ export const createTimberStack = async (data: CreateTimberStackDto): Promise<ITi
 
         const newStack = await getTimberStackById(newStackId);
         if (newStack) return newStack;
-        
+
         throw new Error('Timber stack created but could not retrieve the new record.');
 
     } catch (error) {
@@ -163,7 +185,7 @@ export const getTimberStackFullDetails = async (id: number): Promise<IPuulaaniFu
     const client = await pool.connect();
     try {
         const puulaaniResult = await client.query('SELECT *, asiakas_id as "clientId" FROM public.puulaani WHERE puulaani_id = $1', [id]);
-        
+
         if (puulaaniResult.rows.length === 0) {
             return null;
         }
@@ -197,7 +219,7 @@ export const getTimberStackFullDetails = async (id: number): Promise<IPuulaaniFu
                 ORDER BY k.pvm DESC;
             `, [id])
         ]);
-                // --- DEBUGGING LINE ---
+        // --- DEBUGGING LINE ---
         console.log("[BACKEND DEBUG] Raw relatedLoadsResult from DB:", relatedLoadsResult.rows);
 
         if (puulaaniResult.rows.length === 0) {
@@ -207,8 +229,8 @@ export const getTimberStackFullDetails = async (id: number): Promise<IPuulaaniFu
 
         return {
             puulaani: camelcaseKeys(puulaaniResult.rows[0]),
-            autot: autotResult.rows.map(r => r.kalusto_id), 
-            timberEntries: camelcaseKeys(puutavaratResult.rows), 
+            autot: autotResult.rows.map(r => r.kalusto_id),
+            timberEntries: camelcaseKeys(puutavaratResult.rows),
             relatedLoads: camelcaseKeys(relatedLoadsResult.rows)
         };
     } catch (error) {
@@ -269,7 +291,7 @@ export const updateTimberStackFull = async (id: number, data: IUpdateTimberStack
         // --- DEBUGGING STEP ---
         for (const woodEntry of puutavarat) {
             console.log(`[DEBUG] Processing woodEntry from frontend:`, woodEntry);
-            
+
             const isCompleted = woodEntry.valmis;
             console.log(`[DEBUG] Extracted 'isCompleted' value: ${isCompleted}, Type: ${typeof isCompleted}`);
 
@@ -277,11 +299,11 @@ export const updateTimberStackFull = async (id: number, data: IUpdateTimberStack
 
             if (isExisting) {
                 const updateParams = [
-                    woodEntry.puutavaranro, 
-                    woodEntry.purkupaikka_id, 
-                    woodEntry.kuutiot, 
-                    woodEntry.haettu, 
-                    (woodEntry.kuutiot - woodEntry.haettu), 
+                    woodEntry.puutavaranro,
+                    woodEntry.purkupaikka_id,
+                    woodEntry.kuutiot,
+                    woodEntry.haettu,
+                    (woodEntry.kuutiot - woodEntry.haettu),
                     isCompleted, // This is parameter $6
                     woodEntry.puutavara_id
                 ];
@@ -293,13 +315,13 @@ export const updateTimberStackFull = async (id: number, data: IUpdateTimberStack
                 );
             } else {
                 const insertParams = [
-                    id, 
-                    puulaani.asiakasId, 
-                    woodEntry.puutavaranro, 
-                    woodEntry.purkupaikka_id, 
-                    woodEntry.kuutiot, 
-                    woodEntry.haettu, 
-                    (woodEntry.kuutiot - woodEntry.haettu), 
+                    id,
+                    puulaani.asiakasId,
+                    woodEntry.puutavaranro,
+                    woodEntry.purkupaikka_id,
+                    woodEntry.kuutiot,
+                    woodEntry.haettu,
+                    (woodEntry.kuutiot - woodEntry.haettu),
                     isCompleted // This is parameter $8
                 ];
                 console.log(`[DEBUG] Preparing to INSERT with params:`, insertParams);
@@ -328,9 +350,9 @@ export const deleteTimberStack = async (id: number): Promise<{ puulaaniId: numbe
 
         await client.query(deleteQueries.DELETE_VEHICLE_ASSOCIATIONS_BY_STACK_ID, [id]);
         await client.query(deleteQueries.DELETE_WOOD_ENTRIES_BY_STACK_ID, [id]);
-        
+
         const result = await client.query(deleteQueries.DELETE_TIMBER_STACK_BY_ID, [id]);
-        
+
         const rows = camelcaseKeys(result.rows);
 
         if (result.rowCount === 0) {
@@ -339,7 +361,7 @@ export const deleteTimberStack = async (id: number): Promise<{ puulaaniId: numbe
         }
 
         await client.query('COMMIT');
-        
+
         return { puulaaniId: rows[0].puulaaniId, message: 'Timber stack and all associated data deleted successfully' };
 
     } catch (error) {
@@ -354,7 +376,7 @@ export const deleteTimberStack = async (id: number): Promise<{ puulaaniId: numbe
 export const updateTimberStackLocation = async (id: number, data: UpdateTimberStackLocationDto) => {
     const { latitude, longitude } = data;
     const result = await pool.query(updateQueries.UPDATE_TIMBER_STACK_LOCATION, [latitude, longitude, id]);
-    
+
     if (result.rowCount === 0) {
         return null;
     }
@@ -362,7 +384,7 @@ export const updateTimberStackLocation = async (id: number, data: UpdateTimberSt
 };
 
 export const getTimberStackList = async (filters: ITimberStackListFilters): Promise<ITimberStackListItem[]> => {
-    
+
     const queryText = `
         SELECT
             p.puulaani_id,
@@ -374,7 +396,7 @@ export const getTimberStackList = async (filters: ITimberStackListFilters): Prom
         FROM public.puulaani p
         LEFT JOIN public.asiakkaat a ON p.asiakas_id = a.asiakkaan_id
     `;
-    
+
     const conditions: string[] = [];
     const queryParams: (string | number)[] = [];
     let paramIndex = 1;
@@ -403,13 +425,15 @@ export const getTimberStackList = async (filters: ITimberStackListFilters): Prom
             queryParams.push(vehicleIdAsInt);
         }
     }
-    
+
     if (filters.timberTypeId) {
         const timberTypeIdAsInt = parseInt(filters.timberTypeId, 10);
         if (!isNaN(timberTypeIdAsInt)) {
-             conditions.push(`EXISTS (
-                SELECT 1 FROM public.puutavaralaji pt 
-                WHERE pt.puulaani_id = p.puulaani_id AND pt.puutavara_nro = $${paramIndex++}
+            conditions.push(`EXISTS (
+                SELECT 1 
+                FROM public.puutavaralaji pl 
+                WHERE pl.puulaani_id = p.puulaani_id 
+                AND pl.puutavara_nro = $${paramIndex++}
             )`);
             queryParams.push(timberTypeIdAsInt);
         }
@@ -420,7 +444,7 @@ export const getTimberStackList = async (filters: ITimberStackListFilters): Prom
         finalQuery += ` WHERE ${conditions.join(' AND ')}`;
     }
     finalQuery += ` ORDER BY p.pvm DESC, p.puulaani_id DESC;`;
-    
+
     try {
         const result = await pool.query(finalQuery, queryParams);
         return camelcaseKeys(result.rows);
@@ -498,7 +522,7 @@ export const getWoodEntriesByPuulaaniId = async (puulaaniId: number) => {
         WHERE
             pl.puulaani_id = $1;
     `;
-    
+
     const result = await pool.query(query, [puulaaniId]);
     return camelcaseKeys(result.rows);
 };

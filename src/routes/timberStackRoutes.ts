@@ -26,7 +26,6 @@ router.get('/',
     timberStackController.getAllTimberStacksHandler
 );
 
-// --- THIS IS THE MOST CRITICAL FIX ---
 // The route for getting active stacks for a specific client.
 // The `:clientId` makes it a URL parameter, which is what the controller expects.
 router.get('/active/by-client/:clientId',
@@ -86,5 +85,6 @@ router.delete('/:id',
     authorize(officeRoles, TIMBER_MAP_DELETE),
     timberStackController.deleteTimberStackHandler
 );
+
 
 export default router;

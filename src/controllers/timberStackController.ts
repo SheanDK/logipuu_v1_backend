@@ -10,7 +10,8 @@ export const getAllTimberStacksHandler = async (req: AuthenticatedRequest, res: 
         const filters: ITimberStackFilters = {
             clientId: req.query.clientId as string | undefined,
             status: req.query.status as 'all' | 'active' | undefined,
-            vehicleId: req.query.vehicleId as string | undefined, // Add vehicleId
+            vehicleId: req.query.vehicleId as string | undefined,
+            timberTypeId: req.query.timberTypeId as string | undefined,
         };
         
         const stacks = await timberStackService.getAllTimberStacks(filters);
