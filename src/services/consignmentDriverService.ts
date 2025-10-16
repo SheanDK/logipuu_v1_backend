@@ -1,116 +1,155 @@
 // backend/src/services/consignmentDriverService.ts
+import { PoolClient } from 'pg';
 import pool from '../config/db';
-import camelcaseKeys from 'camelcase-keys';
 import { CreateConsignmentDto } from '../dto/consignment.dto';
+import { executeTransaction } from '../utils/dbUtils';
 
-// --- SERVICE TO GET THE LIST OF CONSIGNMENTS FOR THE DASHBOARD ---
-export const getConsignmentsForDriver = async (driverId: number) => {
+/**
+ * Fetches a list of parent consignment loads for a specific driver and vehicle.
+ * This is used for the main dashboard list view.
+ */
+export const getConsignmentsForDriver = async (driverId: number, vehicleId: number) => { 
     const query = `
         SELECT
-            k.kuorma_id,
-            k.pvm,
-            a.asiakkaan_nimi,
+            k.kuorma_id, 
+            k.pvm, 
+            a.asiakkaan_nimi, 
+            kal.rek_nro as auto_nro, 
+            kul.nimi as kuljettajan_nimi, 
             k.status,
             (SELECT COUNT(*) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id) as rahtikirja_count
         FROM public.kuorma k
         JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
-        WHERE k.kulj_id = $1 AND k.tyyppi = 1 AND k.is_active = TRUE
+        JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+        JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+        WHERE 
+            k.kulj_id = $1 
+            AND k.kalusto_nro = $2 
+            AND k.tyyppi = 1 
+            AND k.is_active = TRUE
         ORDER BY k.pvm DESC;
     `;
-    const result = await pool.query(query, [driverId]);
-    return camelcaseKeys(result.rows);
+    const result = await pool.query(query, [driverId, vehicleId]);
+    return result.rows;
 };
 
-// --- SERVICE TO GET A SINGLE CONSIGNMENT WITH ITS WAYBILLS FOR EDITING ---
-export const getConsignmentById = async (id: number, driverId: number) => {
-    const kuormaQuery = `SELECT * FROM public.kuorma WHERE kuorma_id = $1 AND kulj_id = $2 AND tyyppi = 1;`;
-    const rahtikirjatQuery = `SELECT * FROM public.rahtikirja WHERE kuorma_id = $1;`;
+/**
+ * Fetches the full details of a single consignment load, including all its child waybills.
+ * This is used when a user clicks to edit an existing consignment.
+ */
+export const getConsignmentById = async (id: number, driverId: number): Promise<any | null> => {
+    console.log(`\n--- [Service: getConsignmentById] ---`);
+    console.log(`[1] Initiated for kuorma_id: ${id}, driver_id: ${driverId}`);
+    
+    // The parent kuorma_id is also likely a bigint, so we cast here as well for safety.
+    const kuormaQuery = `SELECT * FROM public.kuorma WHERE kuorma_id = $1::bigint AND kulj_id = $2 AND tyyppi = 1;`;
+    
+    // --- THE MAIN FIX IS HERE ---
+    const rahtikirjatQuery = `SELECT * FROM public.rahtikirja WHERE kuorma_id = $1::bigint ORDER BY rahti_id ASC;`;
 
-    const kuormaResult = await pool.query(kuormaQuery, [id, driverId]);
-    if (kuormaResult.rowCount === 0) {
-        return null; // Not found or not owned by this driver
-    }
-
-    const rahtikirjatResult = await pool.query(rahtikirjatQuery, [id]);
-
-    const kuorma = camelcaseKeys(kuormaResult.rows[0]);
-    kuorma.rahtikirjat = camelcaseKeys(rahtikirjatResult.rows);
-
-    return kuorma;
-};
-
-// --- SERVICE TO CREATE A NEW CONSIGNMENT (PARENT + CHILDREN) ---
-export const createConsignment = async (dto: CreateConsignmentDto, driverId: number, vehicleId: number) => {
-    const client = await pool.connect();
     try {
-        await client.query('BEGIN'); // Start transaction
+        const kuormaResult = await pool.query(kuormaQuery, [id, driverId]);
+        
+        if (!kuormaResult || kuormaResult.rowCount === 0) {
+            console.log(`[2] RESULT: Parent kuorma with id ${id} NOT FOUND for this driver. Returning null.`);
+            console.log(`-------------------------------------\n`);
+            return null;
+        }
+        console.log(`[2] SUCCESS: Parent kuorma with id ${id} found.`);
 
-        // 1. Insert the parent "Kuorma"
+        console.log(`[3] Now fetching waybills with query: ${rahtikirjatQuery} (using parameter: ${id})`);
+        const rahtikirjatResult = await pool.query(rahtikirjatQuery, [id]);
+        
+        const rowCount = rahtikirjatResult?.rowCount || 0;
+        console.log(`[4] RESULT: Waybill query returned ${rowCount} rows.`);
+        
+        if (rowCount > 0) {
+            console.log('[5] Found waybill data:', rahtikirjatResult.rows);
+        }
+
+        const kuorma = kuormaResult.rows[0];
+        kuorma.rahtikirjat = rahtikirjatResult?.rows || []; 
+        
+        console.log('[6] SUCCESS: Final object being returned to controller:', kuorma);
+        console.log(`-------------------------------------\n`);
+        return kuorma;
+
+    } catch (error) {
+        console.error(`[!!!] UNEXPECTED ERROR in getConsignmentById:`, error);
+        console.log(`-------------------------------------\n`);
+        throw error;
+    }
+};
+
+/**
+ * Creates a new consignment load (parent) and its associated waybills (children)
+ * within a single database transaction.
+ */
+export const createConsignment = async (dto: CreateConsignmentDto, driverId: number, vehicleId: number) => {
+    return executeTransaction(async (client: PoolClient) => {
         const kuormaInsertQuery = `
             INSERT INTO public.kuorma (tyyppi, asiakas_id, pvm, lisatiedot, kulj_id, kalusto_nro, status)
-            VALUES (1, $1, $2, $3, $4, $5, 'Assigned')
-            RETURNING kuorma_id;
+            VALUES (1, $1, $2, $3, $4, $5, 'Assigned') RETURNING kuorma_id;
         `;
         const kuormaResult = await client.query(kuormaInsertQuery, [dto.asiakasId, dto.pvm, dto.lisatiedot, driverId, vehicleId]);
         const newKuormaId = kuormaResult.rows[0].kuorma_id;
 
-        // 2. Insert the child "Rahtikirjat"
-        for (const r of dto.rahtikirjat) {
-            const rahtikirjaInsertQuery = `
-                INSERT INTO public.rahtikirja (kuorma_id, reitti, m3, km)
-                VALUES ($1, $2, $3, $4);
-            `;
-            await client.query(rahtikirjaInsertQuery, [newKuormaId, r.reitti, r.m3, r.km]);
+        if (dto.rahtikirjat && dto.rahtikirjat.length > 0) {
+            for (const r of dto.rahtikirjat) {
+                const rahtikirjaInsertQuery = `
+                    INSERT INTO public.rahtikirja (
+                        kuorma_id, pvm, rahtikirjan_nro, reitti, 
+                        m3, km, kpl, jako, tievero, lisatiedot
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                    RETURNING rahti_id;
+                `;
+                // FIX: Use camelCase properties from the DTO.
+                const params = [
+                    newKuormaId, dto.pvm, 
+                    r.rahtikirjanNumero || '',
+                    r.reitti || '',
+                    Number(r.m3) || 0, Number(r.km) || 0, Number(r.kpl) || 0,
+                    Number(r.jako) || 0, Number(r.tievero) || 0, r.lisatiedot || ''
+                ];
+                const result = await client.query(rahtikirjaInsertQuery, params);
+                if (result.rowCount === 0) { throw new Error(`DB INSERT FAILED`); }
+            }
         }
-
-        await client.query('COMMIT'); // Commit transaction
         return { kuormaId: newKuormaId };
-
-    } catch (error) {
-        await client.query('ROLLBACK'); // Rollback on error
-        throw error;
-    } finally {
-        client.release();
-    }
+    });
 };
 
-// --- SERVICE TO UPDATE AN EXISTING CONSIGNMENT ---
 export const updateConsignment = async (id: number, dto: CreateConsignmentDto, driverId: number) => {
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-
-        // Security check: Ensure the driver owns this Kuorma
+    return executeTransaction(async (client: PoolClient) => {
         const ownerCheck = await client.query('SELECT kulj_id FROM public.kuorma WHERE kuorma_id = $1', [id]);
-        if (ownerCheck.rowCount === 0 || ownerCheck.rows[0].kulj_id !== driverId) {
-            throw new Error('Forbidden');
-        }
+        if (ownerCheck.rowCount === 0 || ownerCheck.rows[0].kulj_id !== driverId) { throw new Error('Forbidden'); }
         
-        // 1. Update parent "Kuorma"
-        const kuormaUpdateQuery = `
-            UPDATE public.kuorma SET asiakas_id = $1, pvm = $2, lisatiedot = $3 WHERE kuorma_id = $4;
-        `;
+        const kuormaUpdateQuery = `UPDATE public.kuorma SET asiakas_id = $1, pvm = $2, lisatiedot = $3 WHERE kuorma_id = $4;`;
         await client.query(kuormaUpdateQuery, [dto.asiakasId, dto.pvm, dto.lisatiedot, id]);
-
-        // 2. Delete old child "Rahtikirjat"
+        
         await client.query('DELETE FROM public.rahtikirja WHERE kuorma_id = $1', [id]);
 
-        // 3. Insert new child "Rahtikirjat"
-        for (const r of dto.rahtikirjat) {
-             const rahtikirjaInsertQuery = `
-                INSERT INTO public.rahtikirja (kuorma_id, reitti, m3, km)
-                VALUES ($1, $2, $3, $4);
-            `;
-            await client.query(rahtikirjaInsertQuery, [id, r.reitti, r.m3, r.km]);
+        if (dto.rahtikirjat && dto.rahtikirjat.length > 0) {
+            for (const r of dto.rahtikirjat) {
+                const rahtikirjaInsertQuery = `
+                    INSERT INTO public.rahtikirja (
+                        kuorma_id, pvm, rahtikirjan_nro, reitti, 
+                        m3, km, kpl, jako, tievero, lisatiedot
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                    RETURNING rahti_id;
+                `;
+                // FIX: Use camelCase properties from the DTO.
+                const params = [
+                    id, dto.pvm,
+                    r.rahtikirjanNumero || '',
+                    r.reitti || '',
+                    Number(r.m3) || 0, Number(r.km) || 0, Number(r.kpl) || 0,
+                    Number(r.jako) || 0, Number(r.tievero) || 0, r.lisatiedot || ''
+                ];
+                const result = await client.query(rahtikirjaInsertQuery, params);
+                if (result.rowCount === 0) { throw new Error(`DB INSERT FAILED during update.`); }
+            }
         }
-        
-        await client.query('COMMIT');
         return { kuormaId: id };
-
-    } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-    } finally {
-        client.release();
-    }
+    });
 };

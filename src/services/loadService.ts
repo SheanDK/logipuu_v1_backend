@@ -613,7 +613,9 @@ export const acceptLoadsForInvoicing = async (loadIds: number[]): Promise<{ coun
 
 // --- THIS IS THE NEW FUNCTION FOR FETCHING COMPLETED TRIPS ---
 export const getMyCompletedLoadsForList = async (driverId: number): Promise<ILoadListItem[]> => {
-    let queryText = `
+    // This query combines results for Timber Loads (tyyppi = 0) and Consignments (tyyppi = 1)
+    const queryText = `
+        -- Query 1: Fetch completed Timber Loads (Puulaani)
         SELECT
             k.kuorma_id,
             TO_CHAR(k.pvm, 'YYYY-MM-DD') AS pvm,
@@ -622,15 +624,8 @@ export const getMyCompletedLoadsForList = async (driverId: number): Promise<ILoa
             COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
             kal.rek_nro,
             kul.nimi AS kuljettajan_nimi,
-            CASE
-                WHEN k.tyyppi = 0 THEN 'Puulaani'
-                WHEN k.tyyppi = 1 THEN 'Pole Transport'
-                ELSE 'Unknown'
-            END AS tyyppi,
-            k.is_active,
-            k.status
-        FROM
-            public.kuorma k
+            'Timber Load' AS tyyppi -- Hardcode the type for the frontend
+        FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
         LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
         LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
@@ -638,16 +633,38 @@ export const getMyCompletedLoadsForList = async (driverId: number): Promise<ILoa
         LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
         LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
         WHERE 
-            k.is_active = TRUE 
-            AND k.kulj_id = $1
-            AND k.status = 'Completed' -- The only difference is this line
-        ORDER BY 
-            k.pvm DESC, k.kuorma_id DESC; -- Show most recent completed trips first
+            k.kulj_id = $1
+            AND k.status = 'Completed'
+            AND k.tyyppi = 0 -- Filter for Timber Loads
+
+        UNION ALL
+
+        -- Query 2: Fetch completed Consignments (Rahtikirja)
+        SELECT
+            k.kuorma_id,
+            TO_CHAR(k.pvm, 'YYYY-MM-DD') AS pvm,
+            a.asiakkaan_nimi,
+            k.lahto AS lahto, -- For consignments, lahto and kohde are simple text fields
+            k.kohde AS kohde,
+            kal.rek_nro,
+            kul.nimi AS kuljettajan_nimi,
+            'Consignment' AS tyyppi -- Hardcode the type for the frontend
+        FROM public.kuorma k
+        LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+        LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+        LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+        WHERE 
+            k.kulj_id = $1
+            AND k.status = 'Completed'
+            AND k.tyyppi = 1 -- Filter for Consignments
+
+        ORDER BY pvm DESC, kuorma_id DESC; -- Order the combined results
     `;
     
     try {
         const result = await pool.query(queryText, [driverId]);
-        return camelcaseKeys(result.rows);
+        // The db wrapper will handle camelCasing the snake_case column names.
+        return result.rows;
     } catch (error) {
         console.error(`Error fetching completed loads for driver ID ${driverId}:`, error);
         throw new Error("Database query for fetching driver's completed loads failed.");

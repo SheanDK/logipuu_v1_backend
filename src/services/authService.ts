@@ -52,6 +52,7 @@ export const loginUserService = async (loginData: UserLoginDTO) => {
         permissions: userFromDb.permissions || [],
         userLevel: userFromDb.taso,
         driverNumericId: userFromDb.kuljId ? parseInt(String(userFromDb.kuljId), 10) : undefined,
+        // kalustoNro: userFromDb.kalustoNro ? parseInt(String(userFromDb.kalustoNro), 10) : undefined,
     };
     
     // --- DEBUGGING STEP 3: The final check before signing ---
@@ -68,6 +69,7 @@ export const loginUserService = async (loginData: UserLoginDTO) => {
             roles: payload.roles,
             permissions: payload.permissions,
             driverNumericId: payload.driverNumericId,
+            // kalustoNro: payload.kalustoNro,
         },
     };
 };

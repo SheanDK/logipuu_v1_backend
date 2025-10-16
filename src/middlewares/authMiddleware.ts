@@ -15,6 +15,7 @@ export interface UserPayload extends JwtPayload {
     permissions: string[]; // <-- THIS IS THE CRITICAL FIX
     userLevel: number;
     driverNumericId?: number;
+    // kalustoNro?: number;
 }
 
 // Keep AuthenticatedRequest for clarity, or switch to global type declaration

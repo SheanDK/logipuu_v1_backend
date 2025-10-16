@@ -169,3 +169,38 @@ export const updateTimberEntryStatus = async (puulaaniId: number, timberEntries:
         client.release();
     }
 };
+
+export const getCompletedTripsForDriver = async (driverId: number): Promise<any[]> => {
+    const query = `
+        SELECT
+            k.kuorma_id,
+            k.pvm,
+            a.asiakkaan_nimi,
+            -- Use a CASE statement to determine the load type as a string
+            CASE 
+                WHEN k.tyyppi = 0 THEN 'Timber Load'
+                WHEN k.tyyppi = 1 THEN 'Consignment'
+                ELSE 'Unknown'
+            END AS load_type,
+            -- Try to get the destination name from multiple sources
+            COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
+            COALESCE(p.nimi, k.lahto, 'N/A') AS lahto
+        FROM public.kuorma k
+        LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+        LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
+        LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
+        LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
+        WHERE
+            k.kulj_id = $1 AND
+            k.status = 'Completed' AND
+            k.is_active = TRUE
+        ORDER BY k.pvm DESC;
+    `;
+    try {
+        const result = await pool.query(query, [driverId]);
+        return result.rows; // db wrapper will convert to camelCase
+    } catch (error) {
+        console.error(`[Service Error] Failed to get completed trips for driver ${driverId}:`, error);
+        throw new Error('Database query for completed trips failed.');
+    }
+};

@@ -1,3 +1,4 @@
+// backend/src/routes/authRoutes.ts
 import { Router } from 'express';
 import * as authController from '../controllers/authController';
 import { protect, AuthenticatedRequest } from '../middlewares/authMiddleware';

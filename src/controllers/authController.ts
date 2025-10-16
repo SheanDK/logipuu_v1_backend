@@ -1,3 +1,4 @@
+// backend/src/controllers/authController.ts
 import { Request, Response, NextFunction, RequestHandler } from 'express'; // RequestHandler import 
 import * as authService from '../services/authService';
 import { UserLoginDTO } from '../dto/auth.dto';

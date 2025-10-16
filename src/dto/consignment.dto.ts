@@ -2,7 +2,7 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsDateString, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
-// This class validates each individual waybill (Rahtikirja) object inside the main payload
+// FIX: This class now expects camelCase properties to perfectly match the frontend.
 class CreateRahtikirjaItemDto {
     @IsString()
     @IsNotEmpty()
@@ -15,17 +15,37 @@ class CreateRahtikirjaItemDto {
     @IsNumber()
     @Type(() => Number)
     km!: number;
+
+    @IsString()
+    @IsOptional()
+    rahtikirjanNumero?: string; // Expects camelCase
+
+    @IsNumber()
+    @IsOptional()
+    @Type(() => Number)
+    kpl?: number;
+
+    @IsNumber()
+    @IsOptional()
+    @Type(() => Number)
+    jako?: number;
+
+    @IsNumber()
+    @IsOptional()
+    @Type(() => Number)
+    tievero?: number;
+
+    @IsString()
+    @IsOptional()
+    lisatiedot?: string;
 }
 
-// This is the main DTO for creating a new consignment (parent Kuorma + child Rahtikirjat)
 export class CreateConsignmentDto {
     @IsInt()
-    @IsNotEmpty()
     @Type(() => Number)
     asiakasId!: number;
 
     @IsDateString()
-    @IsNotEmpty()
     pvm!: string;
 
     @IsString()
@@ -33,11 +53,7 @@ export class CreateConsignmentDto {
     lisatiedot?: string;
 
     @IsArray()
-    @ValidateNested({ each: true }) // This ensures each object in the array is validated
+    @ValidateNested({ each: true })
     @Type(() => CreateRahtikirjaItemDto)
     rahtikirjat!: CreateRahtikirjaItemDto[];
 }
-
-// For updates, all fields can be optional, but the structure is the same.
-// For simplicity, we can reuse the create DTO logic, or create a specific update DTO.
-export class UpdateConsignmentDto extends CreateConsignmentDto {}
