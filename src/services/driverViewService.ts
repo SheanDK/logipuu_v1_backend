@@ -21,15 +21,12 @@ export const getMapDataForDriver = async (driverId: number, vehicleId: number): 
     
     const client = await pool.connect();
     try {
-        console.log(`[Service] Executing getMapDataForDriver for vehicleId: ${vehicleId}`); // Add a log
-        
         const [puulaanitResult, purkupaikatResult] = await Promise.all([
             
-            // --- THIS IS THE SIMPLIFIED DEBUGGING QUERY ---
-            // It ONLY gets puulaanit assigned to the specific vehicle, ignoring all other conditions.
             client.query(`
                 SELECT 
-                    p.puulaani_id AS id, 
+                    -- FIX: Use DISTINCT to ensure each puulaani_id is returned only once.
+                    DISTINCT p.puulaani_id AS id, 
                     p.nimi AS name, 
                     p.sijainti_lat AS latitude, 
                     p.sijainti_long AS longitude 
@@ -38,10 +35,10 @@ export const getMapDataForDriver = async (driverId: number, vehicleId: number): 
                 WHERE a.kalusto_id = $1;
             `, [vehicleId]),
 
-            // Query 2 (Purkupaikat) remains the same
+            // Purkupaikat query
             client.query(`
                 SELECT 
-                    purkupaikka_id AS id, 
+                    (purkupaikka_id * -1) AS id, 
                     purkupaikka AS name, 
                     sijainti_lat AS latitude, 
                     sijainti_long AS longitude 
@@ -50,11 +47,9 @@ export const getMapDataForDriver = async (driverId: number, vehicleId: number): 
             `)
         ]);
 
-        console.log(`[Service] For vehicle ${vehicleId}, DB returned ${puulaanitResult.rowCount} puulaanit.`);
-
         return {
-            puulaanit: camelcaseKeys(puulaanitResult.rows),
-            purkupaikat: camelcaseKeys(purkupaikatResult.rows)
+            puulaanit: puulaanitResult.rows,
+            purkupaikat: purkupaikatResult.rows
         };
 
     } catch (error) {
