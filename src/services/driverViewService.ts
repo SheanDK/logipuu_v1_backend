@@ -25,17 +25,18 @@ export const getMapDataForDriver = async (driverId: number, vehicleId: number): 
             
             client.query(`
                 SELECT 
-                    -- FIX: Use DISTINCT to ensure each puulaani_id is returned only once.
                     DISTINCT p.puulaani_id AS id, 
                     p.nimi AS name, 
                     p.sijainti_lat AS latitude, 
                     p.sijainti_long AS longitude 
                 FROM public.puulaani p
                 JOIN public.autot a ON p.puulaani_id = a.puulaani_id
-                WHERE a.kalusto_id = $1;
+                WHERE 
+                    a.kalusto_id = $1
+                    -- FIX: Add a condition to filter out invalid coordinates
+                    AND (p.sijainti_lat != 0 OR p.sijainti_long != 0);
             `, [vehicleId]),
 
-            // Purkupaikat query
             client.query(`
                 SELECT 
                     (purkupaikka_id * -1) AS id, 
@@ -43,7 +44,13 @@ export const getMapDataForDriver = async (driverId: number, vehicleId: number): 
                     sijainti_lat AS latitude, 
                     sijainti_long AS longitude 
                 FROM public.purkupaikka 
-                WHERE is_active = TRUE AND is_visible_on_map = TRUE AND sijainti_lat IS NOT NULL AND sijainti_long IS NOT NULL;
+                WHERE 
+                    is_active = TRUE 
+                    AND is_visible_on_map = TRUE 
+                    AND sijainti_lat IS NOT NULL 
+                    AND sijainti_long IS NOT NULL
+                    -- FIX: Add a condition to filter out invalid coordinates
+                    AND (sijainti_lat != 0 OR sijainti_long != 0);
             `)
         ]);
 
