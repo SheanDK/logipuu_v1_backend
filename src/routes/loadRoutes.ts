@@ -3,7 +3,7 @@ import { Router } from 'express';
 import * as loadController from '../controllers/loadController';
 import { protect } from '../middlewares/authMiddleware';
 import { authorize } from '../middlewares/rbacMiddleware';
-import { CreateLoadDto, UpdateLoadDto, UpdateLoadStatusDto, CompleteLoadDto, AcceptLoadsDto } from '../dto/load.dto';
+import { CreateLoadDto, UpdateLoadDto, UpdateLoadStatusDto, CompleteLoadDto, AcceptLoadsDto, CreateBulkLoadDto } from '../dto/load.dto';
 import { validateDto } from '../middlewares/validationMiddleware';
 
 const router = Router();
@@ -33,7 +33,6 @@ router.get('/my-loads/completed-trips',
     loadController.getMyCompletedLoadsHandler
 );
 
-// --- THIS IS THE NEW ROUTE ---
 router.get('/my-loads/last-completed',
     protect,
     authorize(driverRoles),
@@ -66,6 +65,16 @@ router.post('/accept-for-invoicing',
     loadController.acceptLoadsHandler
 );
 
+// --- NEW BULK CREATE ROUTE ---
+// Create multiple loads (legs) in a single request.
+// Placed before general routes like '/' and '/:id' to ensure correct matching.
+router.post('/bulk', 
+    protect, 
+    authorize(allStaffRoles, CREATE_LOAD_PERMISSION),
+    validateDto(CreateBulkLoadDto), 
+    loadController.createBulkLoadHandler
+);
+
 
 // ===================================================
 // GENERAL & DYNAMIC ROUTES
@@ -78,7 +87,7 @@ router.get('/',
     loadController.getAllLoadsHandler
 );
 
-// Create a new load (can be done by both roles)
+// Create a new SINGLE load (can be done by both roles)
 router.post('/', 
     protect, 
     authorize(allStaffRoles, CREATE_LOAD_PERMISSION),
@@ -101,11 +110,18 @@ router.put('/:id',
     loadController.updateLoadHandler
 );
 
-// It uses the initial load ID as a parameter to find the trip
+// Update a trip by its initial load ID
 router.put('/trip/:initialLoadId',
     protect,
     authorize(driverRoles), // Only drivers can edit their trips
     loadController.updateTripHandler
+);
+
+router.patch('/trip/:ajomaaraysNro/status',
+    protect,
+    authorize(driverRoles),
+    validateDto(UpdateLoadStatusDto),
+    loadController.updateTripStatusHandler
 );
 
 // Update a load's status
@@ -127,7 +143,9 @@ router.patch('/:id/complete',
 // Soft-delete a load
 router.delete('/:id', 
     protect, 
-    authorize(officeRoles, DELETE_LOAD_PERMISSION), 
+    // FIX: Changed to allStaffRoles to allow drivers to delete their own 'Assigned' loads,
+    // with the actual permission check happening in the service layer.
+    authorize(allStaffRoles, DELETE_LOAD_PERMISSION), 
     loadController.deleteLoadHandler
 );
 

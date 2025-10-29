@@ -28,15 +28,19 @@ export const getMapDataForDriver = async (driverId: number, vehicleId: number): 
                     DISTINCT p.puulaani_id AS id, 
                     p.nimi AS name, 
                     p.sijainti_lat AS latitude, 
-                    p.sijainti_long AS longitude 
+                    p.sijainti_long AS longitude,
+                    -- FIX: Select the 'kohteen_vari' from the joined 'asiakkaat' table.
+                    a.kohteen_vari AS color 
                 FROM public.puulaani p
-                JOIN public.autot a ON p.puulaani_id = a.puulaani_id
+                -- We need to join 'asiakkaat' to get the color
+                JOIN public.asiakkaat a ON p.asiakas_id = a.asiakkaan_id
+                JOIN public.autot au ON p.puulaani_id = au.puulaani_id
                 WHERE 
-                    a.kalusto_id = $1
-                    -- FIX: Add a condition to filter out invalid coordinates
+                    au.kalusto_id = $1
                     AND (p.sijainti_lat != 0 OR p.sijainti_long != 0);
             `, [vehicleId]),
 
+            // Purkupaikat query (remains the same)
             client.query(`
                 SELECT 
                     (purkupaikka_id * -1) AS id, 
@@ -44,13 +48,7 @@ export const getMapDataForDriver = async (driverId: number, vehicleId: number): 
                     sijainti_lat AS latitude, 
                     sijainti_long AS longitude 
                 FROM public.purkupaikka 
-                WHERE 
-                    is_active = TRUE 
-                    AND is_visible_on_map = TRUE 
-                    AND sijainti_lat IS NOT NULL 
-                    AND sijainti_long IS NOT NULL
-                    -- FIX: Add a condition to filter out invalid coordinates
-                    AND (sijainti_lat != 0 OR sijainti_long != 0);
+                WHERE is_active = TRUE AND is_visible_on_map = TRUE AND sijainti_lat IS NOT NULL AND sijainti_long IS NOT NULL;
             `)
         ]);
 
@@ -117,12 +115,38 @@ export const getConsignmentsForDriver = async (driverId: number): Promise<any[]>
     }
 };
 
-// --- THIS IS THE NEW FUNCTION ---
+// FIX: This function is completely rewritten to support multi-leg trips.
 export const getActiveTripForDriver = async (driverId: number): Promise<any | null> => {
+    const client = await pool.connect();
     try {
-        const query = `
+        // --- THE FIX IS HERE ---
+        // Step 1: Find the 'ajomaarays_nro' of any active (non-completed, non-assigned) trip.
+        // This now includes 'In Progress', 'Paused', etc.
+        const activeTripQuery = `
+            SELECT ajomaarays_nro 
+            FROM public.kuorma 
+            WHERE 
+                kulj_id = $1 
+                AND status NOT IN ('Assigned', 'Completed', 'Cancelled')
+                AND is_active = TRUE 
+            ORDER BY pvm DESC, kuorma_id DESC 
+            LIMIT 1;
+        `;
+        const activeTripResult = await client.query(activeTripQuery, [driverId]);
+
+        if (activeTripResult.rowCount === 0) {
+            return null; // No active trip found
+        }
+
+        const ajomaaraysNro = activeTripResult.rows[0].ajomaarays_nro;
+        if (!ajomaaraysNro) {
+            return null;
+        }
+
+        // Step 2: Fetch ALL legs that belong to this trip number.
+        const allLegsQuery = `
             SELECT 
-                k.kuorma_id, k.status, k.puutavara_id,
+                k.kuorma_id, k.status, k.puutavara_id, k.ajomaarays_nro,
                 p.nimi AS puulaani_name, p.sijainti_lat AS puulaani_lat, p.sijainti_long AS puulaani_lng,
                 pp.purkupaikka AS purkupaikka_name, pp.sijainti_lat AS purkupaikka_lat, pp.sijainti_long AS purkupaikka_lng,
                 pt.puutavara AS puutavaralaji
@@ -132,20 +156,24 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
             LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
             LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
             WHERE
-                k.kulj_id = $1 AND
-                k.status NOT IN ('Assigned', 'Completed', 'Cancelled') AND
-                k.is_active = TRUE
-            ORDER BY k.pvm DESC, k.kuorma_id DESC
-            LIMIT 1;
+                k.ajomaarays_nro = $1 AND
+                k.kulj_id = $2 AND
+                k.is_active = TRUE AND
+                k.status NOT IN ('Completed', 'Cancelled')
+            ORDER BY k.kuorma_id ASC;
         `;
-        const result = await pool.query(query, [driverId]);
-        if (result.rowCount === 0) {
-            return null;
-        }
-        return camelcaseKeys(result.rows[0]);
+        const allLegsResult = await client.query(allLegsQuery, [ajomaaraysNro, driverId]);
+
+        return {
+            ajomaaraysNro: ajomaaraysNro,
+            legs: allLegsResult.rows
+        };
+
     } catch (error) {
         console.error(`[Service Error] Failed to get active trip for driver ${driverId}:`, error);
         throw new Error('Database query for active trip failed.');
+    } finally {
+        client.release();
     }
 };
 

@@ -2,7 +2,7 @@
 import { Response, NextFunction } from 'express';
 import * as loadService from '../services/loadService';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
-import { CreateLoadDto, UpdateLoadDto, UpdateLoadStatusDto, CompleteLoadDto, AcceptLoadsDto   } from '../dto/load.dto';
+import { CreateLoadDto, UpdateLoadDto, UpdateLoadStatusDto, CompleteLoadDto, AcceptLoadsDto, CreateBulkLoadDto   } from '../dto/load.dto';
 
 export const getAllLoadsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
@@ -279,6 +279,49 @@ export const updateTripHandler = async (req: AuthenticatedRequest, res: Response
         if (error.message.includes('not found') || error.message.includes('not in Assigned state') || error.message.includes('not authorized')) {
             return res.status(400).json({ message: error.message });
         }
+        next(error);
+    }
+};
+
+// --- ADD THIS NEW HANDLER ---
+
+export const createBulkLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const dto = req.body as CreateBulkLoadDto;
+        const user = req.user!;
+        
+        // Additional check: Ensure the driver creating the loads is themselves
+        if (user.roles.includes('Kuljettaja')) {
+            for (const leg of dto.legs) {
+                if (leg.kuljId !== user.driverNumericId) {
+                    return res.status(403).json({ message: "Forbidden: You can only create loads for yourself." });
+                }
+            }
+        }
+        
+        const result = await loadService.createBulkLoad(dto, user);
+        res.status(201).json(result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const updateTripStatusHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const user = req.user!;
+        const { ajomaaraysNro } = req.params;
+        const { status } = req.body as UpdateLoadStatusDto;
+
+        if (!user.driverNumericId) {
+            return res.status(403).json({ message: "Forbidden: User is not a driver." });
+        }
+        if (!ajomaaraysNro) {
+            return res.status(400).json({ message: "Driving Order Number is required." });
+        }
+
+        const result = await loadService.updateTripStatus(ajomaaraysNro, status, user.driverNumericId);
+        res.status(200).json({ message: `Trip status updated to '${status}'.`, ...result });
+    } catch (error) {
         next(error);
     }
 };

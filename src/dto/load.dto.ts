@@ -1,58 +1,105 @@
 // backend/src/dto/load.dto.ts
-import { IsInt, IsNotEmpty, IsString, MaxLength, IsNumber, IsDate, IsEnum, IsOptional, Min, IsArray } from 'class-validator';
+import { IsInt, 
+    IsNotEmpty, 
+    IsString, 
+    MaxLength, 
+    IsNumber, 
+    IsDate, 
+    IsEnum, 
+    IsOptional, 
+    Min, 
+    IsArray,
+    ValidateNested 
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { LoadTypeEnum } from '../types/load.types';
 
 export class CreateLoadDto {
-    @IsEnum(LoadTypeEnum) @IsNotEmpty()
+    @IsEnum(LoadTypeEnum) 
+    @IsNotEmpty()
     tyyppi!: LoadTypeEnum;
 
-    @IsInt() @IsNotEmpty() @Type(() => Number)
+    @IsInt() 
+    @IsNotEmpty() 
+    @Type(() => Number)
     asiakasId!: number;
     
-    @IsInt() @IsOptional() @Type(() => Number)
+    @IsInt() 
+    @IsOptional() 
+    @Type(() => Number)
     puulaaniId?: number;
 
-    @IsInt() @IsOptional() @Type(() => Number)
+    @IsInt() 
+    @IsOptional() 
+    @Type(() => Number)
     puutavaraId?: number;
 
-    @IsInt() @IsNotEmpty() @Type(() => Number)
+    @IsInt() 
+    @IsNotEmpty() 
+    @Type(() => Number)
     kalustoNro!: number;
 
-    @IsInt() @IsNotEmpty() @Type(() => Number)
+    @IsInt() 
+    @IsNotEmpty() 
+    @Type(() => Number)
     kuljId!: number;
 
-    @IsDate() @IsNotEmpty() @Type(() => Date)
+    @IsDate() 
+    @IsNotEmpty() 
+    @Type(() => Date)
     pvm!: Date;
 
-    @IsString() @IsOptional() @MaxLength(45)
+    @IsString() 
+    @IsOptional() 
+    @MaxLength(45)
     ajomaaraysNro?: string;
     
-    @IsString() @IsOptional() @MaxLength(100)
+    @IsString() 
+    @IsOptional() 
+    @MaxLength(100)
     kohde?: string;
 
-    @IsString() @IsOptional() @MaxLength(100)
+    @IsString() 
+    @IsOptional() 
+    @MaxLength(100)
     lahto?: string;
     
-    @IsNumber() @IsOptional() @Min(0) @Type(() => Number)
+    @IsNumber() 
+    @IsOptional() 
+    @Min(0) 
+    @Type(() => Number)
     m3?: number;
 
-    @IsNumber() @IsOptional() @Min(0) @Type(() => Number)
+    @IsNumber() 
+    @IsOptional() 
+    @Min(0) 
+    @Type(() => Number)
     km?: number;
     
-    @IsString() @IsOptional()
+    @IsString() 
+    @IsOptional()
     lisatiedot?: string;
 
-    @IsString() @IsOptional() @MaxLength(45)
+    @IsString() 
+    @IsOptional() 
+    @MaxLength(45)
     vastaanottoNro?: string;
 
-    @IsString() @IsOptional() @MaxLength(100)
+    @IsString() 
+    @IsOptional() 
+    @MaxLength(100)
     reitti?: string;
 
-    @IsNumber() @IsOptional() @Min(0) @Type(() => Number)
+    @IsNumber() 
+    @IsOptional() 
+    @Min(0) 
+    @Type(() => Number)
     tunnit?: number;
 
-    @IsNumber() @IsOptional() @Min(0) @Type(() => Number)
+    @IsNumber() 
+    @IsOptional() 
+    @Min(0) 
+    @Type(() => Number)
     kpl?: number;
 }
 
@@ -60,14 +107,22 @@ export class CreateLoadDto {
 export class UpdateLoadDto extends CreateLoadDto {}
 
 export class UpdateLoadStatusDto {
-    @IsString() @IsNotEmpty() @MaxLength(50)
+    @IsString() 
+    @IsNotEmpty() 
+    @MaxLength(50)
     status!: string;
 }
 
 export class CompleteLoadDto {
-    @IsNumber() @IsNotEmpty() @Min(0) @Type(() => Number)
+    @IsNumber() 
+    @IsNotEmpty() 
+    @Min(0) 
+    @Type(() => Number)
     actualM3!: number;
-    @IsNumber() @IsNotEmpty() @Min(0) @Type(() => Number)
+    @IsNumber() 
+    @IsNotEmpty() 
+    @Min(0) 
+    @Type(() => Number)
     actualKm!: number;
 }
 
@@ -77,4 +132,15 @@ export class AcceptLoadsDto {
     @IsInt({ each: true })
     @Type(() => Number)
     loadIds!: number[];
+}
+
+/**
+ * DTO for creating multiple loads (legs) in a single bulk request.
+ */
+export class CreateBulkLoadDto {
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => CreateLoadDto)
+    @IsNotEmpty()
+    legs!: CreateLoadDto[];
 }

@@ -3,8 +3,9 @@
 import pool from '../config/db';
 import camelcaseKeys from 'camelcase-keys';
 import { ILoad, ILoadDetails, ILoadListItem, IMapTrip, ITripDetails } from '../types/load.types';
-import { CreateLoadDto, UpdateLoadDto, CompleteLoadDto } from '../dto/load.dto';
+import { CreateLoadDto, UpdateLoadDto, CompleteLoadDto, CreateBulkLoadDto } from '../dto/load.dto';
 import { UserPayload } from '../middlewares/authMiddleware';
+import { getActiveTripForDriver } from './driverViewService'; 
 
 export interface ILoadListFilters {
     asiakasId?: string;
@@ -204,58 +205,6 @@ export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
         client.release();
     }
 };
-
-// export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
-//     // Destructure all required fields from data
-//     const { tyyppi, asiakasId, puulaaniId, kalustoNro, kuljId, pvm, ajomaaraysNro, kohde, lahto, m3, km, lisatiedot, puutavaraId } = data;
-    
-//     const client = await pool.connect();
-//      try {
-//         await client.query('BEGIN');
-
-//         // --- THIS IS THE NEW LOGIC WITH THE FIX ---
-//         // Step 1: Find the 'auto_id' from the 'autot' table using puulaaniId and kalustoNro
-//         let autoId: number | null = null;
-//         if (puulaaniId && kalustoNro) {
-//             const autoResult = await client.query(
-//                 'SELECT auto_id FROM public.autot WHERE puulaani_id = $1 AND kalusto_id = $2 LIMIT 1',
-//                 [puulaaniId, kalustoNro]
-//             );
-
-//             // Add a check to ensure autoResult is not null before accessing rowCount
-//             if (autoResult?.rowCount && autoResult.rowCount > 0) {
-//                 autoId = autoResult.rows[0].auto_id;
-//             } else {
-//                 console.warn(`No entry found in 'autot' table for puulaani_id=${puulaaniId} and kalusto_id=${kalustoNro}. 'auto_id' will be null.`);
-//             }
-//         }
-        
-//         // Step 2: Insert into 'kuorma' table, now including the 'auto_id'
-//         const insertQuery = `
-//             INSERT INTO public.kuorma 
-//             (tyyppi, asiakas_id, puulaani_id, puutavara_id, auto_id, kulj_id, pvm, ajomaarays_nro, kohde, lahto, m3, km, lisatiedot, kalusto_nro, status) 
-//             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'Assigned') 
-//             RETURNING *;
-//         `;
-//         const params = [ 
-//             tyyppi, asiakasId, puulaaniId ?? null, puutavaraId ?? null, autoId,
-//             kuljId, pvm, ajomaaraysNro ?? null, kohde ?? null, lahto ?? null, 
-//             m3 ?? 0, km ?? 0, lisatiedot ?? null, kalustoNro 
-//         ];
-        
-//         const result = await client.query(insertQuery, params);
-        
-//         await client.query('COMMIT');
-//         return camelcaseKeys(result.rows[0]);
-
-//     } catch (error) {
-//         await client.query('ROLLBACK');
-//         console.error("!!! DATABASE ERROR while creating new load:", error);
-//         throw new Error("Database query for creating a new load failed.");
-//     } finally {
-//         client.release();
-//     }
-// };
 
 // --- THIS IS THE UPDATED, SECURE updateLoad FUNCTION ---
 export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayload): Promise<ILoad> => {
@@ -819,5 +768,110 @@ export const updateTripByLoadId = async (initialLoadId: number, tripData: any, d
         throw error;
     } finally {
         client.release();
+    }
+};
+
+/**
+ * Creates multiple loads (legs) within a single database transaction.
+ * FIX: This function now generates a unique 'ajomaaraysnro' (Driving Order Number)
+ * and applies it to all legs, effectively grouping them into a single trip.
+ */
+export const createBulkLoad = async (data: CreateBulkLoadDto, user: UserPayload) => {
+    const { legs } = data;
+    if (!legs || legs.length === 0) {
+        throw new Error("No load legs provided in the request.");
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // --- THE FIX IS HERE ---
+        // 1. Check if an ajomaaraysNro is already provided by the first leg from the frontend.
+        let ajomaaraysNro = legs[0].ajomaaraysNro;
+
+        // 2. If it's not provided (i.e., this is the start of a NEW trip), generate one.
+        if (!ajomaaraysNro) {
+            const now = new Date();
+            const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+            ajomaaraysNro = `TRIP-${timestamp}-${user.driverNumericId}`;
+            console.log(`[Service: createBulkLoad] No trip number provided. Generated new one: ${ajomaaraysNro}`);
+        } else {
+            console.log(`[Service: createBulkLoad] Using existing trip number from payload: ${ajomaaraysNro}`);
+        }
+
+        const createdLoadIds: number[] = [];
+
+        for (let i = 0; i < legs.length; i++) {
+            const leg = legs[i];
+            
+            // The first leg of a BRAND NEW trip is 'In Progress'. Subsequent legs are 'Assigned'.
+            const isFirstLegOfNewTrip = i === 0 && !legs[0].ajomaaraysNro;
+            const status = isFirstLegOfNewTrip ? 'In Progress' : 'Assigned';
+
+            const insertQuery = `
+                INSERT INTO public.kuorma (
+                    tyyppi, asiakas_id, puulaani_id, puutavara_id, kulj_id, pvm, 
+                    ajomaarays_nro, kohde, lahto, m3, km, lisatiedot, kalusto_nro, status, 
+                    vastaanotto_nro, reitti, tunnit, kpl
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
+                RETURNING kuorma_id;
+            `;
+            
+            const params = [ 
+                leg.tyyppi, leg.asiakasId, leg.puulaaniId ?? null, leg.puutavaraId ?? null,
+                leg.kuljId, leg.pvm, 
+                ajomaaraysNro, // Use the determined trip number for all legs
+                leg.kohde ?? null, leg.lahto ?? null, leg.m3 ?? 0, leg.km ?? 0, leg.lisatiedot ?? null, 
+                leg.kalustoNro, status,
+                leg.vastaanottoNro ?? null, leg.reitti ?? null, leg.tunnit ?? 0, leg.kpl ?? 0
+            ];
+
+            const result = await client.query(insertQuery, params);
+            createdLoadIds.push(result.rows[0].kuorma_id);
+
+            if (leg.puutavaraId && leg.m3 && leg.m3 > 0) {
+                const updateTimberEntryQuery = `UPDATE public.puutavaralaji SET haettu = haettu + $1, jaljella = jaljella - $1 WHERE puutavara_id = $2;`;
+                await client.query(updateTimberEntryQuery, [leg.m3, leg.puutavaraId]);
+            }
+        }
+
+        await client.query('COMMIT');
+        
+        const updatedTrip = await getActiveTripForDriver(user.driverNumericId!);
+        console.log(`[Service] Bulk operation successful. Returning updated trip object.`);
+        return updatedTrip;
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error("!!! DATABASE ERROR while creating bulk loads:", error);
+        throw error;
+    } finally {
+        client.release();
+    }
+};
+
+/**
+ * Updates the status of all loads (legs) belonging to a single trip.
+ * @param ajomaaraysNro The driving order number that identifies the trip.
+ * @param status The new status to set for all legs.
+ * @param driverId The ID of the driver, for authorization.
+ */
+export const updateTripStatus = async (ajomaaraysNro: string, status: string, driverId: number): Promise<{ count: number }> => {
+    const query = `
+        UPDATE public.kuorma
+        SET status = $1
+        WHERE ajomaarays_nro = $2 AND kulj_id = $3;
+    `;
+    try {
+        const result = await pool.query(query, [status, ajomaaraysNro, driverId]);
+        if (result.rowCount === 0) {
+            // This could happen if the ajomaaraysNro doesn't exist or doesn't belong to the driver
+            console.warn(`Attempted to update status for trip '${ajomaaraysNro}' by driver ${driverId}, but no rows were affected.`);
+        }
+        return { count: result.rowCount || 0 };
+    } catch (error) {
+        console.error(`Error updating status for trip ${ajomaaraysNro}:`, error);
+        throw error;
     }
 };
