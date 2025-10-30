@@ -786,28 +786,20 @@ export const createBulkLoad = async (data: CreateBulkLoadDto, user: UserPayload)
     try {
         await client.query('BEGIN');
 
-        // --- THE FIX IS HERE ---
-        // 1. Check if an ajomaaraysNro is already provided by the first leg from the frontend.
         let ajomaaraysNro = legs[0].ajomaaraysNro;
-
-        // 2. If it's not provided (i.e., this is the start of a NEW trip), generate one.
         if (!ajomaaraysNro) {
             const now = new Date();
             const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
             ajomaaraysNro = `TRIP-${timestamp}-${user.driverNumericId}`;
-            console.log(`[Service: createBulkLoad] No trip number provided. Generated new one: ${ajomaaraysNro}`);
-        } else {
-            console.log(`[Service: createBulkLoad] Using existing trip number from payload: ${ajomaaraysNro}`);
         }
 
         const createdLoadIds: number[] = [];
 
-        for (let i = 0; i < legs.length; i++) {
-            const leg = legs[i];
-            
-            // The first leg of a BRAND NEW trip is 'In Progress'. Subsequent legs are 'Assigned'.
-            const isFirstLegOfNewTrip = i === 0 && !legs[0].ajomaaraysNro;
-            const status = isFirstLegOfNewTrip ? 'In Progress' : 'Assigned';
+        for (const leg of legs) {
+            // --- THE FIX IS HERE ---
+            // Always set the status of a newly created load to 'Assigned'.
+            // The user must explicitly start the trip from the UI.
+            const status = 'Assigned'; 
 
             const insertQuery = `
                 INSERT INTO public.kuorma (
@@ -821,9 +813,9 @@ export const createBulkLoad = async (data: CreateBulkLoadDto, user: UserPayload)
             const params = [ 
                 leg.tyyppi, leg.asiakasId, leg.puulaaniId ?? null, leg.puutavaraId ?? null,
                 leg.kuljId, leg.pvm, 
-                ajomaaraysNro, // Use the determined trip number for all legs
+                ajomaaraysNro,
                 leg.kohde ?? null, leg.lahto ?? null, leg.m3 ?? 0, leg.km ?? 0, leg.lisatiedot ?? null, 
-                leg.kalustoNro, status,
+                leg.kalustoNro, status, // Use the fixed 'Assigned' status
                 leg.vastaanottoNro ?? null, leg.reitti ?? null, leg.tunnit ?? 0, leg.kpl ?? 0
             ];
 
@@ -838,9 +830,12 @@ export const createBulkLoad = async (data: CreateBulkLoadDto, user: UserPayload)
 
         await client.query('COMMIT');
         
-        const updatedTrip = await getActiveTripForDriver(user.driverNumericId!);
-        console.log(`[Service] Bulk operation successful. Returning updated trip object.`);
-        return updatedTrip;
+        // Return the trip number and created IDs for confirmation
+        return { 
+            message: `${createdLoadIds.length} loads created successfully under trip ${ajomaaraysNro}.`,
+            ajomaaraysNro: ajomaaraysNro,
+            createdLoadIds: createdLoadIds
+        };
 
     } catch (error) {
         await client.query('ROLLBACK');
