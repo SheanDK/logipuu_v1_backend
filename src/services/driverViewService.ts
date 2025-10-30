@@ -18,37 +18,50 @@ export interface DriverMapData {
 // --- THIS IS THE MAIN CHANGE ---
 // The function now accepts vehicleId as a required parameter
 export const getMapDataForDriver = async (driverId: number, vehicleId: number): Promise<DriverMapData> => {
-    
     const client = await pool.connect();
     try {
         const [puulaanitResult, purkupaikatResult] = await Promise.all([
             
             client.query(`
                 SELECT 
-                    DISTINCT p.puulaani_id AS id, 
+                    p.puulaani_id AS id, 
                     p.nimi AS name, 
                     p.sijainti_lat AS latitude, 
                     p.sijainti_long AS longitude,
-                    -- FIX: Select the 'kohteen_vari' from the joined 'asiakkaat' table.
-                    a.kohteen_vari AS color 
-                FROM public.puulaani p
-                -- We need to join 'asiakkaat' to get the color
-                JOIN public.asiakkaat a ON p.asiakas_id = a.asiakkaan_id
-                JOIN public.autot au ON p.puulaani_id = au.puulaani_id
+                    -- FIX: Use the customer's color directly from the 'asiakkaat' table.
+                    -- Provide a default color if it's null.
+                    COALESCE(a.kohteen_vari, '#1976D2') AS color 
+                FROM 
+                    public.puulaani p
+                -- Join with 'asiakkaat' to get the customer's color
+                LEFT JOIN 
+                    public.asiakkaat a ON p.asiakas_id = a.asiakkaan_id
+                -- LEFT JOIN with 'autot' to check for assignments
+                LEFT JOIN 
+                    public.autot at ON p.puulaani_id = at.puulaani_id
                 WHERE 
-                    au.kalusto_id = $1
-                    AND (p.sijainti_lat != 0 OR p.sijainti_long != 0);
+                    p.aktiivinen = TRUE 
+                    AND p.valmis = FALSE
+                    AND (p.sijainti_lat IS NOT NULL AND p.sijainti_long IS NOT NULL)
+                    AND (p.sijainti_lat != 0 OR p.sijainti_long != 0)
+                    AND (
+                        -- Condition 1: Puulaani is assigned to the selected vehicle
+                        at.kalusto_id = $1 
+                        OR
+                        -- Condition 2: Puulaani is not assigned to ANY vehicle
+                        NOT EXISTS (SELECT 1 FROM public.autot a2 WHERE a2.puulaani_id = p.puulaani_id)
+                    )
+                -- Group by to handle cases where a puulaani might be linked to multiple customers or assignments,
+                -- ensuring each puulaani appears only once.
+                GROUP BY p.puulaani_id, a.kohteen_vari;
+
             `, [vehicleId]),
 
-            // Purkupaikat query (remains the same)
+            // Purkupaikat query remains the same
             client.query(`
-                SELECT 
-                    (purkupaikka_id * -1) AS id, 
-                    purkupaikka AS name, 
-                    sijainti_lat AS latitude, 
-                    sijainti_long AS longitude 
+                SELECT (purkupaikka_id * -1) AS id, purkupaikka AS name, sijainti_lat AS latitude, sijainti_long AS longitude 
                 FROM public.purkupaikka 
-                WHERE is_active = TRUE AND is_visible_on_map = TRUE AND sijainti_lat IS NOT NULL AND sijainti_long IS NOT NULL;
+                WHERE is_active = TRUE AND is_visible_on_map = TRUE AND sijainti_lat IS NOT NULL AND sijainti_long IS NOT NULL AND (sijainti_lat != 0 OR sijainti_long != 0);
             `)
         ]);
 
