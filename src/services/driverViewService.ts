@@ -57,12 +57,28 @@ export const getMapDataForDriver = async (driverId: number, vehicleId: number): 
 
             `, [vehicleId]),
 
-            // Purkupaikat query remains the same
             client.query(`
-                SELECT (purkupaikka_id * -1) AS id, purkupaikka AS name, sijainti_lat AS latitude, sijainti_long AS longitude 
-                FROM public.purkupaikka 
-                WHERE is_active = TRUE AND is_visible_on_map = TRUE AND sijainti_lat IS NOT NULL AND sijainti_long IS NOT NULL AND (sijainti_lat != 0 OR sijainti_long != 0);
-            `)
+                SELECT DISTINCT
+                    (pp.purkupaikka_id * -1) AS id,
+                    pp.purkupaikka AS name,
+                    pp.sijainti_lat AS latitude,
+                    pp.sijainti_long AS longitude
+                FROM 
+                    public.purkupaikka pp
+                JOIN 
+                    public.puutavaralaji pl ON pp.purkupaikka_id = pl.purkupaikka_id
+                JOIN 
+                    public.puulaani p ON pl.puulaani_id = p.puulaani_id
+                JOIN 
+                    public.autot a ON p.puulaani_id = a.puulaani_id
+                WHERE 
+                    a.kalusto_id = $1
+                    AND pp.is_active = TRUE 
+                    AND pp.is_visible_on_map = TRUE 
+                    AND pp.sijainti_lat IS NOT NULL 
+                    AND pp.sijainti_long IS NOT NULL
+                    AND (pp.sijainti_lat != 0 OR pp.sijainti_long != 0);
+            `, [vehicleId])
         ]);
 
         return {
