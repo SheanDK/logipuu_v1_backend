@@ -148,17 +148,14 @@ export const getConsignmentsForDriver = async (driverId: number): Promise<any[]>
 export const getActiveTripForDriver = async (driverId: number): Promise<any | null> => {
     const client = await pool.connect();
     try {
-        // --- THE FIX IS HERE ---
-        // Step 1: Find the 'ajomaarays_nro' of any active (non-completed, non-assigned) trip.
-        // This now includes 'In Progress', 'Paused', etc.
+        // Step 1: Find the ajomaarays_nro of an active trip for the driver
         const activeTripQuery = `
             SELECT ajomaarays_nro 
             FROM public.kuorma 
-            WHERE 
-                kulj_id = $1 
-                AND status NOT IN ('Assigned', 'Completed', 'Cancelled')
-                AND is_active = TRUE 
-            ORDER BY pvm DESC, kuorma_id DESC 
+            WHERE kulj_id = $1 
+              AND status NOT IN ('Assigned', 'Completed', 'Cancelled') 
+              AND is_active = TRUE
+            ORDER BY pvm DESC, kuorma_id DESC
             LIMIT 1;
         `;
         const activeTripResult = await client.query(activeTripQuery, [driverId]);
@@ -166,36 +163,51 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
         if (activeTripResult.rowCount === 0) {
             return null; // No active trip found
         }
-
         const ajomaaraysNro = activeTripResult.rows[0].ajomaarays_nro;
         if (!ajomaaraysNro) {
+            // This case might happen for single-leg trips without a group ID, handle if necessary
             return null;
         }
 
-        // Step 2: Fetch ALL legs that belong to this trip number.
+        // Step 2: Fetch all legs associated with that ajomaarays_nro
         const allLegsQuery = `
             SELECT 
                 k.kuorma_id, k.status, k.puutavara_id, k.ajomaarays_nro,
-                p.nimi AS puulaani_name, p.sijainti_lat AS puulaani_lat, p.sijainti_long AS puulaani_lng,
-                pp.purkupaikka AS purkupaikka_name, pp.sijainti_lat AS purkupaikka_lat, pp.sijainti_long AS purkupaikka_lng,
-                pt.puutavara AS puutavaralaji
+                p.nimi AS puulaani_name, 
+                pp.purkupaikka AS purkupaikka_name, 
+                pt.puutavara AS puutavaralaji,
+                a.asiakkaan_nimi,
+                kal.rek_nro,
+                -- --- THE FIX IS HERE: Added the m3 column ---
+                k.m3,
+                -- Also select lat/lng for the panel
+                pp.sijainti_lat AS purkupaikka_lat,
+                pp.sijainti_long AS purkupaikka_lng
             FROM public.kuorma k
             LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
             LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
             LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
             LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
-            WHERE
-                k.ajomaarays_nro = $1 AND
-                k.kulj_id = $2 AND
-                k.is_active = TRUE AND
-                k.status NOT IN ('Completed', 'Cancelled')
+            LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+            LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+            WHERE k.ajomaarays_nro = $1 AND k.kulj_id = $2 AND k.is_active = TRUE
             ORDER BY k.kuorma_id ASC;
         `;
+        
         const allLegsResult = await client.query(allLegsQuery, [ajomaaraysNro, driverId]);
 
+        if (allLegsResult.rowCount === 0) {
+            return null;
+        }
+
+        // Step 3: Construct the final trip object
+        const firstLeg = allLegsResult.rows[0];
+        
         return {
             ajomaaraysNro: ajomaaraysNro,
-            legs: allLegsResult.rows
+            asiakkaanNimi: firstLeg.asiakkaan_nimi,
+            rekNro: firstLeg.rek_nro,
+            legs: camelcaseKeys(allLegsResult.rows) // Deep conversion
         };
 
     } catch (error) {
@@ -205,7 +217,6 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
         client.release();
     }
 };
-
 // --- THIS IS THE NEW FUNCTION for the driver ---
 export const updateTimberEntryStatus = async (puulaaniId: number, timberEntries: { puutavaraId: number, valmis: boolean }[]): Promise<void> => {
     const client = await pool.connect();
