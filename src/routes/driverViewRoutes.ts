@@ -39,4 +39,12 @@ router.put(
     driverViewController.updateTimberEntryStatusHandler
 );
 
+router.get(
+    '/completed-trips/:id',
+    protect,
+    authorize(driverRoles),
+    driverViewController.getCompletedTripByIdHandler
+);
+
+
 export default router;

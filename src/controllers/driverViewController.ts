@@ -101,3 +101,24 @@ export const updateTimberEntryStatusHandler = async (req: AuthenticatedRequest, 
         next(error);
     }
 };
+
+export const getCompletedTripByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const driverId = req.user!.driverNumericId!;
+        const id = parseInt(req.params.id, 10);
+
+        if (isNaN(id)) {
+            return res.status(400).json({ message: 'Invalid ID format.' });
+        }
+
+        const tripDetails = await driverViewService.getSingleCompletedTrip(id, driverId);
+
+        if (!tripDetails) {
+            return res.status(404).json({ message: 'Completed trip not found or you are not authorized to view it.' });
+        }
+        
+        res.status(200).json(tripDetails);
+    } catch (error) {
+        next(error);
+    }
+};

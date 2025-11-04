@@ -272,3 +272,49 @@ export const getCompletedTripsForDriver = async (driverId: number): Promise<any[
         throw new Error('Database query for completed trips failed.');
     }
 };
+
+export const getSingleCompletedTrip = async (id: number, driverId: number): Promise<any | null> => {
+    // FIX: The query now includes all necessary JOINs and COALESCE logic
+    // to correctly find the Origin and Destination names for both load types.
+    const query = `
+        SELECT
+            k.kuorma_id, 
+            k.pvm, 
+            a.asiakkaan_nimi,
+            kal.rek_nro,
+            kul.nimi AS kuljettajan_nimi, 
+            k.m3, 
+            k.km, 
+            k.lisatiedot,
+            CASE 
+                WHEN k.tyyppi = 0 THEN 'Timber Load'
+                WHEN k.tyyppi = 1 THEN 'Consignment'
+                ELSE 'Unknown'
+            END AS tyyppi,
+            -- Robustly find Origin name
+            COALESCE(p.nimi, k.lahto) AS lahto,
+            -- Robustly find Destination name
+            COALESCE(pp.purkupaikka, k.kohde) AS kohde
+        FROM public.kuorma k
+        LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+        LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+        LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+        -- Add missing JOINs for name resolution
+        LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
+        LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
+        LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
+        WHERE 
+            k.kuorma_id = $1 
+            AND k.kulj_id = $2
+            AND k.status = 'Completed';
+    `;
+    try {
+        const result = await pool.query(query, [id, driverId]);
+        if (result.rowCount === 0) return null;
+        // The db wrapper will handle camelCasing.
+        return result.rows[0];
+    } catch (error) {
+        console.error(`Error fetching completed trip details for ID ${id}:`, error);
+        throw error;
+    }
+};
