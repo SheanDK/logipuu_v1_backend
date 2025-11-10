@@ -1,4 +1,3 @@
-import { SaveConsignmentDto } from '../services/consignmentService';
 
 /**
  * Consignment invoicing – search and get by id
