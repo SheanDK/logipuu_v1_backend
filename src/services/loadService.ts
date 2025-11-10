@@ -489,7 +489,6 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
 export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
     console.log('--- Fetching loads for inspection (Completed but not invoiced) ---');
     
-    // This query is very similar to getAllLoadsForList, but with specific status filters
     const queryText = `
         SELECT
             k.kuorma_id,
@@ -498,7 +497,8 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
             k.vastaanotto_nro,
             kal.rek_nro,
             kul.nimi AS kuljettajan_nimi,
-            p.nimi AS puulaani_nimi,
+            COALESCE(p.nimi, k.lahto, 'N/A') AS lahto,
+            COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
             a.asiakkaan_nimi,
             pt.puutavara AS timber_type,
             k.reitti,
@@ -508,7 +508,10 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
             k.kpl,
             k.lisatiedot,
             k.status,
-            k.is_active
+            k.is_active,
+            k.puutavara_id,
+            -- FIX: Added a comma after the previous column
+            k.tyyppi 
         FROM
             public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
@@ -523,12 +526,13 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
             k.laskutukseen = 0 AND
             k.is_active = TRUE
         ORDER BY
-            k.pvm ASC, k.kuorma_id ASC; -- Order oldest first
+            k.pvm ASC, k.kuorma_id ASC;
     `;
     
     try {
         const result = await pool.query(queryText);
-        return camelcaseKeys(result.rows);
+        // The db wrapper will handle camelCasing automatically
+        return result.rows;
     } catch (error) {
         console.error("Error fetching loads for inspection:", error);
         throw new Error("Database query for fetching inspection loads failed.");
