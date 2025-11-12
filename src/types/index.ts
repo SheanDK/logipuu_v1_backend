@@ -3,7 +3,6 @@
 // Export all interfaces and types
 export * from './client.types';
 export * from './driver.types';
-export * from './drivenInspection.types';
 export * from './otherInfo.types';
 export * from './permission.types';
 export * from './role.types';
@@ -18,7 +17,6 @@ export * from './waybill.types';
 export * from '../dto/auth.dto';
 export * from '../dto/client.dto';
 export * from '../dto/driver.dto';
-export * from '../dto/drivenInspection.dto';
 export * from '../dto/location.dto';
 export * from '../dto/otherInfo.dto';
 export * from '../dto/otherMarker.dto';
