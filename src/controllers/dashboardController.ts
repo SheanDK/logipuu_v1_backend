@@ -48,3 +48,23 @@ export const getDriverDashboardHandler = async (req: AuthenticatedRequest, res: 
         next(error);
     }
 };
+
+// --- NEW HANDLER 1: Volume Chart සඳහා ---
+export const getVolumeByDayHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const data = await dashboardService.getVolumeLast7Days();
+        res.status(200).json(data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// --- NEW HANDLER 2: Active Trips List සඳහා ---
+export const getActiveTripsListHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const list = await dashboardService.getActiveTripsList();
+        res.status(200).json(list);
+    } catch (error) {
+        next(error);
+    }
+};
