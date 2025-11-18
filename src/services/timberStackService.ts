@@ -35,6 +35,10 @@ export const getAllTimberStacks = async (filters: ITimberStackFilters): Promise<
     const queryParams: (string | number)[] = [];
     let paramIndex = 1;
 
+    if (filters.status !== 'all') {
+        conditions.push(`p.aktiivinen = TRUE`);
+    }
+
     if (filters.clientId) {
         console.log(`Applying CLIENT filter. Original value: '${filters.clientId}', Type: ${typeof filters.clientId}`);
         const clientIdAsInt = parseInt(filters.clientId, 10);
@@ -343,33 +347,25 @@ export const updateTimberStackFull = async (id: number, data: IUpdateTimberStack
     }
 };
 
-export const deleteTimberStack = async (id: number): Promise<{ puulaaniId: number; message: string } | null> => {
-    const client = await pool.connect();
+export const deactivateTimberStack = async (id: number): Promise<{ puulaaniId: number; message: string } | null> => {
     try {
-        await client.query('BEGIN');
-
-        await client.query(deleteQueries.DELETE_VEHICLE_ASSOCIATIONS_BY_STACK_ID, [id]);
-        await client.query(deleteQueries.DELETE_WOOD_ENTRIES_BY_STACK_ID, [id]);
-
-        const result = await client.query(deleteQueries.DELETE_TIMBER_STACK_BY_ID, [id]);
-
-        const rows = camelcaseKeys(result.rows);
+        // DELETE query එක වෙනුවට, UPDATE query එක භාවිතා කරන්න
+        const result = await pool.query(updateQueries.DEACTIVATE_TIMBER_STACK_BY_ID, [id]);
 
         if (result.rowCount === 0) {
-            await client.query('ROLLBACK');
-            return null;
+            return null; // Puulaani එක හමු නොවූයේ නම්
         }
 
-        await client.query('COMMIT');
+        const deactivatedStack = camelcaseKeys(result.rows[0]);
 
-        return { puulaaniId: rows[0].puulaaniId, message: 'Timber stack and all associated data deleted successfully' };
+        return { 
+            puulaaniId: deactivatedStack.puulaaniId, 
+            message: `Timber stack '${deactivatedStack.nimi}' was successfully deactivated.` 
+        };
 
     } catch (error) {
-        await client.query('ROLLBACK');
-        console.error(`SERVICE ERROR: Failed to delete timber stack with ID ${id} and its associations.`, error);
-        throw error;
-    } finally {
-        client.release();
+        console.error(`SERVICE ERROR: Failed to deactivate timber stack with ID ${id}.`, error);
+        throw error; // දෝෂය controller එකට යවන්න
     }
 };
 

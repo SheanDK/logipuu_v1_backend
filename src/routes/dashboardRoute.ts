@@ -1,4 +1,4 @@
-// backend/src/routes/dashboardRoutes.ts
+// backend/src/routes/dashboardRoute.ts
 
 import { Router } from 'express';
 import * as dashboardController from '../controllers/dashboardController';

@@ -72,25 +72,35 @@ export const deleteTimberStackHandler = async (req: AuthenticatedRequest, res: R
     try {
         const id = parseInt(req.params.id, 10);
         if (isNaN(id)) return res.status(400).json({ message: "Invalid ID format." });
-        const result = await timberStackService.deleteTimberStack(id);
-        if (!result) return res.status(404).json({ message: 'Timber stack not found for deletion' });
+        
+        // deleteTimberStack වෙනුවට deactivateTimberStack call කරන්න
+        const result = await timberStackService.deactivateTimberStack(id);
+        
+        if (!result) return res.status(404).json({ message: 'Timber stack not found.' });
+        
         res.status(200).json(result);
-    } catch (error) { next(error); }
+    } catch (error) { 
+        next(error); 
+    }
 };
 
 export const updateLocationHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id, 10);
+        // DTO එක, 'res.locals' වෙනුවට, 'req.body' වෙතින් ලබාගන්න
         const dto = req.body as UpdateTimberStackLocationDto;
 
-        if (isNaN(id) || !dto.latitude || !dto.longitude) {
-            return res.status(400).json({ message: "Invalid ID or location data provided." });
+        // Validate a
+        if (isNaN(id) || dto.latitude == null || dto.longitude == null) {
+            return res.status(400).json({ message: "Invalid ID or missing location data provided." });
         }
         
         const updatedLocation = await timberStackService.updateTimberStackLocation(id, dto);
+        
         if (!updatedLocation) {
             return res.status(404).json({ message: 'Timber stack not found for location update.' });
         }
+        
         res.status(200).json(updatedLocation);
     } catch (error) { 
         next(error); 

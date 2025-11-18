@@ -100,16 +100,14 @@ export const getDriverDashboardData = async (driverId: number) => {
     };
 };
 
-// --- NEW FUNCTION 1: Volume Chart සඳහා දත්ත ලබාගැනීම ---
+// --- NEW FUNCTION 1: Volume Chart
 /**
  * Fetches volume data for the last 7 days.
  * This can be used by both Admin and Dispatch dashboards.
  */
 export const getVolumeLast7Days = async (): Promise<IVolumeByDay[]> => {
     try {
-        // adminQueries හි ඇති query එක පොදුවේ භාවිතා කරමු
         const result = await pool.query(adminQueries.GET_VOLUME_LAST_7_DAYS);
-        // query එක මගින් දැනටමත් දත්ත නිවැරදි format එකට සකසා ඇති නිසා, camelcase අවශ්‍ය නොවේ
         return result.rows;
     } catch (error) {
         console.error('Error fetching volume for last 7 days:', error);
@@ -117,7 +115,7 @@ export const getVolumeLast7Days = async (): Promise<IVolumeByDay[]> => {
     }
 };
 
-// --- NEW FUNCTION 2: Active Trips List සඳහා දත්ත ලබාගැනීම ---
+// --- NEW FUNCTION 2: Active Trips List 
 /**
  * Fetches a list of currently active trips.
  * Primarily for the Dispatcher dashboard.

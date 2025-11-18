@@ -21,43 +21,46 @@ class SocketService {
         return SocketService.instance;
     }
 
+    /**
+     * Initializes the Socket.IO server with CORS options.
+     * @param httpServer The HTTP server instance from Express.
+     * @param frontendUrl The allowed origin for CORS.
+     */
     public initialize(httpServer: HttpServer, frontendUrl: string): void {
         if (this.io) {
             console.warn("Socket.IO server is already initialized.");
             return;
         }
 
+        // --- THE FIX IS HERE ---
+        // Initialize the Server with a configuration object that includes CORS settings.
         this.io = new Server(httpServer, {
             cors: {
-                origin: frontendUrl,
+                origin: frontendUrl, // Use the provided frontend URL for the origin
                 methods: ["GET", "POST"]
             }
         });
 
         console.log("✅ Socket.IO server initialized and listening for connections.");
 
-        // --- THE MAIN LOGIC IS UPDATED HERE ---
         this.io.on('connection', (socket: Socket) => {
             console.log(`🔌 New client connected: ${socket.id}`);
             
-            // 1. Authenticate the connection
             try {
-                const { token, vehicleId } = socket.handshake.auth; // FIX: Destructure both token and vehicleId
+                const { token, vehicleId } = socket.handshake.auth;
 
                 if (!token) { throw new Error("No token provided"); }
-                if (!vehicleId) { throw new Error("No vehicleId provided"); } // FIX: Add check for vehicleId
+                if (!vehicleId) { throw new Error("No vehicleId provided"); }
 
                 const decoded = jwt.verify(token, JWT_SECRET) as UserPayload;
 
-                // Ensure the token itself contains the driver ID
                 if (!decoded.driverNumericId) {
                     throw new Error("Token is invalid for a tracking session (missing driver ID)");
                 }
                 
-                // FIX: Attach both decoded data and the separate vehicleId to the socket object
                 (socket as any).user = {
                     ...decoded,
-                    kalustoNro: parseInt(vehicleId, 10) // Use the vehicleId from auth
+                    kalustoNro: parseInt(vehicleId, 10)
                 };
 
                 const user = (socket as any).user;
@@ -74,7 +77,6 @@ class SocketService {
                 return;
             }
 
-            // Handle disconnection
             socket.on('disconnect', () => {
                 const user = (socket as any).user;
                 const reason = user ? `Driver ID ${user.driverNumericId}` : 'Unauthenticated user';
@@ -93,11 +95,8 @@ class SocketService {
 
             console.log(`📍 Received location from Driver ${user.driverNumericId} for Vehicle ${user.kalustoNro}:`, coords);
             
-            // --- 2. THE FIX IS HERE: Call the function to update the database ---
             this.updateVehicleLocationInDb(user.kalustoNro, coords.lat, coords.lng);
 
-
-            // Emit this new location to all clients in the "dispatchers" room
             const locationPayload = {
                 vehicleId: user.kalustoNro,
                 driverId: user.driverNumericId,
@@ -109,12 +108,8 @@ class SocketService {
         });
     }
 
-    // --- 3. ADD THE NEW DATABASE UPDATE FUNCTION ---
     /**
      * Updates the vehicle's last known location in the 'kalusto' table.
-     * @param vehicleId - The ID of the vehicle (kalusto_nro).
-     * @param lat - The latitude.
-     * @param lng - The longitude.
      */
     private async updateVehicleLocationInDb(vehicleId: number, lat: number, lng: number): Promise<void> {
         const query = `
@@ -133,7 +128,6 @@ class SocketService {
         }
     }
 
-    // --- 4. MODIFY THE BROADCAST FUNCTION TO USE THE NEW PAYLOAD ---
     public emitLocationUpdate(locationPayload: any) {
         if (this.io) {
             this.io.to('dispatchers').emit('newDriverLocation', locationPayload);

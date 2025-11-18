@@ -31,7 +31,6 @@ import driverViewRoutes from './routes/driverViewRoutes';
 import consignmentDriverRoutes from './routes/consignmentDriverRoutes';
 import woodCategoryRoutes from './routes/woodCategoryRoutes';
 
-
 import { globalErrorHandler } from './middlewares/errorHandler';
 
 dotenv.config();
@@ -42,25 +41,30 @@ const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
 const httpServer = http.createServer(app);
 
-// Initialize Socket.IO service
+// --- FIX: Initialize Socket.IO service by passing the frontend URL string ---
+// This now matches the `initialize` method in your `socketService.ts`
 socketService.initialize(httpServer, frontendUrl);
 
-// Middlewares
-app.use(cors({ origin: frontendUrl }));
+const corsOptions = {
+    origin: frontendUrl,
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    credentials: true,
+    allowedHeaders: "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); 
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Simple request logger middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
     next();
 });
 
 // --- API Routes ---
-// A main router for the /api path for better organization
 const apiRouter = express.Router();
-
-// Register all the individual route handlers
 apiRouter.use('/auth', authRoutes);       
 apiRouter.use('/users', userRoutes);      
 apiRouter.use('/clients', clientRoutes);
@@ -80,33 +84,23 @@ apiRouter.use('/loads', loadRoutes);
 apiRouter.use('/wood-categories', woodCategoryRoutes);
 apiRouter.use('/invoicing', invoicingRoutes);
 apiRouter.use('/consignments', consignmentRoutes);
-
-// --- THIS IS THE NEWLY ADDED ROUTE ---
-// A dedicated route group for driver-specific views and data
 apiRouter.use('/driver', driverViewRoutes);
-
-// --- ROUTE FOR DRIVER CONSIGNMENTS ---
 apiRouter.use('/driver/consignments', consignmentDriverRoutes);
 
-// Mount the main API router under the /api path
 app.use('/api', apiRouter);
 
-// Root path handler
 app.get('/', (req: Request, res: Response) => {
     res.send('WoodMaster LogiApp Backend is running!');
 });
 
-// 404 Handler for requests that don't match any route
 app.use((req: Request, res: Response, next: NextFunction) => {
     res.status(404).json({ message: `Resource not found at ${req.originalUrl}` });
 });
 
-// Global error handler (must be the last middleware)
 app.use(globalErrorHandler);
 
 const startServer = async () => {
     try {
-        // Test the database connection before starting the server
         await db.query('SELECT NOW()');
         console.log("✅ Successfully connected to the database.");
 

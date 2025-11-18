@@ -60,8 +60,7 @@ router.put('/:id/full',
 router.patch('/:id/location',
     protect,
     authorize(officeRoles, TIMBER_MAP_EDIT),
-    validateDto(UpdateTimberStackLocationDto),
-    timberStackController.updateTimberStackLocationHandler
+    timberStackController.updateLocationHandler 
 );
 
 // Get a single stack by its ID

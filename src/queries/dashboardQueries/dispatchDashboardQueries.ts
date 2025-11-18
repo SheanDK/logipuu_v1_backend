@@ -28,16 +28,20 @@ export const GET_ACTIVE_TRIPS_LIST = `
         k.ajomaarays_nro,
         kul.nimi as driver_name,
         kal.rek_nro as vehicle_reg_no,
-        k.status,
-        ROUND((SUM(CASE WHEN k.status = 'Completed' THEN 1 ELSE 0 END)::decimal / COUNT(k.kuorma_id)) * 100) as progress
+        -- Get the most "active" status for the trip (e.g., 'In Progress' is more important than 'At Origin')
+        MIN(k.status) as status,
+        -- Calculate progress based on ALL loads in the trip
+        ROUND(
+            (SUM(CASE WHEN k.status = 'Completed' THEN 1 ELSE 0 END)::decimal / COUNT(k.kuorma_id)) * 100
+        ) as progress
     FROM public.kuorma k
     LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
     LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
     WHERE k.ajomaarays_nro IN (
         SELECT DISTINCT ajomaarays_nro FROM public.kuorma 
-        WHERE status IN ('In Progress', 'En Route to Destination', 'At Origin', 'At Destination')
+        WHERE status NOT IN ('Completed', 'Assigned', 'Paused') -- More robust status check
     ) AND k.ajomaarays_nro IS NOT NULL
-    GROUP BY k.ajomaarays_nro, kul.nimi, kal.rek_nro, k.status
+    GROUP BY k.ajomaarays_nro, kul.nimi, kal.rek_nro -- 'k.status' is removed from GROUP BY
     ORDER BY k.ajomaarays_nro DESC
     LIMIT 5;
 `;

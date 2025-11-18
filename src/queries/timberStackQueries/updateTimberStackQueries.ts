@@ -45,3 +45,10 @@ export const UPDATE_TIMBER_STACK_LOCATION = `
     WHERE puulaani_id = $3
     RETURNING puulaani_id, sijainti_lat, sijainti_long;
 `;
+
+export const DEACTIVATE_TIMBER_STACK_BY_ID = `
+    UPDATE public.puulaani
+    SET aktiivinen = FALSE
+    WHERE puulaani_id = $1
+    RETURNING puulaani_id, nimi, aktiivinen;
+`;

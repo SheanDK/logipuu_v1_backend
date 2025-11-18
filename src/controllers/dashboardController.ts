@@ -26,30 +26,23 @@ export const getDispatchDashboardHandler = async (req: AuthenticatedRequest, res
 
 export const getDriverDashboardHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        // Taking the login Driver ID using req.user
-        const driverId = req.user?.userId; // Assuming userId from token is the driver's identifier in kuljettajat.KuljID (needs to be number)
-                                         
+        // --- FIX: Use 'driverNumericId' from the user object ---
+        const driverId = req.user?.driverNumericId; 
 
         if (!driverId) {
-            return res.status(400).json({ message: "Driver identification not found in token." });
+            return res.status(400).json({ message: "Driver ID not found in user token." });
         }
         
-       
-        // For now, if req.user.userId is the string version of KuljID:
-        const numericDriverId = parseInt(driverId, 10);
-        if (isNaN(numericDriverId)) {
-             return res.status(400).json({ message: "Invalid driver ID format in token." });
-        }
-
-        console.log(`Driver ${numericDriverId} accessing Driver Dashboard.`);
-        const data = await dashboardService.getDriverDashboardData(numericDriverId);
+        // driverId is already a number, no need for parseInt
+        console.log(`Driver ${driverId} accessing Driver Dashboard.`);
+        const data = await dashboardService.getDriverDashboardData(driverId);
         res.status(200).json(data);
     } catch (error) {
         next(error);
     }
 };
 
-// --- NEW HANDLER 1: Volume Chart සඳහා ---
+// --- NEW HANDLER 1: Volume Chart  ---
 export const getVolumeByDayHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const data = await dashboardService.getVolumeLast7Days();
@@ -59,7 +52,7 @@ export const getVolumeByDayHandler = async (req: AuthenticatedRequest, res: Resp
     }
 };
 
-// --- NEW HANDLER 2: Active Trips List සඳහා ---
+// --- NEW HANDLER 2: Active Trips List  ---
 export const getActiveTripsListHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const list = await dashboardService.getActiveTripsList();
