@@ -87,7 +87,6 @@ export const deleteTimberStackHandler = async (req: AuthenticatedRequest, res: R
 export const updateLocationHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id, 10);
-        // DTO එක, 'res.locals' වෙනුවට, 'req.body' වෙතින් ලබාගන්න
         const dto = req.body as UpdateTimberStackLocationDto;
 
         // Validate a

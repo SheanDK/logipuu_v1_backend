@@ -349,11 +349,10 @@ export const updateTimberStackFull = async (id: number, data: IUpdateTimberStack
 
 export const deactivateTimberStack = async (id: number): Promise<{ puulaaniId: number; message: string } | null> => {
     try {
-        // DELETE query එක වෙනුවට, UPDATE query එක භාවිතා කරන්න
         const result = await pool.query(updateQueries.DEACTIVATE_TIMBER_STACK_BY_ID, [id]);
 
         if (result.rowCount === 0) {
-            return null; // Puulaani එක හමු නොවූයේ නම්
+            return null;
         }
 
         const deactivatedStack = camelcaseKeys(result.rows[0]);
@@ -365,7 +364,7 @@ export const deactivateTimberStack = async (id: number): Promise<{ puulaaniId: n
 
     } catch (error) {
         console.error(`SERVICE ERROR: Failed to deactivate timber stack with ID ${id}.`, error);
-        throw error; // දෝෂය controller එකට යවන්න
+        throw error; 
     }
 };
 
