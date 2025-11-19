@@ -16,7 +16,6 @@ import {
 import * as getQueries from '../queries/timberStackQueries/getTimberStackQueries';
 import * as createQueries from '../queries/timberStackQueries/createTimberStackQueries';
 import * as updateQueries from '../queries/timberStackQueries/updateTimberStackQueries';
-import * as deleteQueries from '../queries/timberStackQueries/deleteTimberStackQueries';
 
 export const getAllTimberStacks = async (filters: ITimberStackFilters): Promise<ITimberStack[]> => {
 
