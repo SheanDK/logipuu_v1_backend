@@ -216,22 +216,25 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
 };
 
 // --- THIS IS THE NEW FUNCTION for the driver ---
-export const updateTimberEntryStatus = async (puulaaniId: number, timberEntries: { puutavaraId: number, valmis: boolean }[]): Promise<void> => {
+export const updateTimberEntryStatus = async (puulaaniId: number, timberEntries: { puutavaraId: number, valmis: boolean }[]): Promise<any> => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        
-        for (const entry of timberEntries) {
-            await client.query(
-                'UPDATE public.puutavaralaji SET valmis = $1 WHERE puutavara_id = $2 AND puulaani_id = $3',
-                [entry.valmis, entry.puutavaraId, puulaaniId]
-            );
-        }
 
+        // Step 1: Update the 'valmis' status for each timber entry
+        // The database trigger will automatically handle the recalculation.
+        for (const entry of timberEntries) {
+            const updateQuery = 'UPDATE public.puutavaralaji SET valmis = $1 WHERE puutavara_id = $2 AND puulaani_id = $3';
+            await client.query(updateQuery, [entry.valmis, entry.puutavaraId, puulaaniId]);
+        }
+        
         await client.query('COMMIT');
+        
+        return { message: `Statuses updated for puulaani ${puulaaniId}. Totals recalculated by trigger.` };
+
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error(`[Service Error] Failed to update timber entry statuses for puulaani ${puulaaniId}:`, error);
+        console.error(`SERVICE ERROR: Failed to update timber entry statuses for puulaani ${puulaaniId}`, error);
         throw new Error('Database query for updating timber statuses failed.');
     } finally {
         client.release();

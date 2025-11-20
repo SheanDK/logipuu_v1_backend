@@ -143,6 +143,31 @@ export const getTripByLoadId = async (id: number): Promise<ITripDetails | null> 
     return tripDetails;
 };
 
+// Helper function to recalculate totals for a given puulaani_id
+const recalculatePuulaaniTotals = async (client: any, puulaaniId: number) => {
+    if (!puulaaniId) return;
+
+    console.log(`Recalculating totals for parent puulaani ID: ${puulaaniId}...`);
+    const recalculateQuery = `
+        WITH ptl_summary AS (
+            SELECT
+                COALESCE(SUM(kuutiot), 0) as total_volume,
+                COALESCE(SUM(haettu), 0) as total_hauled
+            FROM public.puutavaralaji
+            WHERE puulaani_id = $1
+        )
+        UPDATE public.puulaani
+        SET
+            kok = ptl_summary.total_volume,
+            jaljella = (ptl_summary.total_volume - ptl_summary.total_hauled)
+        FROM ptl_summary
+        WHERE puulaani_id = $1;
+    `;
+    await client.query(recalculateQuery, [puulaaniId]);
+    console.log(`Parent puulaani ${puulaaniId} totals updated successfully.`);
+};
+
+
 export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
     const { 
         tyyppi, asiakasId, puulaaniId, kalustoNro, kuljId, pvm, 
@@ -193,7 +218,9 @@ export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
             `;
             await client.query(updateTimberEntryQuery, [m3, puutavaraId]);
         }
-
+        if (newLoad.puulaani_id) {
+            await recalculatePuulaaniTotals(client, newLoad.puulaani_id);
+        }
         await client.query('COMMIT');
         return camelcaseKeys(newLoad);
 
@@ -321,10 +348,24 @@ export const deleteLoad = async (id: number, user: UserPayload): Promise<{ kuorm
                 throw new Error(`Cannot delete a load that is already in progress (Status: ${existingLoad.status}).`);
             }
         }
+
+        const m3ToRevert = Number(existingLoad.m3) || 0;
+        if (existingLoad.puutavara_id && m3ToRevert > 0) {
+             const updateTimberEntryQuery = `
+                UPDATE public.puutavaralaji
+                SET haettu = haettu - $1, jaljella = jaljella + $1
+                WHERE puutavara_id = $2;
+            `;
+            await client.query(updateTimberEntryQuery, [m3ToRevert, existingLoad.puutavara_id]);
+        }
         // Office staff can delete (soft delete) any load (as per original logic).
 
         const softDeleteQuery = 'UPDATE public.kuorma SET is_active = FALSE WHERE kuorma_id = $1 RETURNING kuorma_id;';
         const result = await client.query(softDeleteQuery, [id]);
+
+        if (existingLoad.puulaani_id) {
+            await recalculatePuulaaniTotals(client, existingLoad.puulaani_id);
+        }
 
         await client.query('COMMIT');
         
@@ -469,6 +510,7 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
                     jaljella = jaljella - $1
                 WHERE puulaani_id = $2;
             `;
+            await recalculatePuulaaniTotals(client, load.puulaani_id);
             await client.query(updatePuulaaniQuery, [data.actualM3, load.puulaani_id]);
         }
         
