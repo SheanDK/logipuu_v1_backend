@@ -247,6 +247,14 @@ export const getTimberStackFullDetails = async (id: number): Promise<IPuulaaniFu
 
 
 // --- THIS IS THE FULLY CORRECTED updateTimberStackFull FUNCTION ---
+/**
+ * Performs a full update of a timber stack (puulaani), including its vehicle assignments
+ * and timber log entries (puutavaralaji). This function operates within a single
+ * database transaction to ensure data integrity.
+ *
+ * @param id - The ID of the puulaani to update.
+ * @param data - An object containing the updated details for puulaani, autot (vehicles), and puutavarat (timber logs).
+ */
 export const updateTimberStackFull = async (id: number, data: IUpdateTimberStackFullDto): Promise<void> => {
     const client = await pool.connect();
     try {
@@ -254,20 +262,8 @@ export const updateTimberStackFull = async (id: number, data: IUpdateTimberStack
 
         const { puulaani, autot, puutavarat } = data;
 
-        // Step 1: Update the main 'puulaani' table
-        const totalVolume = puutavarat.reduce((sum, item) => sum + (Number(item.kuutiot) || 0), 0);
-        const totalFetched = puutavarat.reduce((sum, item) => sum + (Number(item.haettu) || 0), 0);
-        const remainingVolume = totalVolume - totalFetched;
-
-        const puulaaniParams = [
-            puulaani.asiakasId, new Date(puulaani.pvm), puulaani.nimi, puulaani.autoNro,
-            puulaani.lisatiedot, totalVolume, remainingVolume, puulaani.km ?? 0,
-            puulaani.aktiivinen, puulaani.valmis, puulaani.sijaintiLat,
-            puulaani.sijaintiLong, puulaani.ajomaaraysnro, id
-        ];
-        await client.query(updateQueries.UPDATE_TIMBER_STACK_BY_ID, puulaaniParams);
-
-        // Step 2: Update 'autot' (vehicle assignments)
+        // Step 1: Update 'autot' (vehicle assignments)
+        // It's safer to handle simple deletions first.
         await client.query(updateQueries.DELETE_AUTOT_BY_PUULAANI_ID, [id]);
         if (autot && autot.length > 0) {
             for (const kalustoId of autot) {
@@ -275,68 +271,105 @@ export const updateTimberStackFull = async (id: number, data: IUpdateTimberStack
             }
         }
 
-        // Step 3: A safer way to update 'puutavaralaji' (timber entries)
+        // Step 2: Handle deletion of timber entries that were removed in the UI
         const existingEntriesResult = await client.query('SELECT puutavara_id FROM public.puutavaralaji WHERE puulaani_id = $1', [id]);
         const existingEntryIds = existingEntriesResult.rows.map(r => r.puutavara_id);
         const submittedEntryIds = puutavarat.map(p => p.puutavara_id).filter(pid => pid && pid > 0);
 
         const entriesToDelete = existingEntryIds.filter(eid => !submittedEntryIds.includes(eid));
         if (entriesToDelete.length > 0) {
-            const referencedResult = await client.query('SELECT 1 FROM public.kuorma WHERE puutavara_id = ANY($1::bigint[]) LIMIT 1', [entriesToDelete]);
-            if (referencedResult && referencedResult.rowCount) {
-                throw new Error('Cannot delete a timber entry that is already assigned to a load/trip.');
+            // Before deleting, check if any of these entries are referenced in 'kuorma' table
+            const referencedResult = await client.query('SELECT 1 FROM public.kuorma WHERE puutavara_id = ANY($1::bigint[]) AND is_active = TRUE LIMIT 1', [entriesToDelete]);
+             if (referencedResult && referencedResult.rowCount != null && referencedResult.rowCount > 0) {
+                throw new Error('Cannot delete a timber log that is already used in an active load.');
             }
+            // Proceed with deletion if not referenced
             await client.query('DELETE FROM public.puutavaralaji WHERE puutavara_id = ANY($1::bigint[])', [entriesToDelete]);
         }
 
-        // --- THIS IS THE FINAL FIX ---
-        // Upsert logic that RESPECTS the 'valmis' property from the frontend payload.
-        // --- DEBUGGING STEP ---
+        // Step 3: Upsert (Update or Insert) each timber entry from the frontend.
         for (const woodEntry of puutavarat) {
-            console.log(`[DEBUG] Processing woodEntry from frontend:`, woodEntry);
-
-            const isCompleted = woodEntry.valmis;
-            console.log(`[DEBUG] Extracted 'isCompleted' value: ${isCompleted}, Type: ${typeof isCompleted}`);
-
             const isExisting = woodEntry.puutavara_id && woodEntry.puutavara_id > 0;
+            const jaljella = (Number(woodEntry.kuutiot) || 0) - (Number(woodEntry.haettu) || 0);
+            
+            let isCompleted = woodEntry.valmis; // Start with the value from the frontend payload.
 
             if (isExisting) {
+                // --- AUTOMATIC UNCHECK LOGIC ---
+                // Get the current state of the timber log from the database to compare.
+                const existingEntryResult = await client.query('SELECT kuutiot, valmis FROM public.puutavaralaji WHERE puutavara_id = $1', [woodEntry.puutavara_id]);
+                
+                if (existingEntryResult.rows.length > 0) {
+                    const existingEntry = existingEntryResult.rows[0];
+                    // If the entry was previously marked as complete by a driver...
+                    if (existingEntry.valmis === true) {
+                        // ...and the new total volume from the office is greater than the old one...
+                        if ((Number(woodEntry.kuutiot) || 0) > (Number(existingEntry.kuutiot) || 0)) {
+                            // ...then it means new volume was added, so it can't be complete anymore.
+                            console.log(`Volume added to completed entry ${woodEntry.puutavara_id}. Forcibly setting 'valmis' to FALSE.`);
+                            isCompleted = false; // Automatically uncheck it.
+                        }
+                    }
+                }
+                
+                // UPDATE the existing timber log with corrected 'isCompleted' status.
                 const updateParams = [
                     woodEntry.puutavaranro,
                     woodEntry.purkupaikka_id,
-                    woodEntry.kuutiot,
-                    woodEntry.haettu,
-                    (woodEntry.kuutiot - woodEntry.haettu),
-                    isCompleted, // This is parameter $6
+                    Number(woodEntry.kuutiot) || 0,
+                    Number(woodEntry.haettu) || 0,
+                    jaljella,
+                    isCompleted,
                     woodEntry.puutavara_id
                 ];
-                console.log(`[DEBUG] Preparing to UPDATE with params:`, updateParams);
-
                 await client.query(
-                    `UPDATE public.puutavaralaji SET puutavara_nro = $1, purkupaikka_id = $2, kuutiot = $3, haettu = $4, jaljella = $5, valmis = $6 WHERE puutavara_id = $7`,
+                    `UPDATE public.puutavaralaji 
+                     SET puutavara_nro = $1, purkupaikka_id = $2, kuutiot = $3, haettu = $4, jaljella = $5, valmis = $6 
+                     WHERE puutavara_id = $7`,
                     updateParams
                 );
             } else {
+                // INSERT a new timber log.
                 const insertParams = [
-                    id,
+                    id, // puulaani_id
                     puulaani.asiakasId,
                     woodEntry.puutavaranro,
                     woodEntry.purkupaikka_id,
-                    woodEntry.kuutiot,
-                    woodEntry.haettu,
-                    (woodEntry.kuutiot - woodEntry.haettu),
-                    isCompleted // This is parameter $8
+                    Number(woodEntry.kuutiot) || 0,
+                    0, // New entries always have 0 retrieved/hauled
+                    Number(woodEntry.kuutiot) || 0, // Remaining is same as total for new entries
+                    false // New entries created from the office are never 'valmis' by default
                 ];
-                console.log(`[DEBUG] Preparing to INSERT with params:`, insertParams);
-
                 await client.query(
-                    `INSERT INTO public.puutavaralaji (puulaani_id, asiakas_id, puutavara_nro, purkupaikka_id, kuutiot, haettu, jaljella, valmis) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                    `INSERT INTO public.puutavaralaji (puulaani_id, asiakas_id, puutavara_nro, purkupaikka_id, kuutiot, haettu, jaljella, valmis) 
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
                     insertParams
                 );
             }
         }
+        
+        // Step 4: After all child entries are finalized, recalculate and update the parent 'puulaani' table.
+        const recalculateResult = await client.query(`
+            SELECT
+                COALESCE(SUM(kuutiot), 0) as total_volume,
+                COALESCE(SUM(haettu), 0) as total_hauled
+            FROM public.puutavaralaji
+            WHERE puulaani_id = $1
+        `, [id]);
+
+        const { total_volume, total_hauled } = recalculateResult.rows[0];
+        const remaining_volume = total_volume - total_hauled;
+        
+        const puulaaniParams = [
+            puulaani.asiakasId, new Date(puulaani.pvm), puulaani.nimi, puulaani.autoNro,
+            puulaani.lisatiedot, total_volume, remaining_volume, // Use recalculated totals
+            puulaani.km ?? 0, puulaani.aktiivinen, puulaani.valmis,
+            puulaani.sijaintiLat, puulaani.sijaintiLong, puulaani.ajomaaraysnro, id
+        ];
+        await client.query(updateQueries.UPDATE_TIMBER_STACK_BY_ID, puulaaniParams);
 
         await client.query('COMMIT');
+        console.log(`Successfully updated puulaani ${id} and all its associations.`);
     } catch (e) {
         await client.query('ROLLBACK');
         console.error("Error in updateTimberStackFull, transaction rolled back.", e);
