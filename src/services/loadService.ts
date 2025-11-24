@@ -146,24 +146,48 @@ export const getTripByLoadId = async (id: number): Promise<ITripDetails | null> 
 const recalculatePuulaaniTotals = async (client: any, puulaaniId: number) => {
     if (!puulaaniId) return;
 
-    console.log(`Recalculating totals for parent puulaani ID: ${puulaaniId}...`);
+    console.log(`Recalculating ALL totals for parent puulaani ID: ${puulaaniId}...`);
+    
+    // This single, powerful query does everything in one go.
     const recalculateQuery = `
-        WITH ptl_summary AS (
+        WITH 
+        -- First, calculate the new 'haettu' (hauled) sum for each timber log based on ALL active loads
+        ptl_hauled_sum AS (
+            SELECT
+                puutavara_id,
+                COALESCE(SUM(m3), 0) AS new_hauled_total
+            FROM public.kuorma
+            WHERE puulaani_id = $1 AND is_active = TRUE AND puutavara_id IS NOT NULL
+            GROUP BY puutavara_id
+        ),
+        -- Then, update the 'puutavaralaji' table with these new sums
+        updated_ptl AS (
+            UPDATE public.puutavaralaji ptl
+            SET
+                haettu = COALESCE(phs.new_hauled_total, 0),
+                jaljella = ptl.kuutiot - COALESCE(phs.new_hauled_total, 0)
+            FROM ptl_hauled_sum phs
+            WHERE ptl.puulaani_id = $1 AND ptl.puutavara_id = phs.puutavara_id
+            RETURNING ptl.puulaani_id
+        ),
+        -- Finally, recalculate the grand totals for the 'puulaani' table itself
+        puulaani_summary AS (
             SELECT
                 COALESCE(SUM(kuutiot), 0) as total_volume,
                 COALESCE(SUM(haettu), 0) as total_hauled
             FROM public.puutavaralaji
             WHERE puulaani_id = $1
         )
-        UPDATE public.puulaani
+        UPDATE public.puulaani p
         SET
-            kok = ptl_summary.total_volume,
-            jaljella = (ptl_summary.total_volume - ptl_summary.total_hauled)
-        FROM ptl_summary
-        WHERE puulaani_id = $1;
+            kok = ps.total_volume,
+            jaljella = (ps.total_volume - ps.total_hauled)
+        FROM puulaani_summary ps
+        WHERE p.puulaani_id = $1;
     `;
+
     await client.query(recalculateQuery, [puulaaniId]);
-    console.log(`Parent puulaani ${puulaaniId} totals updated successfully.`);
+    console.log(`Parent puulaani ${puulaaniId} and its timber logs were fully recalculated.`);
 };
 
 
@@ -294,28 +318,32 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
 
         const updates: { [key: string]: any } = {};
         for (const [key, value] of Object.entries(fieldsToUpdate)) {
-            // Keys should already be in snake_case
-            if (value !== undefined) {
-                updates[key] = value;
-            }
-        }
-
-        if (Object.keys(updates).length === 0) {
-            return camelcaseKeys(existingLoad) as ILoad;
+            if (value !== undefined) updates[key] = value;
         }
         
-        const setClauses = Object.keys(updates).map((key, index) => `${key} = $${index + 1}`).join(', ');
-        const params = [...Object.values(updates), id];
-        const updateQuery = `UPDATE public.kuorma SET ${setClauses} WHERE kuorma_id = $${params.length} RETURNING *;`;
+        let updatedLoadRow;
+        if (Object.keys(updates).length > 0) {
+            const setClauses = Object.keys(updates).map((key, index) => `${key} = $${index + 1}`).join(', ');
+            const params = [...Object.values(updates), id];
+            const updateQuery = `UPDATE public.kuorma SET ${setClauses} WHERE kuorma_id = $${params.length} RETURNING *;`;
+            const result = await client.query(updateQuery, params);
+            updatedLoadRow = result.rows[0];
+        } else {
+            updatedLoadRow = existingLoad;
+        }
 
-        const result = await client.query(updateQuery, params);
+        // --- THE CRITICAL FIX ---
+        // After updating the load, call the powerful recalculate function.
+        if (updatedLoadRow.puulaani_id) {
+            await recalculatePuulaaniTotals(client, updatedLoadRow.puulaani_id);
+        }
         
         await client.query('COMMIT');
-        return camelcaseKeys(result.rows[0]) as ILoad;
+        return camelcaseKeys(updatedLoadRow) as ILoad;
 
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error(`Error in updateLoad transaction for ID ${id}:`, error);
+        console.error(`Error in updateLoad transaction for load ID ${id}:`, error);
         throw error;
     } finally {
         client.release();
