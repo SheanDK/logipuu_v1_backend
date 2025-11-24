@@ -5,7 +5,6 @@ import camelcaseKeys from 'camelcase-keys';
 import { ILoad, ILoadDetails, ILoadListItem, IMapTrip, ITripDetails } from '../types/load.types';
 import { CreateLoadDto, UpdateLoadDto, CompleteLoadDto, CreateBulkLoadDto } from '../dto/load.dto';
 import { UserPayload } from '../middlewares/authMiddleware';
-import { getActiveTripForDriver } from './driverViewService'; 
 
 export interface ILoadListFilters {
     asiakasId?: string;
@@ -328,51 +327,55 @@ export const deleteLoad = async (id: number, user: UserPayload): Promise<{ kuorm
     try {
         await client.query('BEGIN');
         
-        // First, get the load to perform checks
-        const loadResult = await client.query('SELECT kulj_id, status FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [id]);
+        // Step 1: Get the full load details to perform checks and get necessary IDs.
+        // Lock the row for the transaction.
+        const loadResult = await client.query('SELECT * FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [id]);
         if (loadResult.rowCount === 0) {
             return null; // Not found
         }
         const existingLoad = loadResult.rows[0];
-
+        
+        // --- Authorization Checks ---
         const isDriver = user.roles.includes('Kuljettaja');
-
-        // --- SECURITY CHECKS ---
         if (isDriver) {
-            // 1. Driver must own the load
             if (existingLoad.kulj_id !== user.driverNumericId) {
                 throw new Error('Forbidden: You are not authorized to delete this load.');
             }
-            // 2. Driver can only delete loads that have not yet started
             if (existingLoad.status !== 'Assigned') {
                 throw new Error(`Cannot delete a load that is already in progress (Status: ${existingLoad.status}).`);
             }
         }
 
+        // --- THE FIX IS HERE ---
+        // Step 2: Revert the 'haettu' (hauled) value in the corresponding timber log.
         const m3ToRevert = Number(existingLoad.m3) || 0;
         if (existingLoad.puutavara_id && m3ToRevert > 0) {
+             console.log(`Reverting ${m3ToRevert} m³ from timber entry ID: ${existingLoad.puutavara_id}...`);
              const updateTimberEntryQuery = `
                 UPDATE public.puutavaralaji
-                SET haettu = haettu - $1, jaljella = jaljella + $1
+                SET 
+                    haettu = haettu - $1, 
+                    jaljella = jaljella + $1
                 WHERE puutavara_id = $2;
             `;
             await client.query(updateTimberEntryQuery, [m3ToRevert, existingLoad.puutavara_id]);
         }
-        // Office staff can delete (soft delete) any load (as per original logic).
 
+        // Step 3: Soft-delete the load itself.
         const softDeleteQuery = 'UPDATE public.kuorma SET is_active = FALSE WHERE kuorma_id = $1 RETURNING kuorma_id;';
         const result = await client.query(softDeleteQuery, [id]);
 
+        // Step 4: Recalculate the grand totals for the parent puulaani.
         if (existingLoad.puulaani_id) {
             await recalculatePuulaaniTotals(client, existingLoad.puulaani_id);
         }
 
         await client.query('COMMIT');
         
-        console.log(`Successfully soft-deleted load with ID: ${id} by user: ${user.userId}`);
+        console.log(`Successfully soft-deleted load with ID: ${id} and updated totals.`);
         return { 
             kuormaId: result.rows[0].kuorma_id, 
-            message: 'Load marked as inactive successfully' 
+            message: 'Load marked as inactive and totals updated successfully' 
         };
 
     } catch (error) {
