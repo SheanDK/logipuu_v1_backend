@@ -149,7 +149,15 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
     const client = await pool.connect();
     try {
         // Step 1: Find the 'ajomaarays_nro' of any active trip (this part is correct).
-        const activeTripQuery = `SELECT ajomaarays_nro FROM public.kuorma WHERE kulj_id = $1 AND status NOT IN ('Assigned', 'Completed', 'Cancelled') AND is_active = TRUE ORDER BY pvm DESC, kuorma_id DESC LIMIT 1;`;
+        const activeTripQuery = `
+        SELECT ajomaarays_nro 
+        FROM public.kuorma 
+        WHERE
+         kulj_id = $1 
+         AND status NOT IN ('Assigned', 'Completed', 'Cancelled') 
+         AND is_active = TRUE 
+         ORDER BY pvm DESC, kuorma_id DESC 
+         LIMIT 1;`;
         const activeTripResult = await client.query(activeTripQuery, [driverId]);
 
         if (activeTripResult.rowCount === 0) { return null; }

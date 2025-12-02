@@ -279,8 +279,8 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
             throw new Error('You are not authorized to edit this load.');
         }
 
-        if (isDriver && existingLoad.status !== 'Assigned') {
-            throw new Error('This load is already in progress and cannot be edited.');
+        if (existingLoad.status === 'Completed') {
+             throw new Error('Cannot edit a completed load.');
         }
 
         let fieldsToUpdate: Partial<any>;
@@ -369,8 +369,8 @@ export const deleteLoad = async (id: number, user: UserPayload): Promise<{ kuorm
             if (existingLoad.kulj_id !== user.driverNumericId) {
                 throw new Error('Forbidden: You are not authorized to delete this load.');
             }
-            if (existingLoad.status !== 'Assigned') {
-                throw new Error(`Cannot delete a load that is already in progress (Status: ${existingLoad.status}).`);
+            if (existingLoad.status === 'Completed') {
+                 throw new Error('Cannot delete a completed load.');
             }
         }
 
@@ -866,17 +866,15 @@ export const createBulkLoad = async (data: CreateBulkLoadDto, user: UserPayload)
         let ajomaaraysNro = legs[0].ajomaaraysNro;
         if (!ajomaaraysNro) {
             const now = new Date();
-            const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+            const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
             ajomaaraysNro = `TRIP-${timestamp}-${user.driverNumericId}`;
         }
 
         const createdLoadIds: number[] = [];
 
         for (const leg of legs) {
-            // --- THE FIX IS HERE ---
-            // Always set the status of a newly created load to 'Assigned'.
-            // The user must explicitly start the trip from the UI.
-            const status = 'Assigned'; 
+            // --- FIX 1: Set initial status to 'In Progress' for automatic start ---
+            const status = 'In Progress'; 
 
             const insertQuery = `
                 INSERT INTO public.kuorma (
@@ -892,7 +890,7 @@ export const createBulkLoad = async (data: CreateBulkLoadDto, user: UserPayload)
                 leg.kuljId, leg.pvm, 
                 ajomaaraysNro,
                 leg.kohde ?? null, leg.lahto ?? null, leg.m3 ?? 0, leg.km ?? 0, leg.lisatiedot ?? null, 
-                leg.kalustoNro, status, // Use the fixed 'Assigned' status
+                leg.kalustoNro, status, // <-- Use 'In Progress'
                 leg.vastaanottoNro ?? null, leg.reitti ?? null, leg.tunnit ?? 0, leg.kpl ?? 0
             ];
 
@@ -904,12 +902,34 @@ export const createBulkLoad = async (data: CreateBulkLoadDto, user: UserPayload)
                 await client.query(updateTimberEntryQuery, [leg.m3, leg.puutavaraId]);
             }
         }
+        
+        // --- FIX 2: Recalculate Puulaani Totals for each affected puulaani (Crucial for Map View) ---
+        // Although the logic is more complex with bulk loads, for simplicity, we call the helper function
+        // for the first leg's puulaani, as the frontend sends only one.
+        if (legs[0].puulaaniId) {
+             const recalculateQuery = `
+                WITH ptl_summary AS (
+                    SELECT
+                        COALESCE(SUM(kuutiot), 0) as total_volume,
+                        COALESCE(SUM(haettu), 0) as total_hauled
+                    FROM public.puutavaralaji
+                    WHERE puulaani_id = $1
+                )
+                UPDATE public.puulaani
+                SET
+                    kok = ptl_summary.total_volume,
+                    jaljella = (ptl_summary.total_volume - ptl_summary.total_hauled)
+                FROM ptl_summary
+                WHERE puulaani_id = $1;
+            `;
+            await client.query(recalculateQuery, [legs[0].puulaaniId]);
+        }
 
         await client.query('COMMIT');
         
         // Return the trip number and created IDs for confirmation
         return { 
-            message: `${createdLoadIds.length} loads created successfully under trip ${ajomaaraysNro}.`,
+            message: `${createdLoadIds.length} loads created and trip ${ajomaaraysNro} started successfully.`,
             ajomaaraysNro: ajomaaraysNro,
             createdLoadIds: createdLoadIds
         };
