@@ -1,5 +1,3 @@
-// backend/src/server.ts
-
 import 'reflect-metadata'; 
 import express, { Application, Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
@@ -20,12 +18,12 @@ import rolePermissionRoutes from './routes/rolePermissionRoutes';
 import adminUserRoutes from './routes/adminUserRoutes';
 import unloadingSiteRoutes from './routes/unloadingSiteRoutes';
 import waybillRoutes from './routes/waybillRoutes';
-import puutavaraRoutes from './routes/puutavaraRoutes'; // wood-types
-import locationRoutes from './routes/locationRoutes'; // locations
+import puutavaraRoutes from './routes/puutavaraRoutes';
+import locationRoutes from './routes/locationRoutes';
 import otherMarkerRoutes from './routes/otherMarkerRoutes'; 
 import puutavaralajiRoutes from './routes/timberLogRoutes';
 import loadRoutes from './routes/loadRoutes';
-import invoicingRoutes from './routes/invoicingRoutes'
+import invoicingRoutes from './routes/invoicingRoutes';
 import consignmentRoutes from './routes/consignmentDriverRoutes';
 import driverViewRoutes from './routes/driverViewRoutes';
 import consignmentDriverRoutes from './routes/consignmentDriverRoutes';
@@ -41,10 +39,11 @@ const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
 const httpServer = http.createServer(app);
 
-// --- FIX: Initialize Socket.IO service by passing the frontend URL string ---
-// This now matches the `initialize` method in your `socketService.ts`
+// --- FIX 1: Pass the string URL to the service. The service will handle options. ---
+// This matches the signature of your `socketService.ts` file.
 socketService.initialize(httpServer, frontendUrl);
 
+// --- FIX 2: Correct CORS setup for Express v5 ---
 const corsOptions = {
     origin: frontendUrl,
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
@@ -52,8 +51,11 @@ const corsOptions = {
     allowedHeaders: "Origin, X-Requested-With, Content-Type, Accept, Authorization"
 };
 
+// This one 'app.use(cors(corsOptions))' handles ALL requests, including pre-flight OPTIONS requests.
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); 
+
+// This line is redundant and causes the error in Express v5.
+// app.options('*', cors(corsOptions)); // <-- REMOVED
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
