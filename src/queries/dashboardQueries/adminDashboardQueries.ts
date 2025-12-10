@@ -28,7 +28,8 @@ export const GET_VOLUME_LAST_7_DAYS = `
         SELECT generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day')::date as day
     )
     SELECT 
-        to_char(ds.day, 'Mon DD') as date,
+        -- FIX: Return standard ISO date format (YYYY-MM-DD)
+        to_char(ds.day, 'YYYY-MM-DD') as date, 
         COALESCE(SUM(k.m3), 0) as volume
     FROM date_series ds
     LEFT JOIN public.kuorma k ON k.pvm::date = ds.day AND k.status = 'Completed'
