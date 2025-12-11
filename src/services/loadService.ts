@@ -5,12 +5,14 @@ import camelcaseKeys from 'camelcase-keys';
 import { ILoad, ILoadDetails, ILoadListItem, IMapTrip, ITripDetails } from '../types/load.types';
 import { CreateLoadDto, UpdateLoadDto, CompleteLoadDto, CreateBulkLoadDto } from '../dto/load.dto';
 import { UserPayload } from '../middlewares/authMiddleware';
+import { socketService } from './socketService'; 
 
 export interface ILoadListFilters {
     asiakasId?: string;
     kalustoNro?: string;
     kuljId?: string;
     status?: 'active' | 'pending_inspection' | 'all';
+    loadType?: number; 
 }
 
 export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILoadListItem[]> => {
@@ -32,6 +34,11 @@ export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILo
     const conditions: string[] = [];
     const queryParams: (string | number)[] = [];
     let paramIndex = 1;
+
+     if (filters.loadType !== undefined) {
+        conditions.push(`k.tyyppi = $${paramIndex++}`);
+        queryParams.push(filters.loadType);
+    }
 
     if (filters.status === 'active') {
         conditions.push(`k.status != 'Completed'`);
@@ -422,7 +429,12 @@ export const updateLoadStatus = async (id: number, status: string, driverId: num
         if (result.rowCount === 0) {
             throw new Error('Load not found or you are not authorized to update it.');
         }
-        return camelcaseKeys(result.rows[0]);
+        const updatedLoad = camelcaseKeys(result.rows[0]);
+
+        // --- Emit socket event ---
+        socketService.emit('loadStatusUpdated', updatedLoad);
+
+        return updatedLoad;
     } catch (error) {
         console.error(`Error during status update for load ID ${id}:`, error);
         throw error;
@@ -479,6 +491,7 @@ export const getMyLoadsForList = async (driverId: number): Promise<ILoadListItem
             return camelcaseKeys(finalRow);
         });
 
+        
         return processedRows;
 
     } catch (error) {

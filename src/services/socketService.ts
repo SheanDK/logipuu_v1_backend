@@ -9,6 +9,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_for_dev_chang
 
 // Singleton class to manage the Socket.IO server instance
 class SocketService {
+    emit(arg0: string, updatedLoad: any) {
+        throw new Error('Method not implemented.');
+    }
     private static instance: SocketService;
     private io: Server | null = null;
 

@@ -11,6 +11,7 @@ export const getAllLoadsHandler = async (req: AuthenticatedRequest, res: Respons
             asiakasId: req.query.asiakasId as string | undefined,
             kalustoNro: req.query.kalustoNro as string | undefined,
             kuljId: req.query.kuljId as string | undefined,
+            loadType: req.query.loadType !== undefined ? parseInt(req.query.loadType as string, 10) : undefined,
         };
         
         const loads = await loadService.getAllLoadsForList(filters);
