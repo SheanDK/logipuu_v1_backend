@@ -24,7 +24,7 @@ import otherMarkerRoutes from './routes/otherMarkerRoutes';
 import puutavaralajiRoutes from './routes/timberLogRoutes';
 import loadRoutes from './routes/loadRoutes';
 import invoicingRoutes from './routes/invoicingRoutes';
-import consignmentRoutes from './routes/consignmentDriverRoutes';
+import consignmentRoutes from './routes/consignmentRoutes';
 import driverViewRoutes from './routes/driverViewRoutes';
 import consignmentDriverRoutes from './routes/consignmentDriverRoutes';
 import woodCategoryRoutes from './routes/woodCategoryRoutes';

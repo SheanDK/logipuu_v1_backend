@@ -269,27 +269,60 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
     try {
         await client.query('BEGIN');
         
+        // Step 1: Lock the target row and get its current state.
         const { rows, rowCount } = await client.query('SELECT * FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [id]);
-
         if (rowCount === 0) {
             throw new Error(`Load with ID ${id} not found.`);
         }
-        
         const existingLoad = rows[0];
-
-        console.log(`[DEBUG] updateLoad: User ID=${user.driverNumericId} vs Load's Driver ID=${existingLoad.kulj_id}`);
-        console.log(`[DEBUG] updateLoad: Load's current status is '${existingLoad.status}'`);
-        
         const isDriver = user.roles.includes('Kuljettaja');
 
-        if (isDriver && existingLoad.kulj_id !== user.driverNumericId) {
-            throw new Error('You are not authorized to edit this load.');
+        // --- AUTHORIZATION & STATUS CHECKS ---
+
+        if (isDriver) {
+            // Driver Check 1: Must own the load
+            if (existingLoad.kulj_id !== user.driverNumericId) {
+                throw new Error('You are not authorized to edit this load.');
+            }
+            
+            // Driver Check 2: Cannot edit if Completed
+            if (existingLoad.status === 'Completed') {
+                 throw new Error('Cannot edit a completed load.');
+            }
+            
+            // Driver Check 3: Can only edit 'Assigned' loads (loads that haven't started moving)
+            // If you want drivers to edit Active loads, remove this check.
+            if (existingLoad.status !== 'Assigned') {
+                throw new Error('This load is already in progress and cannot be edited.');
+            }
+
+        } else {
+            // Office User Check: Cannot edit if already invoiced (laskutukseen = 1)
+            // They CAN edit 'Completed' loads as long as they are pending inspection (laskutukseen = 0)
+            if (existingLoad.status === 'Completed' && existingLoad.laskutukseen === 1) {
+                throw new Error('Cannot edit a load that has already been accepted for invoicing.');
+            }
         }
 
-        if (existingLoad.status === 'Completed') {
-             throw new Error('Cannot edit a completed load.');
-        }
+        // Step 3: Calculate the change in volume (m3 delta).
+        const oldM3 = Number(existingLoad.m3) || 0;
+        const newM3 = data.m3 !== undefined ? Number(data.m3) : oldM3;
+        const m3Delta = newM3 - oldM3;
 
+        // Step 4: Update the corresponding 'puutavaralaji' (timber entry) if volume has changed.
+        if (existingLoad.puutavara_id && m3Delta !== 0) {
+            console.log(`Volume changed by ${m3Delta} m³. Updating timber entry ID: ${existingLoad.puutavara_id}...`);
+            const updateTimberEntryQuery = `
+                UPDATE public.puutavaralaji
+                SET
+                    haettu = haettu + $1,
+                    jaljella = jaljella - $1
+                WHERE puutavara_id = $2;
+            `;
+            await client.query(updateTimberEntryQuery, [m3Delta, existingLoad.puutavara_id]);
+        }
+        
+        // Step 5: Construct the update query for the 'kuorma' table based on user role.
         let fieldsToUpdate: Partial<any>;
 
         if (isDriver) {
@@ -301,7 +334,7 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
                 lisatiedot: data.lisatiedot
             };
         } else {
-            // Office users can update a wider set of fields
+            // Office users can update a wider range of fields
             fieldsToUpdate = {
                 tyyppi: data.tyyppi,
                 asiakas_id: data.asiakasId,
@@ -325,7 +358,9 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
 
         const updates: { [key: string]: any } = {};
         for (const [key, value] of Object.entries(fieldsToUpdate)) {
-            if (value !== undefined) updates[key] = value;
+            if (value !== undefined) {
+                updates[key] = value;
+            }
         }
         
         let updatedLoadRow;
@@ -333,14 +368,14 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
             const setClauses = Object.keys(updates).map((key, index) => `${key} = $${index + 1}`).join(', ');
             const params = [...Object.values(updates), id];
             const updateQuery = `UPDATE public.kuorma SET ${setClauses} WHERE kuorma_id = $${params.length} RETURNING *;`;
+            
             const result = await client.query(updateQuery, params);
             updatedLoadRow = result.rows[0];
         } else {
             updatedLoadRow = existingLoad;
         }
 
-        // --- THE CRITICAL FIX ---
-        // After updating the load, call the powerful recalculate function.
+        // Step 6: Recalculate and update the parent Puulaani totals.
         if (updatedLoadRow.puulaani_id) {
             await recalculatePuulaaniTotals(client, updatedLoadRow.puulaani_id);
         }
@@ -350,7 +385,7 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
 
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error(`Error in updateLoad transaction for load ID ${id}:`, error);
+        console.error(`Error in updateLoad transaction for ID ${id}:`, error);
         throw error;
     } finally {
         client.release();
