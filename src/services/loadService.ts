@@ -18,11 +18,15 @@ export interface ILoadListFilters {
 export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILoadListItem[]> => {
     let queryText = `
         SELECT
-            k.kuorma_id, TO_CHAR(k.pvm, 'DD.MM.YYYY') AS pvm, k.ajomaarays_nro,
+            k.kuorma_id, 
+            k.pvm, -- Return RAW DATE for frontend formatting
+            k.ajomaarays_nro,
             k.vastaanotto_nro, kal.rek_nro, kul.nimi AS kuljettajan_nimi,
             p.nimi AS puulaani_nimi, a.asiakkaan_nimi, pt.puutavara AS timber_type,
-            k.reitti, k.m3, k.km, k.tunnit, k.kpl, k.lisatiedot, k.status, k.is_active,
-            p.sijainti_lat as origin_lat, p.sijainti_long as origin_lng
+            k.reitti, k.m3, k.km, k.tunnit, k.kpl, k.lisatiedot, k.status, k.is_active, k.tyyppi,
+            p.sijainti_lat as origin_lat, p.sijainti_long as origin_lng,
+            -- Calculate Waybill Count for Consignments
+            (SELECT COUNT(*) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id) as waybill_count
         FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
         LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
@@ -96,57 +100,129 @@ export const getLoadById = async (id: number): Promise<ILoadDetails | null> => {
     }
 };
 
-export const getTripByLoadId = async (id: number): Promise<ITripDetails | null> => {
-    const initialLoadQuery = 'SELECT ajomaarays_nro, asiakas_id, kulj_id, kalusto_nro FROM public.kuorma WHERE kuorma_id = $1';
-    const initialLoadResult = await pool.query(initialLoadQuery, [id]);
+// IMPORTANT: This is the function called by your controller based on the logs.
+export const getTripByLoadId = async (id: number): Promise<any> => {
     
-    if (initialLoadResult.rowCount === 0) {
-        console.error(`[getTripById] Initial load with ID ${id} not found.`);
-        return null;
+    // 1. Check Load Type to decide how to fetch data
+    const typeCheckQuery = `SELECT tyyppi FROM public.kuorma WHERE kuorma_id = $1`;
+    const typeCheckResult = await pool.query(typeCheckQuery, [id]);
+
+    if (typeCheckResult.rowCount === 0) {
+        console.error(`[getTripByLoadId] Load with ID ${id} not found.`);
+        return null; 
     }
 
-    const { ajomaarays_nro, asiakas_id, kulj_id, kalusto_nro } = initialLoadResult.rows[0];
-    const drivingOrderNumber = ajomaarays_nro;
+    const loadType = typeCheckResult.rows[0].tyyppi;
 
-    const tripLegsQuery = `
-        SELECT
-            k.kuorma_id, k.pvm, k.status, k.m3, k.km, k.tunnit, k.kpl, k.reitti, k.vastaanotto_nro,
-            k.kulj_id, k.ajomaarays_nro, k.lisatiedot,
-            k.puulaani_id, k.puutavara_id,
-            p.nimi AS origin_name, pp.purkupaikka AS destination_name,
-            p.sijainti_lat AS origin_lat, p.sijainti_long AS origin_lng,
-            pp.sijainti_lat AS destination_lat, pp.sijainti_long AS destination_lng,
-            pt.puutavara AS task_timber_type_name,
-            a.asiakkaan_nimi, kal.rek_nro, kul.nimi AS kuljettajan_nimi
-        FROM public.kuorma k
-        LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
-        LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
-        LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
-        LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
-        LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
-        LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
-        LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
-        WHERE (k.ajomaarays_nro = $1 AND k.ajomaarays_nro IS NOT NULL) OR (k.kuorma_id = $2)
-        ORDER BY k.kuorma_id ASC;
-    `;
-    const tripLegsResult = await pool.query(tripLegsQuery, [drivingOrderNumber, id]);
-    
-    if (tripLegsResult.rowCount === 0) return null;
+    // =========================================================
+    // CASE A: CONSIGNMENT (Rahtikirja) - tyyppi = 1
+    // =========================================================
+    if (loadType === 1) {
+        console.log(`[getTripByLoadId] Fetching Consignment details for ID ${id}`);
+        
+        const loadQuery = `
+            SELECT 
+                k.kuorma_id as "kuormaId",
+                k.pvm,
+                k.status,
+                k.lisatiedot,
+                k.m3, k.km, k.kpl, k.tunnit, 
+                k.tyyppi,
+                k.kulj_id,
+                k.kalusto_nro,
+                k.asiakas_id,
+                
+                -- Joins for Names
+                a.asiakkaan_nimi as "asiakkaanNimi",
+                kal.rek_nro as "rekNro",
+                kul.nimi as "kuljettajanNimi"
+            FROM public.kuorma k
+            LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+            LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+            LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+            WHERE k.kuorma_id = $1
+        `;
+        const loadResult = await pool.query(loadQuery, [id]);
+        const loadData = loadResult.rows[0];
 
-    const firstLeg = tripLegsResult.rows[0];
+        // Fetch Waybills
+        const waybillsQuery = `
+            SELECT 
+                r.rahti_id as "rahtiId",
+                r.asiakas_id as "asiakasId",
+                a.asiakkaan_nimi as "customerName", -- Joined name
+                r.rahtikirjan_nro as "rahtikirjanNro",
+                r.reitti,
+                r.m3, 
+                r.km, 
+                r.kpl, 
+                r.jako, 
+                r.tievero, 
+                r.lisatiedot
+            FROM public.rahtikirja r
+            LEFT JOIN public.asiakkaat a ON r.asiakas_id = a.asiakkaan_id
+            WHERE r.kuorma_id = $1
+            ORDER BY r.rahti_id ASC
+        `;
+        const waybillsResult = await pool.query(waybillsQuery, [id]);
 
-    const tripDetails: ITripDetails = {
-        // --- THIS IS THE FIX ---
-        tripId: drivingOrderNumber || `Trip #${id}`, // The display ID
-        ajomaaraysNro: drivingOrderNumber, // The actual data field
-        asiakasId: asiakas_id,
-        asiakkaanNimi: firstLeg.asiakkaan_nimi,
-        rekNro: firstLeg.rek_nro,
-        kalustoNro: kalusto_nro,
-        kuljettajanNimi: firstLeg.kuljettajan_nimi,
-        legs: camelcaseKeys(tripLegsResult.rows)
-    };
-    return tripDetails;
+        loadData.rahtikirjat = waybillsResult.rows;
+
+        // Use camelcaseKeys just in case, but aliases handled most of it
+        return camelcaseKeys(loadData);
+    }
+
+    // =========================================================
+    // CASE B: TIMBER LOAD (Puukuorma) - tyyppi = 0
+    // =========================================================
+    else {
+        console.log(`[getTripByLoadId] Fetching Timber Trip details for ID ${id}`);
+
+        const initialLoadQuery = 'SELECT ajomaarays_nro, asiakas_id, kulj_id, kalusto_nro FROM public.kuorma WHERE kuorma_id = $1';
+        const initialLoadResult = await pool.query(initialLoadQuery, [id]);
+        
+        const { ajomaarays_nro, asiakas_id, kulj_id, kalusto_nro } = initialLoadResult.rows[0];
+        const drivingOrderNumber = ajomaarays_nro;
+
+        const tripLegsQuery = `
+            SELECT
+                k.kuorma_id, k.pvm, k.status, k.m3, k.km, k.tunnit, k.kpl, k.reitti, k.vastaanotto_nro,
+                k.kulj_id, k.ajomaarays_nro, k.lisatiedot,
+                k.puulaani_id, k.puutavara_id,
+                p.nimi AS origin_name, pp.purkupaikka AS destination_name,
+                p.sijainti_lat AS origin_lat, p.sijainti_long AS origin_lng,
+                pp.sijainti_lat AS destination_lat, pp.sijainti_long AS destination_lng,
+                pt.puutavara AS task_timber_type_name,
+                a.asiakkaan_nimi, kal.rek_nro, kul.nimi AS kuljettajan_nimi
+            FROM public.kuorma k
+            LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+            LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+            LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+            LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
+            LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
+            LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
+            LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
+            WHERE (k.ajomaarays_nro = $1 AND k.ajomaarays_nro IS NOT NULL) OR (k.kuorma_id = $2)
+            ORDER BY k.kuorma_id ASC;
+        `;
+        const tripLegsResult = await pool.query(tripLegsQuery, [drivingOrderNumber, id]);
+        
+        if (tripLegsResult.rowCount === 0) return null;
+
+        const firstLeg = tripLegsResult.rows[0];
+
+        const tripDetails: ITripDetails = {
+            tripId: drivingOrderNumber || `Trip #${id}`, 
+            ajomaaraysNro: drivingOrderNumber,
+            asiakasId: asiakas_id,
+            asiakkaanNimi: firstLeg.asiakkaan_nimi,
+            rekNro: firstLeg.rek_nro,
+            kalustoNro: kalusto_nro,
+            kuljettajanNimi: firstLeg.kuljettajan_nimi,
+            legs: camelcaseKeys(tripLegsResult.rows)
+        };
+        return tripDetails;
+    }
 };
 
 // Helper function to recalculate totals for a given puulaani_id
@@ -613,7 +689,7 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
     const queryText = `
         SELECT
             k.kuorma_id,
-            TO_CHAR(k.pvm, 'DD.MM.YYYY') AS pvm,
+            k.pvm, -- Return RAW DATE object, let frontend format it
             k.ajomaarays_nro,
             k.vastaanotto_nro,
             kal.rek_nro,
@@ -631,8 +707,9 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
             k.status,
             k.is_active,
             k.puutavara_id,
-            -- FIX: Added a comma after the previous column
-            k.tyyppi 
+            k.tyyppi,
+            -- Add Waybill Count
+            (SELECT COUNT(*) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id) as waybill_count
         FROM
             public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
@@ -652,8 +729,8 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
     
     try {
         const result = await pool.query(queryText);
-        // The db wrapper will handle camelCasing automatically
-        return result.rows;
+        // camelcaseKeys converts 'waybill_count' -> 'waybillCount'
+        return camelcaseKeys(result.rows);
     } catch (error) {
         console.error("Error fetching loads for inspection:", error);
         throw new Error("Database query for fetching inspection loads failed.");
@@ -1013,5 +1090,127 @@ export const updateTripStatus = async (ajomaaraysNro: string, status: string, dr
     } catch (error) {
         console.error(`Error updating status for trip ${ajomaaraysNro}:`, error);
         throw error;
+    }
+};
+
+export const getTripById = async (id: number): Promise<any> => {
+    // 1. First, check the Load Type
+    const typeCheckQuery = `SELECT tyyppi FROM public.kuorma WHERE kuorma_id = $1`;
+    const typeCheckResult = await pool.query(typeCheckQuery, [id]);
+
+    if (typeCheckResult.rowCount === 0) {
+        return null; // Load not found
+    }
+
+    const loadType = typeCheckResult.rows[0].tyyppi;
+
+    // =========================================================
+    // SCENARIO 1: CONSIGNMENT (Rahtikirja) - tyyppi = 1
+    // =========================================================
+    if (loadType === 1) {
+        // Fetch Parent Load Details with Joins for display names
+        const loadQuery = `
+            SELECT 
+                k.kuorma_id as "kuormaId",
+                k.pvm,
+                k.status,
+                k.lisatiedot,
+                k.m3, k.km, k.kpl, k.tunnit, -- Aggregates stored in parent
+                k.tyyppi,
+                k.kulj_id,
+                k.kalusto_nro,
+                k.asiakas_id,
+                
+                -- Joins for Names (Aliases must match Frontend expectations)
+                a.asiakkaan_nimi as "asiakkaanNimi",
+                kal.rek_nro as "rekNro",
+                kul.nimi as "kuljettajanNimi"
+            FROM public.kuorma k
+            LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+            LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+            LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+            WHERE k.kuorma_id = $1
+        `;
+        const loadResult = await pool.query(loadQuery, [id]);
+        const loadData = loadResult.rows[0];
+
+        // Fetch Child Waybills with Customer Names
+        const waybillsQuery = `
+            SELECT 
+                r.rahti_id as "rahtiId",
+                r.asiakas_id as "asiakasId",
+                a.asiakkaan_nimi as "customerName", -- Joined for display
+                r.rahtikirjan_nro as "rahtikirjanNro",
+                r.reitti,
+                r.m3, 
+                r.km, 
+                r.kpl, 
+                r.jako, 
+                r.tievero, 
+                r.lisatiedot
+            FROM public.rahtikirja r
+            LEFT JOIN public.asiakkaat a ON r.asiakas_id = a.asiakkaan_id
+            WHERE r.kuorma_id = $1
+            ORDER BY r.rahti_id ASC
+        `;
+        const waybillsResult = await pool.query(waybillsQuery, [id]);
+
+        // Attach waybills array to the main object
+        loadData.rahtikirjat = waybillsResult.rows;
+
+        // Return CamelCased object (Manual aliasing in SQL handles most, but ensuring consistency)
+        return camelcaseKeys(loadData);
+    }
+
+    // =========================================================
+    // SCENARIO 2: TIMBER LOAD (Puukuorma) - tyyppi = 0
+    // =========================================================
+    else {
+        // Fetch specific load to get driving order number
+        const initialLoadQuery = 'SELECT ajomaarays_nro, asiakas_id, kulj_id, kalusto_nro FROM public.kuorma WHERE kuorma_id = $1';
+        const initialLoadResult = await pool.query(initialLoadQuery, [id]);
+        const { ajomaarays_nro, asiakas_id, kulj_id, kalusto_nro } = initialLoadResult.rows[0];
+        const drivingOrderNumber = ajomaarays_nro;
+
+        // Fetch all legs belonging to this trip
+        const tripLegsQuery = `
+            SELECT
+                k.kuorma_id, k.pvm, k.status, k.m3, k.km, k.tunnit, k.kpl, k.reitti, k.vastaanotto_nro,
+                k.kulj_id, k.ajomaarays_nro, k.lisatiedot,
+                k.puulaani_id, k.puutavara_id,
+                p.nimi AS origin_name, pp.purkupaikka AS destination_name,
+                p.sijainti_lat AS origin_lat, p.sijainti_long AS origin_lng,
+                pp.sijainti_lat AS destination_lat, pp.sijainti_long AS destination_lng,
+                pt.puutavara AS task_timber_type_name,
+                a.asiakkaan_nimi, kal.rek_nro, kul.nimi AS kuljettajan_nimi
+            FROM public.kuorma k
+            LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
+            LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
+            LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+            LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
+            LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
+            LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
+            LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
+            WHERE (k.ajomaarays_nro = $1 AND k.ajomaarays_nro IS NOT NULL) OR (k.kuorma_id = $2)
+            ORDER BY k.kuorma_id ASC;
+        `;
+        const tripLegsResult = await pool.query(tripLegsQuery, [drivingOrderNumber, id]);
+        
+        if (tripLegsResult.rowCount === 0) return null;
+
+        const firstLeg = tripLegsResult.rows[0];
+
+        // Construct Timber Trip Details
+        const tripDetails: ITripDetails = {
+            tripId: drivingOrderNumber || `Trip #${id}`,
+            ajomaaraysNro: drivingOrderNumber,
+            asiakasId: asiakas_id,
+            asiakkaanNimi: firstLeg.asiakkaan_nimi,
+            rekNro: firstLeg.rek_nro,
+            kalustoNro: kalusto_nro,
+            kuljettajanNimi: firstLeg.kuljettajan_nimi,
+            legs: camelcaseKeys(tripLegsResult.rows)
+        };
+        return tripDetails;
     }
 };

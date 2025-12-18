@@ -1,81 +1,62 @@
 // src/services/consignmentDriverService.ts
 import { PoolClient } from 'pg';
 import pool from '../config/db';
-import { CreateConsignmentDto } from '../dto/consignment.dto';
 import { executeTransaction } from '../utils/dbUtils';
 
 /**
- * Helper to calculate totals from waybills array
- */
-const calculateTotals = (waybills: any[]) => {
-    let m3 = 0;
-    let km = 0;
-    let kpl = 0;
-    let tunnit = 0; // Maps to 'jako'
-
-    if (waybills && waybills.length > 0) {
-        waybills.forEach(w => {
-            m3 += Number(w.m3) || 0;
-            km += Number(w.km) || 0;
-            kpl += Number(w.kpl) || 0;
-            tunnit += Number(w.jako) || 0;
-        });
-    }
-    return { m3, km, kpl, tunnit };
-};
-
-/**
- * Fetches a list of parent consignment loads for a specific driver and vehicle.
+ * Fetches a list of parent consignment loads for a specific driver.
+ * ONLY fetches 'Draft' status loads (Assigned loads go to office inspection).
  */
 export const getConsignmentsForDriver = async (driverId: number, vehicleId: number) => { 
     const query = `
         SELECT
-            k.kuorma_id, 
+            k.kuorma_id as "kuormaId", 
             k.pvm, 
-            a.asiakkaan_nimi, 
-            kal.rek_nro as auto_nro, 
-            kul.nimi as kuljettajan_nimi, 
+            kal.rek_nro as "autoNro", 
             k.status,
-            -- Fetch totals so Driver sees updates made by Office
-            k.m3,
-            k.km,
-            k.kpl,
-            k.tunnit,
-            (SELECT COUNT(*) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id) as rahtikirja_count
+            -- Count number of waybills
+            (SELECT COUNT(*) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id) as "waybillCount",
+            -- Total M3 form the parent record (calculated by frontend)
+            k.m3 as "totalM3" 
         FROM public.kuorma k
-        JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
-        JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
-        JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
+        LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
         WHERE 
             k.kulj_id = $1 
-            AND k.kalusto_nro = $2 
             AND k.tyyppi = 1 
             AND k.is_active = TRUE
-            -- Only show loads sent by driver ('Completed') but NOT yet accepted by office.
-            -- laskutukseen = 0 means "Unchecked/Unbilled". 
-            -- When office accepts, laskutukseen becomes 1, so it hides from here.
-            AND k.status = 'Completed'
-            AND k.laskutukseen = 0
-        ORDER BY k.pvm DESC;
+            AND k.status = 'Draft' -- CHANGE: Only show Drafts to the driver
+        ORDER BY k.pvm DESC, k.kuorma_id DESC;
     `;
-    const result = await pool.query(query, [driverId, vehicleId]);
+    const result = await pool.query(query, [driverId]);
     return result.rows;
 };
 
 /**
  * Fetches the full details of a single consignment load.
+ * Includes Customer Names for each Waybill.
  */
 export const getConsignmentById = async (id: number, driverId: number): Promise<any | null> => {
-    const kuormaQuery = `SELECT * FROM public.kuorma WHERE kuorma_id = $1::bigint AND kulj_id = $2 AND tyyppi = 1;`;
+    // 1. Get Parent Load Info
+    const kuormaQuery = `
+        SELECT k.*, k.kuorma_id as "kuormaId", k.asiakas_id as "asiakasId" 
+        FROM public.kuorma k 
+        WHERE k.kuorma_id = $1::bigint AND k.kulj_id = $2 AND k.tyyppi = 1;
+    `;
     
+    // 2. Get Waybills with Customer Names
+    // We JOIN with asiakkaat table to get the name for the frontend dropdown display
     const rahtikirjatQuery = `
         SELECT 
-            rahti_id, kuorma_id, pvm, rahtikirjan_nro, reitti, 
-            m3, km, kpl, jako, tievero, lisatiedot,
-            m3_hinta, km_hinta, kpl_hinta, jako_hinta, koko_hinta
-        FROM public.rahtikirja 
-        WHERE kuorma_id = $1::bigint 
-        ORDER BY rahti_id ASC;
+            r.rahti_id as "rahtiId",
+            r.asiakas_id as "asiakasId",
+            a.asiakkaan_nimi as "customerName", -- Needed for frontend display
+            r.rahtikirjan_nro as "rahtikirjanNro",
+            r.reitti,
+            r.m3, r.km, r.kpl, r.jako, r.tievero, r.lisatiedot
+        FROM public.rahtikirja r 
+        LEFT JOIN public.asiakkaat a ON r.asiakas_id = a.asiakkaan_id
+        WHERE r.kuorma_id = $1::bigint 
+        ORDER BY r.rahti_id ASC;
     `;
 
     try {
@@ -88,7 +69,7 @@ export const getConsignmentById = async (id: number, driverId: number): Promise<
         const rahtikirjatResult = await pool.query(rahtikirjatQuery, [id]);
         
         const kuorma = kuormaResult.rows[0];
-        kuorma.rahtikirjat = rahtikirjatResult?.rows || []; 
+        kuorma.rahtikirjat = rahtikirjatResult.rows || []; 
         
         return kuorma;
 
@@ -99,68 +80,58 @@ export const getConsignmentById = async (id: number, driverId: number): Promise<
 };
 
 /**
- * Creates a new consignment load.
+ * Creates a new consignment load (parent) and its associated waybills (children).
+ * Accepts 'status' to distinguish between Draft and Assigned.
  */
-export const createConsignment = async (dto: CreateConsignmentDto, driverId: number, vehicleId: number) => {
+export const createConsignment = async (dto: any, driverId: number, vehicleId: number) => {
     return executeTransaction(async (client: PoolClient) => {
-        // 1. Calculate Totals
-        const totals = calculateTotals(dto.rahtikirjat);
+        // Determine Status: Default to 'Draft' if not provided
+        const status = dto.status || 'Draft';
 
-        // 2. Insert Parent (Kuorma)
-        // status='Completed', laskutukseen=0 (Unchecked)
+        // 1. Insert Parent Load (Kuorma)
         const kuormaInsertQuery = `
             INSERT INTO public.kuorma (
-                tyyppi, asiakas_id, pvm, lisatiedot, kulj_id, kalusto_nro, 
-                status, laskutukseen,
-                m3, km, kpl, tunnit
+                tyyppi, pvm, kulj_id, kalusto_nro, asiakas_id, 
+                m3, km, kpl, tunnit, lisatiedot, status, is_active
             )
-            VALUES (1, $1, $2, $3, $4, $5, 'Completed', 0, $6, $7, $8, $9) 
+            VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE) 
             RETURNING kuorma_id;
         `;
         
-        const kuormaResult = await client.query(kuormaInsertQuery, [
-            dto.asiakasId, 
+        const kuormaParams = [
             dto.pvm, 
-            dto.lisatiedot, 
             driverId, 
-            vehicleId,
-            totals.m3,
-            totals.km,
-            totals.kpl,
-            totals.tunnit
-        ]);
-        
+            vehicleId, 
+            dto.asiakasId || null, // Primary customer (often 0 or first waybill's customer)
+            Number(dto.m3) || 0, 
+            Number(dto.km) || 0, 
+            Number(dto.kpl) || 0, 
+            Number(dto.tunnit) || 0, 
+            dto.lisatiedot || '',
+            status // 'Draft' or 'Assigned'
+        ];
+
+        const kuormaResult = await client.query(kuormaInsertQuery, kuormaParams);
         const newKuormaId = kuormaResult.rows[0].kuorma_id;
 
-        // 3. Insert Children
+        // 2. Insert Waybills (Rahtikirja)
         if (dto.rahtikirjat && dto.rahtikirjat.length > 0) {
             for (const r of dto.rahtikirjat) {
                 const rahtikirjaInsertQuery = `
                     INSERT INTO public.rahtikirja (
-                        kuorma_id, pvm, rahtikirjan_nro, reitti, 
-                        m3, km, kpl, jako, tievero, lisatiedot,
-                        m3_hinta, km_hinta, kpl_hinta, jako_hinta, koko_hinta
-                    ) VALUES (
-                        $1, $2, $3, $4, 
-                        $5, $6, $7, $8, $9, $10,
-                        0, 0, 0, 0, 0
-                    )
-                    RETURNING rahti_id;
+                        kuorma_id, pvm, asiakas_id, rahtikirjan_nro, reitti, 
+                        m3, km, kpl, jako, tievero, lisatiedot
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
                 `;
-                
                 const params = [
                     newKuormaId, 
                     dto.pvm, 
+                    r.asiakasId || null, // Specific customer for this waybill
                     r.rahtikirjanNumero || '',
                     r.reitti || '',
-                    Number(r.m3) || 0, 
-                    Number(r.km) || 0, 
-                    Number(r.kpl) || 0,
-                    Number(r.jako) || 0, 
-                    Number(r.tievero) || 0, 
-                    r.lisatiedot || ''
+                    Number(r.m3) || 0, Number(r.km) || 0, Number(r.kpl) || 0,
+                    Number(r.jako) || 0, Number(r.tievero) || 0, r.lisatiedot || ''
                 ];
-                
                 await client.query(rahtikirjaInsertQuery, params);
             }
         }
@@ -170,75 +141,57 @@ export const createConsignment = async (dto: CreateConsignmentDto, driverId: num
 
 /**
  * Updates an existing consignment.
+ * Used for both saving draft changes and sending the load (updating status).
  */
-export const updateConsignment = async (id: number, dto: CreateConsignmentDto, driverId: number) => {
+export const updateConsignment = async (id: number, dto: any, driverId: number) => {
     return executeTransaction(async (client: PoolClient) => {
-        // 1. Verify Ownership & Status
-        // Check both 'status' and 'laskutukseen' to ensure it's not accepted/billed yet
-        const ownerCheck = await client.query('SELECT kulj_id, status, laskutukseen FROM public.kuorma WHERE kuorma_id = $1', [id]);
+        // Verify ownership
+        const ownerCheck = await client.query('SELECT kulj_id FROM public.kuorma WHERE kuorma_id = $1', [id]);
+        if (ownerCheck.rowCount === 0 || ownerCheck.rows[0].kulj_id !== driverId) { throw new Error('Forbidden'); }
         
-        if (ownerCheck.rowCount === 0) { throw new Error('Not Found'); }
-        if (ownerCheck.rows[0].kulj_id !== driverId) { throw new Error('Forbidden'); }
-        
-        const { status, laskutukseen } = ownerCheck.rows[0];
-        // If status is not Completed OR laskutukseen is not 0, it means office has processed it.
-        if (status !== 'Completed' || laskutukseen !== 0) { 
-            throw new Error('Cannot edit: Load already accepted/processed by office'); 
-        }
-        
-        // 2. Calculate Totals
-        const totals = calculateTotals(dto.rahtikirjat);
+        // Determine Status
+        const status = dto.status || 'Draft';
 
-        // 3. Update Parent (Kuorma)
+        // 1. Update Parent Load
         const kuormaUpdateQuery = `
             UPDATE public.kuorma 
-            SET asiakas_id = $1, pvm = $2, lisatiedot = $3,
-                m3 = $4, km = $5, kpl = $6, tunnit = $7
-            WHERE kuorma_id = $8;
+            SET pvm = $1, asiakas_id = $2, m3 = $3, km = $4, kpl = $5, tunnit = $6, lisatiedot = $7, status = $8
+            WHERE kuorma_id = $9;
         `;
-        
-        await client.query(kuormaUpdateQuery, [
-            dto.asiakasId, 
+        const kuormaParams = [
             dto.pvm, 
-            dto.lisatiedot,
-            totals.m3,
-            totals.km,
-            totals.kpl,
-            totals.tunnit,
+            dto.asiakasId || null,
+            Number(dto.m3) || 0, 
+            Number(dto.km) || 0, 
+            Number(dto.kpl) || 0, 
+            Number(dto.tunnit) || 0, 
+            dto.lisatiedot || '',
+            status, // Update status to 'Assigned' if sending
             id
-        ]);
+        ];
+        await client.query(kuormaUpdateQuery, kuormaParams);
         
-        // 4. Delete old Waybills
+        // 2. Replace Waybills (Delete all & Insert new)
+        // This is simpler than checking which changed
         await client.query('DELETE FROM public.rahtikirja WHERE kuorma_id = $1', [id]);
 
-        // 5. Insert new Waybills
         if (dto.rahtikirjat && dto.rahtikirjat.length > 0) {
             for (const r of dto.rahtikirjat) {
                 const rahtikirjaInsertQuery = `
                     INSERT INTO public.rahtikirja (
-                        kuorma_id, pvm, rahtikirjan_nro, reitti, 
-                        m3, km, kpl, jako, tievero, lisatiedot,
-                        m3_hinta, km_hinta, kpl_hinta, jako_hinta, koko_hinta
-                    ) VALUES (
-                        $1, $2, $3, $4, 
-                        $5, $6, $7, $8, $9, $10,
-                        0, 0, 0, 0, 0
-                    );
+                        kuorma_id, pvm, asiakas_id, rahtikirjan_nro, reitti, 
+                        m3, km, kpl, jako, tievero, lisatiedot
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
                 `;
-                
                 const params = [
                     id, 
-                    dto.pvm, 
-                    r.rahtikirjanNumero || '', 
+                    dto.pvm,
+                    r.asiakasId || null,
+                    r.rahtikirjanNumero || '',
                     r.reitti || '',
-                    Number(r.m3) || 0, 
-                    Number(r.km) || 0, 
-                    Number(r.kpl) || 0, 
-                    Number(r.jako) || 0, 
-                    Number(r.tievero) || 0, 
-                    r.lisatiedot || ''
+                    Number(r.m3) || 0, Number(r.km) || 0, Number(r.kpl) || 0,
+                    Number(r.jako) || 0, Number(r.tievero) || 0, r.lisatiedot || ''
                 ];
-                
                 await client.query(rahtikirjaInsertQuery, params);
             }
         }
