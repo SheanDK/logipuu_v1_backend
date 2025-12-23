@@ -1,4 +1,3 @@
-// backend/src/dto/load.dto.ts
 import { IsInt, 
     IsNotEmpty, 
     IsString, 
@@ -103,8 +102,100 @@ export class CreateLoadDto {
     kpl?: number;
 }
 
-// Update DTO can now correctly inherit all optional fields
-export class UpdateLoadDto extends CreateLoadDto {}
+// FIX: UpdateLoadDto should have all fields as OPTIONAL
+export class UpdateLoadDto {
+    @IsEnum(LoadTypeEnum) 
+    @IsOptional() // Changed from IsNotEmpty
+    tyyppi?: LoadTypeEnum;
+
+    @IsInt() 
+    @IsOptional() // Changed from IsNotEmpty
+    @Type(() => Number)
+    asiakasId?: number;
+    
+    @IsInt() 
+    @IsOptional() 
+    @Type(() => Number)
+    puulaaniId?: number;
+
+    @IsInt() 
+    @IsOptional() 
+    @Type(() => Number)
+    puutavaraId?: number;
+
+    @IsInt() 
+    @IsOptional() // Changed from IsNotEmpty
+    @Type(() => Number)
+    kalustoNro?: number;
+
+    @IsInt() 
+    @IsOptional() // Changed from IsNotEmpty
+    @Type(() => Number)
+    kuljId?: number;
+
+    @IsDate() 
+    @IsOptional() // Changed from IsNotEmpty
+    @Type(() => Date)
+    pvm?: Date;
+
+    @IsString() 
+    @IsOptional() 
+    @MaxLength(45)
+    ajomaaraysNro?: string;
+    
+    @IsString() 
+    @IsOptional() 
+    @MaxLength(100)
+    kohde?: string;
+
+    @IsString() 
+    @IsOptional() 
+    @MaxLength(100)
+    lahto?: string;
+    
+    @IsNumber() 
+    @IsOptional() 
+    @Min(0) 
+    @Type(() => Number)
+    m3?: number;
+
+    @IsNumber() 
+    @IsOptional() 
+    @Min(0) 
+    @Type(() => Number)
+    km?: number;
+    
+    @IsString() 
+    @IsOptional()
+    lisatiedot?: string;
+
+    @IsString() 
+    @IsOptional() 
+    @MaxLength(45)
+    vastaanottoNro?: string;
+
+    @IsString() 
+    @IsOptional() 
+    @MaxLength(100)
+    reitti?: string;
+
+    @IsNumber() 
+    @IsOptional() 
+    @Min(0) 
+    @Type(() => Number)
+    tunnit?: number;
+
+    @IsNumber() 
+    @IsOptional() 
+    @Min(0) 
+    @Type(() => Number)
+    kpl?: number;
+
+    // Allow waybills array for Consignment updates
+    @IsArray()
+    @IsOptional()
+    rahtikirjat?: any[];
+}
 
 export class UpdateLoadStatusDto {
     @IsString() 
@@ -134,9 +225,6 @@ export class AcceptLoadsDto {
     loadIds!: number[];
 }
 
-/**
- * DTO for creating multiple loads (legs) in a single bulk request.
- */
 export class CreateBulkLoadDto {
     @IsArray()
     @ValidateNested({ each: true })

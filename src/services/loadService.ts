@@ -14,18 +14,49 @@ export interface ILoadListFilters {
     status?: 'active' | 'pending_inspection' | 'all';
     loadType?: number; 
 }
+// Helper function to recalculate totals for a given puulaani_id
+const recalculatePuulaaniTotals = async (client: any, puulaaniId: number) => {
+    if (!puulaaniId) return;
+
+    console.log(`Recalculating ALL totals for parent puulaani ID: ${puulaaniId}...`);
+    
+    const recalculateQuery = `
+        WITH ptl_hauled_sum AS (
+            SELECT puutavara_id, COALESCE(SUM(m3), 0) AS new_hauled_total
+            FROM public.kuorma
+            WHERE puulaani_id = $1 AND is_active = TRUE AND puutavara_id IS NOT NULL
+            GROUP BY puutavara_id
+        ),
+        updated_ptl AS (
+            UPDATE public.puutavaralaji ptl
+            SET haettu = COALESCE(phs.new_hauled_total, 0), jaljella = ptl.kuutiot - COALESCE(phs.new_hauled_total, 0)
+            FROM ptl_hauled_sum phs
+            WHERE ptl.puulaani_id = $1 AND ptl.puutavara_id = phs.puutavara_id
+            RETURNING ptl.puulaani_id
+        ),
+        puulaani_summary AS (
+            SELECT COALESCE(SUM(kuutiot), 0) as total_volume, COALESCE(SUM(haettu), 0) as total_hauled
+            FROM public.puutavaralaji
+            WHERE puulaani_id = $1
+        )
+        UPDATE public.puulaani p
+        SET kok = ps.total_volume, jaljella = (ps.total_volume - ps.total_hauled)
+        FROM puulaani_summary ps
+        WHERE p.puulaani_id = $1;
+    `;
+    await client.query(recalculateQuery, [puulaaniId]);
+};
 
 export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILoadListItem[]> => {
     let queryText = `
         SELECT
             k.kuorma_id, 
-            k.pvm, -- Return RAW DATE for frontend formatting
+            k.pvm, -- Return RAW DATE
             k.ajomaarays_nro,
             k.vastaanotto_nro, kal.rek_nro, kul.nimi AS kuljettajan_nimi,
             p.nimi AS puulaani_nimi, a.asiakkaan_nimi, pt.puutavara AS timber_type,
             k.reitti, k.m3, k.km, k.tunnit, k.kpl, k.lisatiedot, k.status, k.is_active, k.tyyppi,
             p.sijainti_lat as origin_lat, p.sijainti_long as origin_lng,
-            -- Calculate Waybill Count for Consignments
             (SELECT COUNT(*) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id) as waybill_count
         FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
@@ -71,7 +102,9 @@ export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILo
     }
 };
 
+
 export const getLoadById = async (id: number): Promise<ILoadDetails | null> => {
+    // Basic fetch for single load details (used in some edits)
     const query = `
         SELECT k.*, a.asiakkaan_nimi, kal.rek_nro, kul.nimi AS kuljettajan_nimi,
             p.nimi AS origin_name, p.osoite AS origin_address, p.sijainti_lat AS origin_lat,
@@ -103,7 +136,7 @@ export const getLoadById = async (id: number): Promise<ILoadDetails | null> => {
 // IMPORTANT: This is the function called by your controller based on the logs.
 export const getTripByLoadId = async (id: number): Promise<any> => {
     
-    // 1. Check Load Type to decide how to fetch data
+    // 1. Check Load Type
     const typeCheckQuery = `SELECT tyyppi FROM public.kuorma WHERE kuorma_id = $1`;
     const typeCheckResult = await pool.query(typeCheckQuery, [id]);
 
@@ -145,7 +178,7 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
         const loadResult = await pool.query(loadQuery, [id]);
         const loadData = loadResult.rows[0];
 
-        // Fetch Waybills
+        // Fetch Waybills with Customer Names
         const waybillsQuery = `
             SELECT 
                 r.rahti_id as "rahtiId",
@@ -168,7 +201,6 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
 
         loadData.rahtikirjat = waybillsResult.rows;
 
-        // Use camelcaseKeys just in case, but aliases handled most of it
         return camelcaseKeys(loadData);
     }
 
@@ -184,16 +216,25 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
         const { ajomaarays_nro, asiakas_id, kulj_id, kalusto_nro } = initialLoadResult.rows[0];
         const drivingOrderNumber = ajomaarays_nro;
 
+        // Fetch details for the specific row (for completed trip view)
+        // Or fetch all legs if needed. For detail view, we fetch the specific load details.
         const tripLegsQuery = `
             SELECT
-                k.kuorma_id, k.pvm, k.status, k.m3, k.km, k.tunnit, k.kpl, k.reitti, k.vastaanotto_nro,
+                k.kuorma_id as "kuormaId", 
+                k.pvm, 
+                k.status, 
+                k.m3, k.km, k.tunnit, k.kpl, k.reitti, k.vastaanotto_nro,
                 k.kulj_id, k.ajomaarays_nro, k.lisatiedot,
-                k.puulaani_id, k.puutavara_id,
-                p.nimi AS origin_name, pp.purkupaikka AS destination_name,
-                p.sijainti_lat AS origin_lat, p.sijainti_long AS origin_lng,
-                pp.sijainti_lat AS destination_lat, pp.sijainti_long AS destination_lng,
-                pt.puutavara AS task_timber_type_name,
-                a.asiakkaan_nimi, kal.rek_nro, kul.nimi AS kuljettajan_nimi
+                k.puulaani_id, k.puutavara_id, k.kalusto_nro,
+                
+                COALESCE(p.nimi, k.lahto, 'N/A') AS lahto,
+                COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
+                
+                a.asiakkaan_nimi as "asiakkaanNimi",
+                kal.rek_nro as "rekNro",
+                kul.nimi as "kuljettajanNimi",
+                
+                'Timber Load' as tyyppi
             FROM public.kuorma k
             LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
             LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
@@ -202,75 +243,37 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
             LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
             LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
             LEFT JOIN public.puutavarat pt ON pl.puutavara_nro = pt.puutavara_nro
-            WHERE (k.ajomaarays_nro = $1 AND k.ajomaarays_nro IS NOT NULL) OR (k.kuorma_id = $2)
-            ORDER BY k.kuorma_id ASC;
+            WHERE k.kuorma_id = $1
         `;
-        const tripLegsResult = await pool.query(tripLegsQuery, [drivingOrderNumber, id]);
+        const tripLegsResult = await pool.query(tripLegsQuery, [id]);
         
         if (tripLegsResult.rowCount === 0) return null;
 
-        const firstLeg = tripLegsResult.rows[0];
+        const row = tripLegsResult.rows[0];
 
+        // Construct Trip Details Object
         const tripDetails: ITripDetails = {
             tripId: drivingOrderNumber || `Trip #${id}`, 
             ajomaaraysNro: drivingOrderNumber,
             asiakasId: asiakas_id,
-            asiakkaanNimi: firstLeg.asiakkaan_nimi,
-            rekNro: firstLeg.rek_nro,
+            asiakkaanNimi: row.asiakkaanNimi,
+            rekNro: row.rekNro,
             kalustoNro: kalusto_nro,
-            kuljettajanNimi: firstLeg.kuljettajan_nimi,
-            legs: camelcaseKeys(tripLegsResult.rows)
+            kuljettajanNimi: row.kuljettajanNimi,
+            
+            // Map row data to top-level fields for easy access in frontend
+            lahto: row.lahto,
+            kohde: row.kohde,
+            m3: row.m3,
+            km: row.km,
+            tyyppi: row.tyyppi,
+            pvm: row.pvm,
+            lisatiedot: row.lisatiedot,
+
+            legs: [] // Can populate if needed, but row details are sufficient here
         };
-        return tripDetails;
+        return camelcaseKeys(tripDetails);
     }
-};
-
-// Helper function to recalculate totals for a given puulaani_id
-const recalculatePuulaaniTotals = async (client: any, puulaaniId: number) => {
-    if (!puulaaniId) return;
-
-    console.log(`Recalculating ALL totals for parent puulaani ID: ${puulaaniId}...`);
-    
-    // This single, powerful query does everything in one go.
-    const recalculateQuery = `
-        WITH 
-        -- First, calculate the new 'haettu' (hauled) sum for each timber log based on ALL active loads
-        ptl_hauled_sum AS (
-            SELECT
-                puutavara_id,
-                COALESCE(SUM(m3), 0) AS new_hauled_total
-            FROM public.kuorma
-            WHERE puulaani_id = $1 AND is_active = TRUE AND puutavara_id IS NOT NULL
-            GROUP BY puutavara_id
-        ),
-        -- Then, update the 'puutavaralaji' table with these new sums
-        updated_ptl AS (
-            UPDATE public.puutavaralaji ptl
-            SET
-                haettu = COALESCE(phs.new_hauled_total, 0),
-                jaljella = ptl.kuutiot - COALESCE(phs.new_hauled_total, 0)
-            FROM ptl_hauled_sum phs
-            WHERE ptl.puulaani_id = $1 AND ptl.puutavara_id = phs.puutavara_id
-            RETURNING ptl.puulaani_id
-        ),
-        -- Finally, recalculate the grand totals for the 'puulaani' table itself
-        puulaani_summary AS (
-            SELECT
-                COALESCE(SUM(kuutiot), 0) as total_volume,
-                COALESCE(SUM(haettu), 0) as total_hauled
-            FROM public.puutavaralaji
-            WHERE puulaani_id = $1
-        )
-        UPDATE public.puulaani p
-        SET
-            kok = ps.total_volume,
-            jaljella = (ps.total_volume - ps.total_hauled)
-        FROM puulaani_summary ps
-        WHERE p.puulaani_id = $1;
-    `;
-
-    await client.query(recalculateQuery, [puulaaniId]);
-    console.log(`Parent puulaani ${puulaaniId} and its timber logs were fully recalculated.`);
 };
 
 
@@ -286,18 +289,8 @@ export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
 
         let autoId: number | null = null;
         if (puulaaniId && kalustoNro) {
-            const autoResult = await client.query(
-                'SELECT auto_id FROM public.autot WHERE puulaani_id = $1 AND kalusto_id = $2 LIMIT 1',
-                [puulaaniId, kalustoNro]
-            );
-
-            // --- THIS IS THE FIX ---
-            // Add a check to ensure autoResult is not null before accessing its properties
-            if (autoResult && (autoResult.rowCount ?? 0) > 0) {
-                autoId = autoResult.rows[0].auto_id;
-            } else {
-                console.warn(`No entry found in 'autot' table for puulaani_id=${puulaaniId} and kalusto_id=${kalustoNro}. 'auto_id' will be null.`);
-            }
+            const autoResult = await client.query('SELECT auto_id FROM public.autot WHERE puulaani_id = $1 AND kalusto_id = $2 LIMIT 1', [puulaaniId, kalustoNro]);
+            if (autoResult && (autoResult.rowCount ?? 0) > 0) { autoId = autoResult.rows[0].auto_id; }
         }
         
         const insertQuery = `
@@ -306,23 +299,12 @@ export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'Assigned', $15) 
             RETURNING *;
         `;
-        const params = [ 
-            tyyppi, asiakasId, puulaaniId ?? null, puutavaraId ?? null, autoId,
-            kuljId, pvm, ajomaaraysNro ?? null, kohde ?? null, lahto ?? null, 
-            m3 ?? 0, km ?? 0, lisatiedot ?? null, kalustoNro, vastaanottoNro ?? null
-        ];
+        const params = [tyyppi, asiakasId, puulaaniId ?? null, puutavaraId ?? null, autoId, kuljId, pvm, ajomaaraysNro ?? null, kohde ?? null, lahto ?? null, m3 ?? 0, km ?? 0, lisatiedot ?? null, kalustoNro, vastaanottoNro ?? null];
         const result = await client.query(insertQuery, params);
         const newLoad = result.rows[0];
 
         if (puutavaraId && m3 && m3 > 0) {
-            const updateTimberEntryQuery = `
-                UPDATE public.puutavaralaji
-                SET
-                    haettu = haettu + $1,
-                    jaljella = jaljella - $1
-                WHERE puutavara_id = $2;
-            `;
-            await client.query(updateTimberEntryQuery, [m3, puutavaraId]);
+            await client.query(`UPDATE public.puutavaralaji SET haettu = haettu + $1, jaljella = jaljella - $1 WHERE puutavara_id = $2;`, [m3, puutavaraId]);
         }
         if (newLoad.puulaani_id) {
             await recalculatePuulaaniTotals(client, newLoad.puulaani_id);
@@ -338,6 +320,8 @@ export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
         client.release();
     }
 };
+
+
 
 // --- THIS IS THE UPDATED, SECURE updateLoad FUNCTION ---
 export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayload): Promise<ILoad> => {
@@ -380,84 +364,147 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
             }
         }
 
-        // Step 3: Calculate the change in volume (m3 delta).
-        const oldM3 = Number(existingLoad.m3) || 0;
-        const newM3 = data.m3 !== undefined ? Number(data.m3) : oldM3;
-        const m3Delta = newM3 - oldM3;
+        // =========================================================
+        // SCENARIO 1: CONSIGNMENT UPDATE (tyyppi = 1)
+        // =========================================================
+        if (existingLoad.tyyppi === 1) {
+            console.log(`[updateLoad] Updating Consignment ID: ${id}`);
 
-        // Step 4: Update the corresponding 'puutavaralaji' (timber entry) if volume has changed.
-        if (existingLoad.puutavara_id && m3Delta !== 0) {
-            console.log(`Volume changed by ${m3Delta} m³. Updating timber entry ID: ${existingLoad.puutavara_id}...`);
-            const updateTimberEntryQuery = `
-                UPDATE public.puutavaralaji
-                SET
-                    haettu = haettu + $1,
-                    jaljella = jaljella - $1
-                WHERE puutavara_id = $2;
+            // 1. Update Parent Load (Kuorma)
+            // Aggregates (m3, km, kpl) should be calculated in frontend and passed here
+            const updateKuormaQuery = `
+                UPDATE public.kuorma 
+                SET pvm = $1, lisatiedot = $2, m3 = $3, km = $4, kpl = $5, tunnit = $6,  asiakas_id = $7
+                WHERE kuorma_id = $8
+                RETURNING *;
             `;
-            await client.query(updateTimberEntryQuery, [m3Delta, existingLoad.puutavara_id]);
-        }
-        
-        // Step 5: Construct the update query for the 'kuorma' table based on user role.
-        let fieldsToUpdate: Partial<any>;
+            const kuormaParams = [
+                data.pvm, 
+                data.lisatiedot, 
+                Number(data.m3) || 0, 
+                Number(data.km) || 0, 
+                Number(data.kpl) || 0, 
+                Number(data.tunnit) || 0, 
+                data.asiakasId || null,
+                id
+            ];
+            const kuormaResult = await client.query(updateKuormaQuery, kuormaParams);
+            const updatedLoad = kuormaResult.rows[0];
 
-        if (isDriver) {
-            fieldsToUpdate = {
-                vastaanotto_nro: data.vastaanottoNro,
-                m3: data.m3,
-                km: data.km,
-                reitti: data.reitti,
-                lisatiedot: data.lisatiedot
-            };
-        } else {
-            // Office users can update a wider range of fields
-            fieldsToUpdate = {
-                tyyppi: data.tyyppi,
-                asiakas_id: data.asiakasId,
-                puulaani_id: data.puulaaniId,
-                puutavara_id: data.puutavaraId,
-                kalusto_nro: data.kalustoNro,
-                kulj_id: data.kuljId,
-                pvm: data.pvm,
-                ajomaarays_nro: data.ajomaaraysNro,
-                vastaanotto_nro: data.vastaanottoNro,
-                kohde: data.kohde,
-                lahto: data.lahto,
-                reitti: data.reitti,
-                m3: data.m3,
-                km: data.km,
-                tunnit: data.tunnit,
-                kpl: data.kpl,
-                lisatiedot: data.lisatiedot
-            };
-        }
+            // 2. Update Waybills (Rahtikirja)
+            // Strategy: Delete All existing for this load and Insert New ones from payload
+            // This handles adds, edits, and deletes in one go.
+            if (data.rahtikirjat && Array.isArray(data.rahtikirjat)) {
+                await client.query('DELETE FROM public.rahtikirja WHERE kuorma_id = $1', [id]);
 
-        const updates: { [key: string]: any } = {};
-        for (const [key, value] of Object.entries(fieldsToUpdate)) {
-            if (value !== undefined) {
-                updates[key] = value;
+                for (const wb of data.rahtikirjat) {
+                    const insertWbQuery = `
+                        INSERT INTO public.rahtikirja (
+                            kuorma_id, pvm, asiakas_id, rahtikirjan_nro, reitti, 
+                            m3, km, kpl, jako, tievero, lisatiedot
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
+                    `;
+                    const wbParams = [
+                        id, 
+                        data.pvm, // Waybills inherit date from parent
+                        wb.asiakasId || null, 
+                        wb.rahtikirjanNumero || '',
+                        wb.reitti || '',
+                        Number(wb.m3) || 0, 
+                        Number(wb.km) || 0, 
+                        Number(wb.kpl) || 0, 
+                        Number(wb.jako) || 0, 
+                        Number(wb.tievero) || 0, 
+                        wb.lisatiedot || ''
+                    ];
+                    await client.query(insertWbQuery, wbParams);
+                }
             }
-        }
-        
-        let updatedLoadRow;
-        if (Object.keys(updates).length > 0) {
-            const setClauses = Object.keys(updates).map((key, index) => `${key} = $${index + 1}`).join(', ');
-            const params = [...Object.values(updates), id];
-            const updateQuery = `UPDATE public.kuorma SET ${setClauses} WHERE kuorma_id = $${params.length} RETURNING *;`;
-            
-            const result = await client.query(updateQuery, params);
-            updatedLoadRow = result.rows[0];
-        } else {
-            updatedLoadRow = existingLoad;
+
+            await client.query('COMMIT');
+            return camelcaseKeys(updatedLoad) as ILoad;
         }
 
-        // Step 6: Recalculate and update the parent Puulaani totals.
-        if (updatedLoadRow.puulaani_id) {
-            await recalculatePuulaaniTotals(client, updatedLoadRow.puulaani_id);
+        // =========================================================
+        // SCENARIO 2: TIMBER LOAD UPDATE (tyyppi = 0)
+        // =========================================================
+        else {
+            // Step 3: Calculate volume change (m3 delta)
+            const oldM3 = Number(existingLoad.m3) || 0;
+            const newM3 = data.m3 !== undefined ? Number(data.m3) : oldM3;
+            const m3Delta = newM3 - oldM3;
+
+            // Step 4: Update timber entry if volume changed
+            if (existingLoad.puutavara_id && m3Delta !== 0) {
+                const updateTimberEntryQuery = `
+                    UPDATE public.puutavaralaji
+                    SET haettu = haettu + $1, jaljella = jaljella - $1
+                    WHERE puutavara_id = $2;
+                `;
+                await client.query(updateTimberEntryQuery, [m3Delta, existingLoad.puutavara_id]);
+            }
+            
+            // Step 5: Construct update query
+            let fieldsToUpdate: Partial<any>;
+
+            if (isDriver) {
+                fieldsToUpdate = {
+                    vastaanotto_nro: data.vastaanottoNro,
+                    m3: data.m3,
+                    km: data.km,
+                    reitti: data.reitti,
+                    lisatiedot: data.lisatiedot
+                };
+            } else {
+                // Office users fields
+                fieldsToUpdate = {
+                    tyyppi: data.tyyppi,
+                    asiakas_id: data.asiakasId,
+                    puulaani_id: data.puulaaniId,
+                    puutavara_id: data.puutavaraId,
+                    kalusto_nro: data.kalustoNro,
+                    kulj_id: data.kuljId,
+                    pvm: data.pvm,
+                    ajomaarays_nro: data.ajomaaraysNro,
+                    vastaanotto_nro: data.vastaanottoNro,
+                    kohde: data.kohde,
+                    lahto: data.lahto,
+                    reitti: data.reitti,
+                    m3: data.m3,
+                    km: data.km,
+                    tunnit: data.tunnit,
+                    kpl: data.kpl,
+                    lisatiedot: data.lisatiedot
+                };
+            }
+
+            const updates: { [key: string]: any } = {};
+            for (const [key, value] of Object.entries(fieldsToUpdate)) {
+                if (value !== undefined) {
+                    updates[key] = value;
+                }
+            }
+            
+            let updatedLoadRow;
+            if (Object.keys(updates).length > 0) {
+                const setClauses = Object.keys(updates).map((key, index) => `${key} = $${index + 1}`).join(', ');
+                const params = [...Object.values(updates), id];
+                const updateQuery = `UPDATE public.kuorma SET ${setClauses} WHERE kuorma_id = $${params.length} RETURNING *;`;
+                
+                const result = await client.query(updateQuery, params);
+                updatedLoadRow = result.rows[0];
+            } else {
+                updatedLoadRow = existingLoad;
+            }
+
+            // Step 6: Recalculate totals
+            if (updatedLoadRow.puulaani_id) {
+                await recalculatePuulaaniTotals(client, updatedLoadRow.puulaani_id);
+            }
+            
+            await client.query('COMMIT');
+            return camelcaseKeys(updatedLoadRow) as ILoad;
         }
-        
-        await client.query('COMMIT');
-        return camelcaseKeys(updatedLoadRow) as ILoad;
 
     } catch (error) {
         await client.query('ROLLBACK');
@@ -769,13 +816,16 @@ export const getMyCompletedLoadsForList = async (driverId: number): Promise<ILoa
         -- Query 1: Fetch completed Timber Loads (Puulaani)
         SELECT
             k.kuorma_id,
-            TO_CHAR(k.pvm, 'YYYY-MM-DD') AS pvm,
+            k.pvm, -- Return Raw Date
             a.asiakkaan_nimi,
             COALESCE(p.nimi, k.lahto, 'N/A') AS lahto,
             COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
             kal.rek_nro,
             kul.nimi AS kuljettajan_nimi,
-            'Timber Load' AS tyyppi -- Hardcode the type for the frontend
+            COALESCE(k.m3, 0) as m3, -- Ensure m3 is not null
+            0 as waybill_count,      -- Timber loads have 0 waybills
+            k.status,                -- Return status
+            'Timber Load' AS tyyppi
         FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
         LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
@@ -786,20 +836,23 @@ export const getMyCompletedLoadsForList = async (driverId: number): Promise<ILoa
         WHERE 
             k.kulj_id = $1
             AND k.status = 'Completed'
-            AND k.tyyppi = 0 -- Filter for Timber Loads
+            AND k.tyyppi = 0
 
         UNION ALL
 
         -- Query 2: Fetch completed Consignments (Rahtikirja)
         SELECT
             k.kuorma_id,
-            TO_CHAR(k.pvm, 'YYYY-MM-DD') AS pvm,
+            k.pvm, -- Return Raw Date
             a.asiakkaan_nimi,
-            k.lahto AS lahto, -- For consignments, lahto and kohde are simple text fields
+            k.lahto AS lahto,
             k.kohde AS kohde,
             kal.rek_nro,
             kul.nimi AS kuljettajan_nimi,
-            'Consignment' AS tyyppi -- Hardcode the type for the frontend
+            COALESCE(k.m3, 0) as m3, -- Ensure m3 is not null
+            (SELECT COUNT(*) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id) as waybill_count,
+            k.status, -- Return status
+            'Consignment' AS tyyppi
         FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
         LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
@@ -807,15 +860,14 @@ export const getMyCompletedLoadsForList = async (driverId: number): Promise<ILoa
         WHERE 
             k.kulj_id = $1
             AND k.status = 'Completed'
-            AND k.tyyppi = 1 -- Filter for Consignments
+            AND k.tyyppi = 1
 
-        ORDER BY pvm DESC, kuorma_id DESC; -- Order the combined results
+        ORDER BY pvm DESC, kuorma_id DESC;
     `;
     
     try {
         const result = await pool.query(queryText, [driverId]);
-        // The db wrapper will handle camelCasing the snake_case column names.
-        return result.rows;
+        return camelcaseKeys(result.rows);
     } catch (error) {
         console.error(`Error fetching completed loads for driver ID ${driverId}:`, error);
         throw new Error("Database query for fetching driver's completed loads failed.");

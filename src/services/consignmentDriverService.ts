@@ -145,34 +145,27 @@ export const createConsignment = async (dto: any, driverId: number, vehicleId: n
  */
 export const updateConsignment = async (id: number, dto: any, driverId: number) => {
     return executeTransaction(async (client: PoolClient) => {
-        // Verify ownership
         const ownerCheck = await client.query('SELECT kulj_id FROM public.kuorma WHERE kuorma_id = $1', [id]);
         if (ownerCheck.rowCount === 0 || ownerCheck.rows[0].kulj_id !== driverId) { throw new Error('Forbidden'); }
-        
-        // Determine Status
-        const status = dto.status || 'Draft';
 
-        // 1. Update Parent Load
+        if (!dto.rahtikirjat || dto.rahtikirjat.length === 0) {
+            await client.query('DELETE FROM public.rahtikirja WHERE kuorma_id = $1', [id]);
+            await client.query('DELETE FROM public.kuorma WHERE kuorma_id = $1', [id]);
+            
+            return { kuormaId: id, status: 'DELETED' };
+        }
+
+        const status = dto.status || 'Draft';
         const kuormaUpdateQuery = `
             UPDATE public.kuorma 
             SET pvm = $1, asiakas_id = $2, m3 = $3, km = $4, kpl = $5, tunnit = $6, lisatiedot = $7, status = $8
             WHERE kuorma_id = $9;
         `;
         const kuormaParams = [
-            dto.pvm, 
-            dto.asiakasId || null,
-            Number(dto.m3) || 0, 
-            Number(dto.km) || 0, 
-            Number(dto.kpl) || 0, 
-            Number(dto.tunnit) || 0, 
-            dto.lisatiedot || '',
-            status, // Update status to 'Assigned' if sending
-            id
+            dto.pvm, dto.asiakasId || null, Number(dto.m3) || 0, Number(dto.km) || 0, 
+            Number(dto.kpl) || 0, Number(dto.tunnit) || 0, dto.lisatiedot || '', status, id
         ];
         await client.query(kuormaUpdateQuery, kuormaParams);
-        
-        // 2. Replace Waybills (Delete all & Insert new)
-        // This is simpler than checking which changed
         await client.query('DELETE FROM public.rahtikirja WHERE kuorma_id = $1', [id]);
 
         if (dto.rahtikirjat && dto.rahtikirjat.length > 0) {
@@ -184,12 +177,8 @@ export const updateConsignment = async (id: number, dto: any, driverId: number) 
                     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
                 `;
                 const params = [
-                    id, 
-                    dto.pvm,
-                    r.asiakasId || null,
-                    r.rahtikirjanNumero || '',
-                    r.reitti || '',
-                    Number(r.m3) || 0, Number(r.km) || 0, Number(r.kpl) || 0,
+                    id, dto.pvm, r.asiakasId || null, r.rahtikirjanNumero || '',
+                    r.reitti || '', Number(r.m3) || 0, Number(r.km) || 0, Number(r.kpl) || 0,
                     Number(r.jako) || 0, Number(r.tievero) || 0, r.lisatiedot || ''
                 ];
                 await client.query(rahtikirjaInsertQuery, params);

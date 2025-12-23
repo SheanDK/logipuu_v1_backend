@@ -1,6 +1,5 @@
 // backend/src/routes/consignmentRoutes.ts
 import { Router } from 'express';
-// Controller එක හරියටම import කරගන්න. (Path එක ගැන සැලකිලිමත් වන්න)
 import * as consignmentController from '../controllers/consignmentController'; 
 import { protect } from '../middlewares/authMiddleware';
 import { authorize } from '../middlewares/rbacMiddleware';
@@ -13,7 +12,6 @@ const CREATE_PERMISSION = ['consignment invoice_create'];
 const EDIT_PERMISSION = ['consignment invoicing_edit'];
 const DELETE_PERMISSION = ['consignment invoicing_delete'];
 
-// 1. SEARCH route එක (/:id ට කලින් තිබිය යුතුමයි)
 router.get(
   '/search',
   protect,
@@ -21,7 +19,7 @@ router.get(
   consignmentController.searchConsignmentsHandler
 );
 
-// 2. INVOICE route එක (Specific route)
+
 router.post(
   '/invoice',
   protect,
@@ -29,7 +27,7 @@ router.post(
   consignmentController.invoiceManyHandler
 );
 
-// 3. ID based routes (මේවා යටින් තිබිය යුතුයි)
+
 router.get(
   '/:id',
   protect,
@@ -51,7 +49,7 @@ router.delete(
   consignmentController.deleteConsignmentHandler
 );
 
-// 4. Root POST
+
 router.post(
   '/',
   protect,

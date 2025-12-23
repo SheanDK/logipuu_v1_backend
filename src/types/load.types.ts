@@ -1,100 +1,76 @@
 // backend/src/types/load.types.ts
 
-// Enum for Load Type (matches 'tyyppi' column in 'kuorma' table)
 export enum LoadTypeEnum {
     PUULAANI = 0,
-    POLE_TRANSPORT = 1, // 'Pylvas'
+    POLE_TRANSPORT = 1,
 }
 
-/**
- * Represents a single Load (Kuorma) record from the database.
- * Keys are in camelCase, matching what the frontend will receive.
- */
 export interface ILoad {
     kuormaId: number;
     tyyppi: LoadTypeEnum;
     asiakasId: number | null;
     puulaaniId: number | null;
-    puutavaraId: number | null; // This might be a specific timber entry from puutavaralaji
-    autoId: number | null; // This links to the 'autot' table
+    puutavaraId: number | null; 
+    autoId: number | null; 
     kuljId: number | null;
     pvm: Date | null;
-    pvmLaskutus: Date | null; // Invoicing date
+    pvmLaskutus: Date | null; 
     ajomaaraysNro: string | null;
     vastaanottoNro: string | null;
-    kohde: string | null; // Destination
-    lahto: string | null; // Origin
+    kohde: string | null; 
+    lahto: string | null; 
     reitti: string | null;
     m3: number;
     km: number;
-    tunnit: number; // Hours
-    kpl: number; // Pieces
+    tunnit: number; 
+    kpl: number; 
     lisatiedot: string | null;
-    laskutukseen: number; // Status for invoicing
+    laskutukseen: number; 
     m3Hinta: number;
     kmHinta: number;
     tunnitHinta: number;
     kplHinta: number;
-    kokohinta: number; // Total price
+    kokohinta: number; 
     kalustoNro: number | null;
     isActive: boolean;
 }
 
-/**
- * Represents a Load item for the list view on the frontend.
- * This is a "flattened" version with joined data.
- */
 export interface ILoadListItem {
     kuormaId: number;
-    pvm: string; // Formatted as string for display
+    pvm: string; 
     asiakkaanNimi: string;
-    lahto: string | null; // Origin (e.g., Puulaani name)
-    kohde: string | null; // Destination (e.g., Unloading site name)
-    rekNro: string; // Vehicle registration number
-    kuljettajanNimi: string; // Driver's name
-    tyyppi: string; // 'Puulaani' or 'Pole Transport'
+    lahto: string | null; 
+    kohde: string | null; 
+    rekNro: string; 
+    kuljettajanNimi: string; 
+    tyyppi: string; 
     isActive: boolean;
 }
 
-// --- THIS IS THE NEW INTERFACE FOR THE LOAD DETAILS VIEW ---
 export interface ILoadDetails {
-    // Core Load Info (from 'kuorma' table)
     kuormaId: number;
     pvm: Date;
     ajomaaraysNro: string | null;
     status: string;
-    lisatiedot: string | null; // Special instructions for the whole load
+    lisatiedot: string | null; 
     kuljId: number;
-
-    // Customer Info
     asiakkaanNimi: string;
-
-    // Vehicle Info
     rekNro: string;
-
-    // Driver Info
     kuljettajanNimi: string;
-
-    // Origin (Puulaani) Info
     originName: string;
-    originAddress: string | null; // We need to join to get this
+    originAddress: string | null; 
     originLat: number | null;
     originLng: number | null;
-    originInstructions: string | null; // lisatiedot from puulaani table
-
-    // Timber Task Info (from puutavaralaji)
+    originInstructions: string | null; 
     taskTimberTypeName: string;
-    taskVolume: number; // The m3 amount set by the driver/office for THIS trip
-    taskRemainingVolumeBeforeThisTrip: number; // 'jaljella' from puutavaralaji
-
-    // Destination (Purkupaikka) Info
+    taskVolume: number; 
+    taskRemainingVolumeBeforeThisTrip: number; 
     destinationName: string;
-    destinationAddress: string | null; // We need to join to get this
+    destinationAddress: string | null; 
     destinationLat: number | null;
     destinationLng: number | null;
 }
 
-// --- NEW interface for map trip lines ---
 export interface IMapTrip {
     tripId: number;
     driverName: string;
@@ -106,14 +82,29 @@ export interface IMapTrip {
     destinationCoords: { lat: number, lng: number };
 }
 
+// --- UPDATED ITripDetails ---
 export interface ITripDetails {
     tripId: string | null;
-    ajomaaraysNro: string | null; // Add the missing property
+    ajomaaraysNro: string | null;
     asiakasId: number;
     asiakkaanNimi: string;
     rekNro: string;
     kalustoNro: number | null;
     kuljettajanNimi: string;
+    
+    // Added these optional fields to support direct display in modal
+    lahto?: string | null;
+    kohde?: string | null;
+    m3?: number;
+    km?: number;
+    tyyppi?: string | number;
+    pvm?: Date | string;
+    lisatiedot?: string | null;
+    status?: string;
+
+    // Optional Waybills for Consignment
+    rahtikirjat?: any[];
+
     legs: {
         kuormaId: number;
         pvm: Date;
@@ -138,14 +129,12 @@ export interface ITripDetails {
     }[];
 }
 
-// A simple type for other trips on the map
 export interface IOtherTripOnMap {
     kuormaId: number;
     originName: string;
     originCoords: { lat: number, lng: number };
 }
 
-// The new data structure for the Trip Details Page
 export interface ITripDetailsPageData {
     mainTrip: ITripDetails;
     otherActiveTrips: IOtherTripOnMap[];
@@ -168,4 +157,3 @@ export interface ITripLeg {
     destinationLng: number | null;
     taskTimberTypeName: string;
 }
-
