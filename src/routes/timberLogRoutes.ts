@@ -5,7 +5,7 @@ import { protect } from '../middlewares/authMiddleware';
 import { authorize } from '../middlewares/rbacMiddleware';
 
 const router = Router();
-const allowedRoles = ['Superuser', 'Admin', 'Toimisto', 'Ajojärjestelijä']; // Adjust as needed
+const allowedRoles = ['Superuser', 'Admin', 'Office', 'Ajojärjestelijä']; // Adjust as needed
 
 router.get(
     '/for-stack/:puulaaniId', 

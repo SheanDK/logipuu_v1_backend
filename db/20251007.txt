@@ -1705,7 +1705,7 @@ COPY public.role_permissions (rooli_id, permission_id) FROM stdin;
 COPY public.roolit (rooli_id, roolin_nimi) FROM stdin;
 1	Superuser
 2	Admin
-3	Toimisto
+3	Office
 4	Dispatch
 5	Kuljettaja
 6	Alihankkija

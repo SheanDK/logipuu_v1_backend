@@ -9,7 +9,7 @@ import { validateDto } from '../middlewares/validationMiddleware';
 const router = Router();
 
 // Define Roles and Permissions
-const officeRoles = ['Superuser', 'Admin', 'Toimisto', 'Ajärjestelijä'];
+const officeRoles = ['Superuser', 'Admin', 'Office', 'Ajärjestelijä'];
 const driverRoles = ['Kuljettaja'];
 const allStaffRoles = [...officeRoles, ...driverRoles];
 const TIMBER_MAP_VIEW = ['timber map_view'];

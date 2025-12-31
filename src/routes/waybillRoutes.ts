@@ -8,7 +8,7 @@ import { CreateWaybillDto, UpdateWaybillDto } from '../dto/waybill.dto';
 
 const router = Router();
 
-const allowedRoles = ['Superuser', 'Admin', 'Toimisto', 'Ajojärjestelijä']; // Adjust roles as needed
+const allowedRoles = ['Superuser', 'Admin', 'Office', 'Ajojärjestelijä']; // Adjust roles as needed
 
 router.get('/', protect, authorize(allowedRoles), waybillController.getAllWaybillsHandler);
 router.get('/:id', protect, authorize(allowedRoles), waybillController.getWaybillByIdHandler);

@@ -16,7 +16,7 @@ const EDIT_PERMISSION = ['unloading_site_edit'];
 const DELETE_PERMISSION = ['unloading_site_delete'];
 
 // Drivers and Office Staff need to view the list for dropdowns
-const allStaffWithViewPermission = ['Superuser', 'Admin', 'Toimisto', 'Ajojärjestelijä', 'Kuljettaja'];
+const allStaffWithViewPermission = ['Superuser', 'Admin', 'Office', 'Ajojärjestelijä', 'Kuljettaja'];
 
 // --- GET Routes ---
 // Anyone with 'unloading_site_view' permission can access these.

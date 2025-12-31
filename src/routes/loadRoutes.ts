@@ -17,7 +17,7 @@ const INSPECTION_VIEW_PERMISSION = ['driven & inspection_view'];
 const INSPECTION_ACCEPT_PERMISSION = ['driven & inspection_accept'];
 
 // --- Define Roles ---
-const officeRoles = ['Superuser', 'Admin', 'Toimisto', 'Ajärjestelijä'];
+const officeRoles = ['Superuser', 'Admin', 'Office', 'Ajärjestelijä'];
 const driverRoles = ['Kuljettaja'];
 const allStaffRoles = [...officeRoles, ...driverRoles];
 

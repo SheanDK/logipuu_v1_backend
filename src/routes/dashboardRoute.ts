@@ -11,44 +11,46 @@ const router = Router();
 const canViewAdminDashboard = 'dashboard_admin_view';
 const canViewDispatchDashboard = 'dashboard_dispatch_view';
 const canViewDriverDashboard = 'dashboard_driver_view';
+const canViewOfficeDashboard = 'dashboard_office_view'; 
 
 // --- STATS CARDS ROUTES ---
+
 router.get(
     '/admin',
     protect,
-    authorize([canViewAdminDashboard]),
+    authorize([],[canViewAdminDashboard, canViewOfficeDashboard]), 
     dashboardController.getAdminDashboardHandler
 );
 
 router.get(
     '/dispatch',
     protect,
-    authorize([canViewDispatchDashboard]),
+    authorize([],[canViewDispatchDashboard]),
     dashboardController.getDispatchDashboardHandler
 );
 
 router.get(
     '/driver',
     protect,
-    authorize([canViewDriverDashboard]),
+    authorize([],[canViewDriverDashboard]),
     dashboardController.getDriverDashboardHandler
 );
 
 // --- WIDGET ROUTES ---
 
-// Volume chart data (accessible by users who can view EITHER Admin OR Dispatch dashboard)
+// Volume chart data
 router.get(
     '/volume-by-day',
     protect,
-    authorize([canViewAdminDashboard, canViewDispatchDashboard]), // Allow if user has ANY of these permissions
+    authorize([],[canViewAdminDashboard, canViewDispatchDashboard, canViewOfficeDashboard]), 
     dashboardController.getVolumeByDayHandler
 );
 
-// Active trips list data (accessible ONLY by users who can view Dispatch dashboard)
+// Active trips list data
 router.get(
     '/active-trips',
     protect,
-    authorize([canViewDispatchDashboard]),
+    authorize([],[canViewDispatchDashboard, canViewAdminDashboard, canViewOfficeDashboard]), 
     dashboardController.getActiveTripsListHandler
 );
 

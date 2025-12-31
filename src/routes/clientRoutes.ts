@@ -9,7 +9,7 @@ import { CreateClientDto, UpdateClientDto } from '../dto/client.dto';
 const router = Router();
 
 // --- Define Roles ---
-const officeRoles = ['Superuser', 'Admin', 'Toimisto', 'Ajojärjestelijä'];
+const officeRoles = ['Superuser', 'Admin', 'Office', 'Ajojärjestelijä'];
 const driverRoles = ['Kuljettaja'];
 // A combined list for routes accessible by both
 const allStaffRoles = [...officeRoles, ...driverRoles];

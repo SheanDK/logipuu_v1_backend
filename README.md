@@ -143,7 +143,7 @@ SELECT permission_id FROM public.permissions WHERE permission_name = 'load_view'
 INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (5, 29) ON CONFLICT DO NOTHING;
 
 -- Assign 'load_view' to other office roles as well for consistency
--- (Assuming Toimisto ID is 3, Admin is 2, Superuser is 1)
+-- (Assuming Office ID is 3, Admin is 2, Superuser is 1)
 INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (3, 29) ON CONFLICT DO NOTHING;
 INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (2, 29) ON CONFLICT DO NOTHING;
 INSERT INTO public.role_permissions (rooli_id, permission_id) VALUES (1, 29) ON CONFLICT DO NOTHING;
