@@ -7,13 +7,29 @@ import { validateDto } from '../middlewares/validationMiddleware';
 import { CreateUserDto, AdminUpdateUserDto } from '../dto/user.dto';
 
 const router = Router();
-const adminRoles = ['Superuser', 'Admin'];
 
-router.get('/', protect, authorize(adminRoles), adminUserController.getAllUsersHandler);
-router.post('/', protect, authorize(adminRoles), validateDto(CreateUserDto), adminUserController.createUserHandler);
+// 1. Define admin roles
+const adminRoles = ['Superuser', 'Admin', 'Office'];
 
-router.get('/:username', protect, authorize(adminRoles), adminUserController.getUserByTunnusHandler);
-router.put('/:username', protect, authorize(adminRoles), validateDto(AdminUpdateUserDto), adminUserController.updateUserHandler);
-router.delete('/:username', protect, authorize(adminRoles), adminUserController.deleteUserHandler);
+// 2. Define permission constants
+const VIEW_USERS = ['users_view'];
+const CREATE_USERS = ['users_create'];
+const EDIT_USERS = ['users_edit'];
+const DELETE_USERS = ['users_delete'];
+
+// get all users
+router.get('/', protect, authorize(adminRoles, VIEW_USERS), adminUserController.getAllUsersHandler);
+
+// create new user
+router.post('/', protect, authorize(adminRoles, CREATE_USERS), validateDto(CreateUserDto), adminUserController.createUserHandler);
+
+// get details of a specific user by username
+router.get('/:username', protect, authorize(adminRoles, VIEW_USERS), adminUserController.getUserByTunnusHandler);
+
+// Update user
+router.put('/:username', protect, authorize(adminRoles, EDIT_USERS), validateDto(AdminUpdateUserDto), adminUserController.updateUserHandler);
+
+// Delete user
+router.delete('/:username', protect, authorize(adminRoles, DELETE_USERS), adminUserController.deleteUserHandler);
 
 export default router;
