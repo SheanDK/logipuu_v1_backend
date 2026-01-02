@@ -86,6 +86,7 @@ export interface IMapTrip {
 export interface ITripDetails {
     tripId: string | null;
     ajomaaraysNro: string | null;
+    vastaanottoNro?: string | null; 
     asiakasId: number;
     asiakkaanNimi: string;
     rekNro: string;
@@ -101,7 +102,8 @@ export interface ITripDetails {
     pvm?: Date | string;
     lisatiedot?: string | null;
     status?: string;
-
+    tunnit?: number; 
+    kpl?: number;
     // Optional Waybills for Consignment
     rahtikirjat?: any[];
 

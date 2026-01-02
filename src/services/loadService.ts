@@ -223,9 +223,17 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
                 k.kuorma_id as "kuormaId", 
                 k.pvm, 
                 k.status, 
-                k.m3, k.km, k.tunnit, k.kpl, k.reitti, k.vastaanotto_nro,
-                k.kulj_id, k.ajomaarays_nro, k.lisatiedot,
-                k.puulaani_id, k.puutavara_id, k.kalusto_nro,
+                k.m3, k.km, 
+                k.tunnit, 
+                k.kpl, 
+                k.reitti, 
+                k.vastaanotto_nro as "vastaanottoNro", -- EXPLICIT ALIAS
+                k.ajomaarays_nro as "ajomaaraysNro",   -- EXPLICIT ALIAS
+                k.kulj_id, 
+                k.lisatiedot,
+                k.puulaani_id, 
+                k.puutavara_id, 
+                k.kalusto_nro,
                 
                 COALESCE(p.nimi, k.lahto, 'N/A') AS lahto,
                 COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
@@ -252,27 +260,28 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
         const row = tripLegsResult.rows[0];
 
         // Construct Trip Details Object
-        const tripDetails: ITripDetails = {
-            tripId: drivingOrderNumber || `Trip #${id}`, 
-            ajomaaraysNro: drivingOrderNumber,
+        const tripDetails = {
+            tripId: ajomaarays_nro || `Trip #${id}`,
+            ajomaaraysNro: row.ajomaaraysNro,
+            vastaanottoNro: row.vastaanottoNro,
             asiakasId: asiakas_id,
             asiakkaanNimi: row.asiakkaanNimi,
             rekNro: row.rekNro,
             kalustoNro: kalusto_nro,
             kuljettajanNimi: row.kuljettajanNimi,
-            
-            // Map row data to top-level fields for easy access in frontend
             lahto: row.lahto,
             kohde: row.kohde,
             m3: row.m3,
             km: row.km,
+            tunnit: row.tunnit,
+            kpl: row.kpl,
             tyyppi: row.tyyppi,
             pvm: row.pvm,
             lisatiedot: row.lisatiedot,
-
-            legs: [] // Can populate if needed, but row details are sufficient here
+            legs: []
         };
-        return camelcaseKeys(tripDetails);
+
+        return tripDetails; // No need for camelcaseKeys if we use aliases correctly
     }
 };
 
@@ -736,7 +745,7 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
     const queryText = `
         SELECT
             k.kuorma_id,
-            k.pvm, -- Return RAW DATE object, let frontend format it
+            k.pvm, -- TO_CHAR ඉවත් කරන ලදී (Raw date එක එවීමට)
             k.ajomaarays_nro,
             k.vastaanotto_nro,
             kal.rek_nro,
@@ -755,7 +764,6 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
             k.is_active,
             k.puutavara_id,
             k.tyyppi,
-            -- Add Waybill Count
             (SELECT COUNT(*) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id) as waybill_count
         FROM
             public.kuorma k
@@ -776,14 +784,12 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
     
     try {
         const result = await pool.query(queryText);
-        // camelcaseKeys converts 'waybill_count' -> 'waybillCount'
-        return camelcaseKeys(result.rows);
+        return camelcaseKeys(result.rows); 
     } catch (error) {
         console.error("Error fetching loads for inspection:", error);
         throw new Error("Database query for fetching inspection loads failed.");
     }
 };
-
 // --- NEW FUNCTION for accepting loads for invoicing ---
 export const acceptLoadsForInvoicing = async (loadIds: number[]): Promise<{ count: number }> => {
     if (!loadIds || loadIds.length === 0) {
