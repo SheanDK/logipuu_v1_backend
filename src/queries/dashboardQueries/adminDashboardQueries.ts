@@ -1,5 +1,7 @@
+//backend/src/queries/dashboardQueries/adminDashboardQueries.ts
 export const COUNT_ACTIVE_TIMBER_STACKS = `
-    SELECT COUNT(puulaani_id) FROM public.puulaani WHERE valmis = TRUE AND valmis = FALSE;
+    SELECT COUNT(*) FROM public.puulaani 
+    WHERE aktiivinen = TRUE AND valmis = FALSE;
 `;
 
 export const COUNT_LOADS_COMPLETED_TODAY = `
@@ -36,3 +38,12 @@ export const GET_VOLUME_LAST_7_DAYS = `
     GROUP BY ds.day
     ORDER BY ds.day ASC;
 `;
+
+export const COUNT_ACTIVE_CUSTOMERS = `SELECT COUNT(*) FROM public.asiakkaat WHERE aktiivinen = true`;
+
+export const SUM_TOTAL_VOLUME_TODAY = `SELECT SUM(m3) FROM public.kuorma WHERE pvm = CURRENT_DATE AND is_active = true`;
+
+export const COUNT_UNBILLED_CONSIGNMENTS = `
+    SELECT COUNT(*) FROM public.rahtikirja r 
+    JOIN public.kuorma k ON r.kuorma_id = k.kuorma_id 
+    WHERE k.pvm_laskutus IS NULL AND k.is_active = true`;

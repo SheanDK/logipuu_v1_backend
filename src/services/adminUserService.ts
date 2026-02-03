@@ -13,52 +13,54 @@ export const adminGetAllUsers = async () => {
 };
 
 export const adminGetUserByTunnus = async (username: string) => {
-  const clean = username?.trim();
-  console.log('[adminGetUserByTunnus] IN tunnus =', JSON.stringify(clean));
-  const { rows } = await pool.query(userQueries.SELECT_USER_WITH_ROLES_FOR_ADMIN, [clean]);
-  console.log('[adminGetUserByTunnus] rows.length =', rows.length);
-  return rows[0] ?? null;
+    const clean = username?.trim();
+    console.log('[adminGetUserByTunnus] IN tunnus =', JSON.stringify(clean));
+    const { rows } = await pool.query(userQueries.SELECT_USER_WITH_ROLES_FOR_ADMIN, [clean]);
+    console.log('[adminGetUserByTunnus] rows.length =', rows.length);
+    return rows[0] ?? null;
 };
 
 
 // --- CREATE OPERATION ---
-export const adminCreateNewUser = async (data: CreateUserDto) => {
+export const adminCreateNewUser = async (data: any) => { // data is the data from the frontend
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
+        // check if the username already exists
         const existingUser = await client.query('SELECT 1 FROM public.kayttajat WHERE tunnus = $1', [data.username]);
         if (existingUser.rowCount && existingUser.rowCount > 0) {
             throw new Error(`Username '${data.username}' already exists.`);
         }
 
         const passwordHash = await bcrypt.hash(data.password, 10);
-        
-        const DRIVER_ROLE_ID = 5; 
-        let newDriverId: number | null = null;
-        if (data.roleIds.includes(DRIVER_ROLE_ID)) {
-            const driverInsertQuery = `INSERT INTO public.kuljettajat (nimi) VALUES ($1) RETURNING kulj_id;`;
-            const driverResult = await client.query(driverInsertQuery, [data.fullName]);
-            newDriverId = driverResult.rows[0].kulj_id;
-        }
 
-        const userLevel = data.roleIds.includes(1) || data.roleIds.includes(2) ? 2 : data.roleIds.includes(3) ? 3 : 4;
+        // connect to the driver
+        const linkedDriverId = data.kuljId || null;
+        const userLevel = data.roleIds.includes(1) || data.roleIds.includes(2) ? 1 : data.roleIds.includes(3) ? 3 : 4;
+        // connect to the driver
+        const userParams = [
+            data.username,
+            data.fullName,
+            passwordHash,
+            data.isActive ?? true,
+            userLevel,
+            linkedDriverId
+        ];
 
-        const userParams = [data.username, data.fullName, passwordHash, data.isActive ?? true, userLevel, newDriverId];
         const newUserResult = await client.query(userQueries.INSERT_NEW_USER_BY_ADMIN, userParams);
-        
+
+        // connect to the roles
         for (const roleId of data.roleIds) {
             await client.query(userQueries.ADD_USER_ROLE_MAPPING, [newUserResult.rows[0].tunnus, roleId]);
         }
 
         await client.query('COMMIT');
-        // This function returns a user object or null, so the return type is correct.
         return adminGetUserByTunnus(newUserResult.rows[0].tunnus);
 
     } catch (error: any) {
         await client.query('ROLLBACK');
         console.error("Error in adminCreateNewUser service:", error);
-        if (error.code === '23505') throw new Error(`Username '${data.username}' already exists.`);
         throw error;
     } finally {
         client.release();
@@ -70,7 +72,7 @@ export const adminUpdateUser = async (tunnus: string, data: AdminUpdateUserDto) 
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        
+
         const existingUserResult = await client.query(userQueries.SELECT_USER_BY_tunnus_FOR_ADMIN, [tunnus]);
         if (existingUserResult.rowCount === 0) {
             // If user not found, return null explicitly. This fixes the truthiness error.
@@ -89,7 +91,7 @@ export const adminUpdateUser = async (tunnus: string, data: AdminUpdateUserDto) 
         }
 
         await client.query('COMMIT');
-        
+
         // --- KEY CORRECTION IS HERE ---
         // Always return the result of fetching the user.
         // This function returns a user object or null, ensuring the return type is not void.

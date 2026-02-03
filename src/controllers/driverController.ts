@@ -1,5 +1,5 @@
 // backend/src/controllers/driverController.ts
-import { Response, NextFunction } from 'express';
+import { Response, NextFunction, Request } from 'express';
 import * as driverService from '../services/driverService';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import { CreateDriverDto, UpdateDriverDto } from '../dto/driver.dto';
@@ -72,6 +72,18 @@ export const deleteDriverHandler = async (req: AuthenticatedRequest, res: Respon
             return res.status(404).json({ message: 'Driver not found for deletion' });
         }
         res.status(200).json(result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * driver without account
+ */
+export const getDriversWithoutAccountHandler = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const drivers = await driverService.getDriversWithoutAccount();
+        res.status(200).json(drivers);
     } catch (error) {
         next(error);
     }

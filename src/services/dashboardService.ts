@@ -29,14 +29,20 @@ export const getAdminDashboardData = async () => {
         pendingBillingsCount,
         vehiclesNeedingInspectionCount,
         activeVehiclesCount,
-        activeDriversCount
+        activeDriversCount,
+        activeCustomersCount,       // New
+        totalVolumeToday,           // New
+        unbilledConsignmentsCount   // New
     ] = await Promise.all([
         getScalarValue(adminQueries.COUNT_ACTIVE_TIMBER_STACKS),
         getScalarValue(adminQueries.COUNT_LOADS_COMPLETED_TODAY),
         getScalarValue(adminQueries.COUNT_PENDING_BILLINGS),
         getScalarValue(adminQueries.COUNT_VEHICLES_NEEDING_INSPECTION),
         getScalarValue(adminQueries.COUNT_ACTIVE_VEHICLES),
-        getScalarValue(adminQueries.COUNT_ACTIVE_DRIVERS)
+        getScalarValue(adminQueries.COUNT_ACTIVE_DRIVERS),
+        getScalarValue(adminQueries.COUNT_ACTIVE_CUSTOMERS),
+        getScalarValue(adminQueries.SUM_TOTAL_VOLUME_TODAY),
+        getScalarValue(adminQueries.COUNT_UNBILLED_CONSIGNMENTS)
     ]);
 
     return {
@@ -46,6 +52,9 @@ export const getAdminDashboardData = async () => {
         vehiclesNeedingInspectionCount,
         activeVehiclesCount,
         activeDriversCount,
+        activeCustomersCount,
+        totalVolumeToday,
+        unbilledConsignmentsCount,
         // You can add more complex data here if needed
     };
 };
@@ -129,4 +138,48 @@ export const getActiveTripsList = async (): Promise<IActiveTripListItem[]> => {
         console.error('Error fetching active trips list:', error);
         throw error;
     }
+};
+
+/**
+ * get customer data for dashboard
+ */
+export const getCustomerDashboardData = async (customerId: number) => {
+    
+    // 1. අද දින එම පාරිභෝගිකයා වෙනුවෙන් අවසන් කළ ලෝඩ් ගණන
+    const COUNT_CUSTOMER_COMPLETED_TODAY = `
+        SELECT COUNT(*) FROM public.kuorma 
+        WHERE asiakas_id = $1 AND status = 'Completed' AND pvm::date = CURRENT_DATE
+    `;
+
+    // 2. එම පාරිභෝගිකයාගේ සක්‍රිය පූලානිවල ඉතිරිව ඇති මුළු පරිමාව
+    const SUM_CUSTOMER_REMAINING_VOLUME = `
+        SELECT COALESCE(SUM(jaljella), 0) FROM public.puulaani 
+        WHERE asiakas_id = $1 AND aktiivinen = TRUE AND valmis = FALSE
+    `;
+
+    // 3. එම පාරිභෝගිකයාගේ දැනට පවතින සක්‍රිය පූලානි ගණන
+    const COUNT_CUSTOMER_ACTIVE_STACKS = `
+        SELECT COUNT(*) FROM public.puulaani 
+        WHERE asiakas_id = $1 AND aktiivinen = TRUE AND valmis = FALSE
+    `;
+
+    // 4. එම පාරිභෝගිකයාගේ බිල් කිරීමට ඇති ලෝඩ් ගණන
+    const COUNT_CUSTOMER_PENDING_INVOICE = `
+        SELECT COUNT(*) FROM public.kuorma 
+        WHERE asiakas_id = $1 AND (laskutukseen IS NULL OR laskutukseen = 0) AND status = 'Completed'
+    `;
+
+    const [completedToday, remainingVolume, activeStacks, pendingInvoices] = await Promise.all([
+        getScalarValue(COUNT_CUSTOMER_COMPLETED_TODAY, [customerId]),
+        getScalarValue(SUM_CUSTOMER_REMAINING_VOLUME, [customerId]),
+        getScalarValue(COUNT_CUSTOMER_ACTIVE_STACKS, [customerId]),
+        getScalarValue(COUNT_CUSTOMER_PENDING_INVOICE, [customerId])
+    ]);
+
+    return {
+        completedTodayCount: completedToday,
+        remainingVolume: Number(remainingVolume) || 0,
+        activeStacksCount: activeStacks,
+        pendingInvoicesCount: pendingInvoices
+    };
 };

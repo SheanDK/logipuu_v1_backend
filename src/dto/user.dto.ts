@@ -1,5 +1,5 @@
 // backend/src/dto/user.dto.ts
-import { 
+import {
     IsString, IsNotEmpty, MinLength, IsBoolean, IsOptional, IsArray, ArrayNotEmpty, IsInt, IsEmail, MaxLength
 } from 'class-validator';
 
@@ -37,8 +37,12 @@ export class CreateUserDto {
 
     @IsArray()
     @ArrayNotEmpty({ message: 'At least one role must be assigned.' })
-    @IsInt({ each: true }) 
+    @IsInt({ each: true })
     roleIds!: number[];
+
+    @IsInt()
+    @IsOptional()
+    kuljId?: number | null;
 }
 
 // --- DTO for an ADMIN updating ANY user's details (FINAL CORRECTED VERSION) ---
@@ -52,4 +56,5 @@ export class AdminUpdateUserDto {
     @IsArray() @IsOptional() @IsInt({ each: true })
     roleIds?: number[];
 }
+
 

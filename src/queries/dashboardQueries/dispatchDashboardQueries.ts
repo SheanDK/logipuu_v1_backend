@@ -1,3 +1,4 @@
+//backend/src/queries/dashboardQueries/dispatchDashboardQueries.ts
 export const COUNT_ACTIVE_LOADS = `
     SELECT COUNT(kuorma_id) FROM public.kuorma WHERE status IN ('In Progress', 'En Route to Destination', 'At Origin', 'At Destination');
 `;
@@ -15,7 +16,8 @@ export const COUNT_AVAILABLE_VEHICLES = `
 `;
 
 export const SUM_REMAINING_VOLUME_ACTIVE_STACKS = `
-    SELECT COALESCE(SUM(jaljella), 0) FROM public.puulaani WHERE valmis = TRUE AND valmis = FALSE;
+    SELECT COALESCE(SUM(jaljella), 0) FROM public.puulaani 
+    WHERE aktiivinen = TRUE AND valmis = FALSE;
 `;
 
 export const COUNT_UPCOMING_LOADS_TODAY = `

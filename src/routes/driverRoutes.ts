@@ -14,6 +14,13 @@ const CREATE_DRIVER_PERMISSION = ['drivers_create'];
 const EDIT_DRIVER_PERMISSION = ['drivers_edit'];
 const DELETE_DRIVER_PERMISSION = ['drivers_delete'];
 
+router.get(
+    '/no-account',
+    protect,
+    authorize(['Superuser', 'Admin', 'Office']),
+    driverController.getDriversWithoutAccountHandler
+);
+
 router.get('/', protect, authorize([], VIEW_DRIVER_PERMISSION), driverController.getAllDriversHandler);
 
 router.get('/:id', protect, authorize([], VIEW_DRIVER_PERMISSION), driverController.getDriverByIdHandler);

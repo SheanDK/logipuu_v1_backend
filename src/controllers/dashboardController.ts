@@ -61,3 +61,15 @@ export const getActiveTripsListHandler = async (req: AuthenticatedRequest, res: 
         next(error);
     }
 };
+
+export const getCustomerDashboardHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const customerId = parseInt(req.params.id, 10);
+        if (isNaN(customerId)) return res.status(400).json({ message: "Invalid Customer ID" });
+        
+        const data = await dashboardService.getCustomerDashboardData(customerId);
+        res.status(200).json(data);
+    } catch (error) {
+        next(error);
+    }
+};

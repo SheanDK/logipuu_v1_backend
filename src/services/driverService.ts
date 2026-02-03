@@ -1,7 +1,8 @@
 // backend/src/services/driverService.ts
 import pool from '../config/db';
-import { CreateDriverDto, 
-    UpdateDriverDto 
+import {
+    CreateDriverDto,
+    UpdateDriverDto
 } from '../dto/driver.dto';
 
 import * as getQueries from '../queries/driverQueries/getDriverQueries';
@@ -63,4 +64,17 @@ export const deleteDriver = async (id: number) => {
         return null;
     }
     return { driverId: result.rows[0].driverId, message: 'Driver deleted successfully' };
+};
+
+export const getDriversWithoutAccount = async () => {
+    const query = `
+        SELECT kulj_id as "kuljId", nimi as "name" 
+        FROM public.kuljettajat 
+        WHERE kulj_id NOT IN (
+            SELECT kulj_id FROM public.kayttajat WHERE kulj_id IS NOT NULL
+        )
+        ORDER BY nimi ASC;
+    `;
+    const result = await pool.query(query);
+    return result.rows;
 };

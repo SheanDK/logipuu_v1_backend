@@ -36,6 +36,12 @@ router.get(
     dashboardController.getDriverDashboardHandler
 );
 
+router.get(
+    '/customer-stats/:id', 
+    protect, 
+    authorize([],[canViewAdminDashboard, canViewOfficeDashboard]),
+    dashboardController.getCustomerDashboardHandler);
+
 // --- WIDGET ROUTES ---
 
 // Volume chart data

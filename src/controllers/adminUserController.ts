@@ -41,20 +41,12 @@ export const getUserByTunnusHandler = async (req: Request, res: Response, next: 
  */
 export const createUserHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { username, fullName, password, roleIds, isActive } = req.body as CreateUserDto;
-
-        if (!username || !fullName || !password || !Array.isArray(roleIds)) {
-            return res.status(400).json({ message: 'Invalid data provided' });
-        }
-
-        const newUser = await adminUserService.adminCreateNewUser(req.body as CreateUserDto);
+        // req.body එකේ දැන් username, fullName, password, roleIds, isActive, kuljId 
+        const newUser = await adminUserService.adminCreateNewUser(req.body);
         res.status(201).json(newUser);
     } catch (error: any) {
         if (error.message.includes('already exists')) {
             return res.status(409).json({ message: error.message });
-        }
-        if (error.message.includes('Invalid data provided')) {
-            return res.status(400).json({ message: error.message });
         }
         next(error);
     }
@@ -118,3 +110,5 @@ export const deleteUserHandler = async (req: Request, res: Response, next: NextF
         return next(error);
     }
 };
+
+
