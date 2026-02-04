@@ -212,8 +212,8 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
         const initialLoadQuery = 'SELECT ajomaarays_nro, asiakas_id, kulj_id, kalusto_nro FROM public.kuorma WHERE kuorma_id = $1';
         const initialLoadResult = await pool.query(initialLoadQuery, [id]);
 
-        const { ajomaarays_nro, asiakas_id, kulj_id, kalusto_nro } = initialLoadResult.rows[0];
-        const drivingOrderNumber = ajomaarays_nro;
+        const { ajomaaraysNro, asiakasId, kuljId, kalustoNro } = initialLoadResult.rows[0];
+        const drivingOrderNumber = ajomaaraysNro;
 
         // Fetch details for the specific row (for completed trip view)
         // Or fetch all legs if needed. For detail view, we fetch the specific load details.
@@ -260,13 +260,13 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
 
         // Construct Trip Details Object
         const tripDetails = {
-            tripId: ajomaarays_nro || `Trip #${id}`,
+            tripId: ajomaaraysNro || `Trip #${id}`,
             ajomaaraysNro: row.ajomaaraysNro,
             vastaanottoNro: row.vastaanottoNro,
-            asiakasId: asiakas_id,
+            asiakasId: asiakasId,
             asiakkaanNimi: row.asiakkaanNimi,
             rekNro: row.rekNro,
-            kalustoNro: kalusto_nro,
+            kalustoNro: kalustoNro,
             kuljettajanNimi: row.kuljettajanNimi,
             lahto: row.lahto,
             kohde: row.kohde,
@@ -298,7 +298,7 @@ export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
         let autoId: number | null = null;
         if (puulaaniId && kalustoNro) {
             const autoResult = await client.query('SELECT auto_id FROM public.autot WHERE puulaani_id = $1 AND kalusto_id = $2 LIMIT 1', [puulaaniId, kalustoNro]);
-            if (autoResult && (autoResult.rowCount ?? 0) > 0) { autoId = autoResult.rows[0].auto_id; }
+            if (autoResult && (autoResult.rowCount ?? 0) > 0) { autoId = autoResult.rows[0].autoId; }
         }
 
         const insertQuery = `
@@ -314,8 +314,8 @@ export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
         if (puutavaraId && m3 && m3 > 0) {
             await client.query(`UPDATE public.puutavaralaji SET haettu = haettu + $1, jaljella = jaljella - $1 WHERE puutavara_id = $2;`, [m3, puutavaraId]);
         }
-        if (newLoad.puulaani_id) {
-            await recalculatePuulaaniTotals(client, newLoad.puulaani_id);
+        if (newLoad.puulaaniId) {
+            await recalculatePuulaaniTotals(client, newLoad.puulaaniId);
         }
         await client.query('COMMIT');
         return newLoad;
@@ -349,7 +349,7 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
 
         if (isDriver) {
             // Driver Check 1: Must own the load
-            if (existingLoad.kulj_id !== user.driverNumericId) {
+            if (existingLoad.kuljId !== user.driverNumericId) {
                 throw new Error('You are not authorized to edit this load.');
             }
 
@@ -443,13 +443,13 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
             const m3Delta = newM3 - oldM3;
 
             // Step 4: Update timber entry if volume changed
-            if (existingLoad.puutavara_id && m3Delta !== 0) {
+            if (existingLoad.puutavaraId && m3Delta !== 0) {
                 const updateTimberEntryQuery = `
                     UPDATE public.puutavaralaji
                     SET haettu = haettu + $1, jaljella = jaljella - $1
                     WHERE puutavara_id = $2;
                 `;
-                await client.query(updateTimberEntryQuery, [m3Delta, existingLoad.puutavara_id]);
+                await client.query(updateTimberEntryQuery, [m3Delta, existingLoad.puutavaraId]);
             }
 
             // Step 5: Construct update query
@@ -506,8 +506,8 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
             }
 
             // Step 6: Recalculate totals
-            if (updatedLoadRow.puulaani_id) {
-                await recalculatePuulaaniTotals(client, updatedLoadRow.puulaani_id);
+            if (updatedLoadRow.puulaaniId) {
+                await recalculatePuulaaniTotals(client, updatedLoadRow.puulaaniId);
             }
 
             await client.query('COMMIT');
@@ -539,7 +539,7 @@ export const deleteLoad = async (id: number, user: UserPayload): Promise<{ kuorm
         // --- Authorization Checks ---
         const isDriver = user.roles.includes('Kuljettaja');
         if (isDriver) {
-            if (existingLoad.kulj_id !== user.driverNumericId) {
+            if (existingLoad.kuljId !== user.driverNumericId) {
                 throw new Error('Forbidden: You are not authorized to delete this load.');
             }
             if (existingLoad.status === 'Completed') {
@@ -550,8 +550,8 @@ export const deleteLoad = async (id: number, user: UserPayload): Promise<{ kuorm
         // --- THE FIX IS HERE ---
         // Step 2: Revert the 'haettu' (hauled) value in the corresponding timber log.
         const m3ToRevert = Number(existingLoad.m3) || 0;
-        if (existingLoad.puutavara_id && m3ToRevert > 0) {
-            console.log(`Reverting ${m3ToRevert} m³ from timber entry ID: ${existingLoad.puutavara_id}...`);
+        if (existingLoad.puutavaraId && m3ToRevert > 0) {
+            console.log(`Reverting ${m3ToRevert} m³ from timber entry ID: ${existingLoad.puutavaraId}...`);
             const updateTimberEntryQuery = `
                 UPDATE public.puutavaralaji
                 SET 
@@ -559,7 +559,7 @@ export const deleteLoad = async (id: number, user: UserPayload): Promise<{ kuorm
                     jaljella = jaljella + $1
                 WHERE puutavara_id = $2;
             `;
-            await client.query(updateTimberEntryQuery, [m3ToRevert, existingLoad.puutavara_id]);
+            await client.query(updateTimberEntryQuery, [m3ToRevert, existingLoad.puutavaraId]);
         }
 
         // Step 3: Soft-delete the load itself.
@@ -567,15 +567,15 @@ export const deleteLoad = async (id: number, user: UserPayload): Promise<{ kuorm
         const result = await client.query(softDeleteQuery, [id]);
 
         // Step 4: Recalculate the grand totals for the parent puulaani.
-        if (existingLoad.puulaani_id) {
-            await recalculatePuulaaniTotals(client, existingLoad.puulaani_id);
+        if (existingLoad.puulaaniId) {
+            await recalculatePuulaaniTotals(client, existingLoad.puulaaniId);
         }
 
         await client.query('COMMIT');
 
         console.log(`Successfully soft-deleted load with ID: ${id} and updated totals.`);
         return {
-            kuormaId: result.rows[0].kuorma_id,
+            kuormaId: result.rows[0].kuormaId,
             message: 'Load marked as inactive and totals updated successfully'
         };
 
@@ -643,7 +643,7 @@ export const getMyLoadsForList = async (driverId: number): Promise<ILoadListItem
             k.ajomaarays_nro
         
         ORDER BY 
-            pvm ASC, kuorma_id ASC;
+            pvm ASC, k.kuorma_id ASC;
     `;
     try {
         const result = await pool.query(queryText, [driverId]);
@@ -651,8 +651,8 @@ export const getMyLoadsForList = async (driverId: number): Promise<ILoadListItem
         // After fetching, manually create the trip identifier for the frontend if ajomaarays_nro is null
         const processedRows = result.rows.map(row => {
             const finalRow = { ...row };
-            if (!finalRow.ajomaarays_nro) {
-                finalRow.ajomaarays_nro = `Trip #${finalRow.kuorma_id}`;
+            if (!finalRow.ajomaaraysNro) {
+                finalRow.ajomaaraysNro = `Trip #${finalRow.kuormaId}`;
             }
             return finalRow;
         });
@@ -680,7 +680,7 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
             throw new Error('Load not found.');
         }
         const load = loadResult.rows[0];
-        if (load.kulj_id !== driverId) {
+        if (load.kuljId !== driverId) {
             throw new Error('You are not authorized to complete this load.');
         }
         if (load.status !== 'At Destination') {
@@ -701,7 +701,7 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
         const updatedLoadResult = await client.query(updateLoadQuery, [data.actualM3, data.actualKm, loadId]);
 
         // Step 3: Update the puutavaralaji table (the timber task)
-        if (load.puutavara_id) {
+        if (load.puutavaraId) {
             const updateTaskQuery = `
                 UPDATE public.puutavaralaji
                 SET 
@@ -709,19 +709,19 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
                     jaljella = jaljella - $1
                 WHERE puutavara_id = $2;
             `;
-            await client.query(updateTaskQuery, [data.actualM3, load.puutavara_id]);
+            await client.query(updateTaskQuery, [data.actualM3, load.puutavaraId]);
         }
 
         // --- THIS IS THE FIX: Step 4: Update the parent puulaani's remaining volume ---
-        if (load.puulaani_id) {
+        if (load.puulaaniId) {
             const updatePuulaaniQuery = `
                 UPDATE public.puulaani
                 SET
                     jaljella = jaljella - $1
                 WHERE puulaani_id = $2;
             `;
-            await recalculatePuulaaniTotals(client, load.puulaani_id);
-            await client.query(updatePuulaaniQuery, [data.actualM3, load.puulaani_id]);
+            await recalculatePuulaaniTotals(client, load.puulaaniId);
+            await client.query(updatePuulaaniQuery, [data.actualM3, load.puulaaniId]);
         }
 
         await client.query('COMMIT'); // Commit all changes if successful
@@ -793,7 +793,7 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
 export const acceptLoadsForInvoicing = async (loadIds: number[]) => {
     const query = `UPDATE public.kuorma SET laskutukseen = 1 WHERE kuorma_id = ANY($1) RETURNING kuorma_id;`;
     const result = await pool.query(query, [loadIds]);
-    return { count: result.rowCount, ids: result.rows.map(r => r.kuorma_id) };
+    return { count: result.rowCount, ids: result.rows.map(r => r.kuormaId) };
 };
 
 export const getMyCompletedLoadsForList = async (driverId: number) => {

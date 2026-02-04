@@ -160,7 +160,7 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
         const activeTripResult = await client.query(activeTripQuery, [driverId]);
 
         if (activeTripResult.rowCount === 0) { return null; }
-        const ajomaaraysNro = activeTripResult.rows[0].ajomaarays_nro;
+        const ajomaaraysNro = activeTripResult.rows[0].ajomaaraysNro;
         if (!ajomaaraysNro) { return null; }
 
         // --- THE FIX IS HERE ---
@@ -209,8 +209,8 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
         const firstLeg = allLegsResult.rows[0];
         return {
             ajomaaraysNro: ajomaaraysNro,
-            asiakkaanNimi: firstLeg.asiakkaan_nimi,
-            rekNro: firstLeg.rek_nro,
+            asiakkaanNimi: firstLeg.asiakkaanNimi,
+            rekNro: firstLeg.rekNro,
             legs: allLegsResult.rows
         };
 

@@ -21,7 +21,24 @@ const pool = {
 
         return result;
     },
-    connect: () => originalPool.connect(),
+    connect: async () => {
+        const client = await originalPool.connect();
+        const originalQuery = client.query.bind(client);
+
+        // Patch the client's query method to automatically camelCase results
+        // This ensures transactions and explicitly managed clients also benefit from conversion.
+        // @ts-ignore
+        client.query = async (...args: any[]) => {
+            // @ts-ignore
+            const result = await originalQuery(...args);
+            if (result && result.rows && result.rows.length > 0) {
+                result.rows = await toCamelCase(result.rows);
+            }
+            return result;
+        };
+
+        return client;
+    },
 };
 
 originalPool.on('error', (err) => {

@@ -223,7 +223,7 @@ export const getTimberStackFullDetails = async (id: number): Promise<IPuulaaniFu
 
         return {
             puulaani: puulaaniResult.rows[0],
-            autot: autotResult.rows.map(r => r.kalusto_id),
+            autot: autotResult.rows.map(r => r.kalustoId),
             timberEntries: puutavaratResult.rows,
             relatedLoads: relatedLoadsResult.rows
         };
@@ -253,7 +253,7 @@ export const updateTimberStackFull = async (id: number, data: IUpdateTimberStack
 
         // Step 2: Handle deletion of timber entries
         const existingEntriesResult = await client.query('SELECT puutavara_id FROM public.puutavaralaji WHERE puulaani_id = $1', [id]);
-        const existingEntryIds = existingEntriesResult.rows.map(r => r.puutavara_id);
+        const existingEntryIds = existingEntriesResult.rows.map(r => r.puutavaraId);
         const submittedEntryIds = puutavarat.map(p => p.puutavara_id).filter(pid => pid && pid > 0);
 
         const entriesToDelete = existingEntryIds.filter(eid => !submittedEntryIds.includes(eid));
@@ -328,12 +328,12 @@ export const updateTimberStackFull = async (id: number, data: IUpdateTimberStack
             WHERE puulaani_id = $1
         `, [id]);
 
-        const { total_volume, total_hauled } = recalculateResult.rows[0];
-        const remaining_volume = total_volume - total_hauled;
+        const { totalVolume, totalHauled } = recalculateResult.rows[0];
+        const remainingVolume = totalVolume - totalHauled;
 
         const puulaaniParams = [
             puulaani.asiakasId, new Date(puulaani.pvm), puulaani.nimi, puulaani.autoNro,
-            puulaani.lisatiedot, total_volume, remaining_volume,
+            puulaani.lisatiedot, totalVolume, remainingVolume,
             puulaani.km ?? 0, puulaani.aktiivinen, puulaani.valmis,
             puulaani.sijaintiLat, puulaani.sijaintiLong, puulaani.ajomaaraysnro, id
         ];

@@ -73,7 +73,7 @@ export const searchConsignments = async (filters: SearchFilters) => {
         params.push(filters.customerId);
     }
     if (filters.vehicleId) {
-        where.push(`kk.kalusto_nro = $${paramIndex++}`); 
+        where.push(`kk.kalusto_nro = $${paramIndex++}`);
         params.push(filters.vehicleId);
     }
 
@@ -84,7 +84,7 @@ export const searchConsignments = async (filters: SearchFilters) => {
         where.push(`kk.laskutukseen = 3`);
         where.push(`kk.pvm_laskutus IS NOT NULL`);
     } else if (!filters.unbilled && !filters.billed) {
-        where.push(`1=0`); 
+        where.push(`1=0`);
     }
 
     const query = `
@@ -175,7 +175,7 @@ export const createConsignment = async (dto: CreateConsignmentDto) => {
             $14, $15
         ) RETURNING *;
     `;
-    
+
     const params = [
         dto.kuormaId,
         dto.pvm,
@@ -209,25 +209,25 @@ export const updateConsignment = async (id: number, dto: UpdateConsignmentDto) =
     addField('rahtikirjan_nro', dto.rahtikirjanNro);
     addField('reitti', dto.reitti);
     addField('lisatiedot', dto.lisatiedot);
-    
+
     addField('m3', dto.m3);
     addField('km', dto.km);
     addField('kpl', dto.kpl);
-    addField('jako', dto.jako); 
+    addField('jako', dto.jako);
 
     // --- FIX: Ensure Prices are added ---
-    addField('m3_hinta', dto.m3_hinta); 
+    addField('m3_hinta', dto.m3_hinta);
     addField('km_hinta', dto.km_hinta);
     addField('kpl_hinta', dto.kpl_hinta);
     addField('jako_hinta', dto.jako_hinta);
 
     addField('tievero', dto.tievero);
-    addField('koko_hinta', dto.koko_hinta); 
+    addField('koko_hinta', dto.koko_hinta);
 
     if (fields.length === 0) return null;
 
     const query = `UPDATE public.rahtikirja SET ${fields.join(', ')} WHERE rahti_id = $1 RETURNING *`;
-    
+
     try {
         const result = await pool.query(query, params);
         return result.rows[0] || null;
@@ -240,7 +240,7 @@ export const updateConsignment = async (id: number, dto: UpdateConsignmentDto) =
 export const checkConsignmentStatus = async (id: number): Promise<'billed' | 'notfound' | 'ok'> => {
     const result = await pool.query('SELECT pvm_laskutus FROM public.rahtikirja WHERE rahti_id = $1', [id]);
     if (result.rowCount === 0) return 'notfound';
-    if (result.rows[0].pvm_laskutus) return 'billed';
+    if (result.rows[0].pvmLaskutus) return 'billed';
     return 'ok';
 };
 
@@ -265,7 +265,7 @@ export const invoiceKuormat = async (kuormaIds: number[]) => {
             RETURNING kuorma_id;
         `;
         const updateResult = await client.query(updateQuery, [kuormaIds]);
-        const updatedIds = updateResult.rows.map(r => r.kuorma_id);
+        const updatedIds = updateResult.rows.map(r => r.kuormaId);
 
         const excludeIds = updatedIds.length > 0 ? updatedIds : [-1];
         const alreadyBilledQuery = `
@@ -273,7 +273,7 @@ export const invoiceKuormat = async (kuormaIds: number[]) => {
             WHERE kuorma_id = ANY($1) AND pvm_laskutus IS NOT NULL AND kuorma_id != ALL($2)
         `;
         const alreadyResult = await client.query(alreadyBilledQuery, [kuormaIds, excludeIds]);
-        const alreadyIds = alreadyResult.rows.map(r => r.kuorma_id);
+        const alreadyIds = alreadyResult.rows.map(r => r.kuormaId);
 
         const foundSet = new Set([...updatedIds, ...alreadyIds]);
         const notFoundIds = kuormaIds.filter(id => !foundSet.has(id));
