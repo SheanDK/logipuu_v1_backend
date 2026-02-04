@@ -9,16 +9,15 @@ import * as consignmentService from '../services/consignmentService';
  */
 export const searchConsignmentsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        // Query params ලබා ගැනීම
+
         const { dateFrom, dateTo, customerId, vehicleId, unbilled, billed } = req.query;
 
-        // Service එකට යැවීමට ෆිල්ටර් සකසා ගැනීම
+
         const filters: consignmentService.SearchFilters = {
             dateFrom: dateFrom as string,
             dateTo: dateTo as string,
             customerId: customerId ? Number(customerId) : null,
             vehicleId: vehicleId ? Number(vehicleId) : null,
-            // 'true' string එක boolean බවට පත් කිරීම
             unbilled: unbilled === '1' || unbilled === 'true',
             billed: billed === '1' || billed === 'true',
         };
@@ -37,10 +36,9 @@ export const searchConsignmentsHandler = async (req: AuthenticatedRequest, res: 
 export const getConsignmentByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id, 10);
-        
-        // "search" වචනය මෙතැනට පැමිණියහොත් NaN වේ, එවිට Error එක පෙන්වයි.
-        if (isNaN(id)) { 
-            return res.status(400).json({ message: "Invalid ID format." }); 
+
+        if (isNaN(id)) {
+            return res.status(400).json({ message: "Invalid ID format." });
         }
 
         const data = await consignmentService.getConsignmentById(id);
@@ -116,7 +114,7 @@ export const invoiceManyHandler = async (req: AuthenticatedRequest, res: Respons
         const { kuormaIds } = req.body;
         // Ensure ids are numbers
         const ids = (Array.isArray(kuormaIds) ? kuormaIds : []).map((x: any) => Number(x)).filter((n: number) => !isNaN(n));
-        
+
         const result = await consignmentService.invoiceKuormat(ids);
         res.status(200).json(result);
     } catch (error) {

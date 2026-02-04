@@ -36,10 +36,6 @@ export const createDriverHandler = async (req: AuthenticatedRequest, res: Respon
         const newDriver = await driverService.createDriver(driverData);
         res.status(201).json(newDriver);
     } catch (error) {
-        // Handle potential unique constraint errors for email if it's unique
-        // if (error.code === '23505' && error.constraint === 'your_email_unique_constraint_name') {
-        //    return res.status(409).json({ message: 'Driver with this email already exists.' });
-        // }
         next(error);
     }
 };

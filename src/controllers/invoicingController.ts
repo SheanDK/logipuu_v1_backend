@@ -82,26 +82,15 @@ export const searchInvoicingHandler = async (req: AuthenticatedRequest, res: Res
     };
 
     const rows = await invoicingService.searchInvoicing(filters);
-    //console.log('[INVOICING][SEARCH][RAW sample row keys]', Object.keys(rows[0] ?? {}));
-    //console.log('[INVOICING][SEARCH][RAW pvm_laskutus]', (rows[0] as any)?.pvm_laskutus);
-    //console.log('[INVOICING][SEARCH][RAW laskutukseen]', (rows[0] as any)?.laskutukseen);
     const payload = rows.map(mapRowToPayload);
-
-    //console.log('[INVOICING][SEARCH][RAW rows]', rows.length);
-    //console.log('[INVOICING][SEARCH][OUT sample]', payload.slice(0, 1));
     res.status(200).json(payload);
   } catch (e) { next(e); }
 };
 
-// --- PATCH /:id ---
 export const updateInvoicingHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    //console.log('[INVOICING][PATCH][IN] params:', req.params, 'body:', req.body);
-
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ message: 'Invalid id' });
-
-    // Front lähettää nämä nimet:
     const {
       waybillNumber, vastaanottoNro, route, notes,
       quantityM3, km, hours, pieces,
@@ -120,52 +109,19 @@ export const updateInvoicingHandler = async (req: AuthenticatedRequest, res: Res
     if (!ok) return res.status(404).json({ message: 'Row not found' });
 
     const fresh = await invoicingService.getInvoicingRowById(id);
-    //console.log('[INVOICING][PATCH] refetched row =', !!fresh);
     if (!fresh) return res.status(404).json({ message: 'Row not found after update' });
-
-    // DEBUG
-    /*
-    console.log('[INVOICING][PATCH][FRESH RAW]', {
-      m3_hinta: (fresh as any)?.m3_hinta,
-      km_hinta: (fresh as any)?.km_hinta,
-      tunnit_hinta: (fresh as any)?.tunnit_hinta,
-      kpl_hinta: (fresh as any)?.kpl_hinta,
-    });
-  */
-
     const payload = mapRowToPayload(fresh as any);
-    //console.log('[INVOICING][PATCH][OUT] ->', payload);
     res.status(200).json(payload);
-  } catch (e) {
-    console.error('[INVOICING][PATCH][ERR]', e);
-    next(e);
-  }
+  } catch (e) { next(e); }
 };
-
-// --- POST /invoice ---
 export const invoiceManyHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    // Log incoming payload for debugging
-    //console.log('[INVOICE][HTTP][IN] body =', req.body);
-
-    // Parse and validate: accept string/number ids, keep only finite numbers
     const raw = (req.body?.ids ?? []) as Array<string | number>;
     const ids = raw.map(n => Number(n)).filter(n => Number.isFinite(n));
-    //console.log('[INVOICE][HTTP][PARSED IDS] ->', ids);
-
-    if (!ids.length) {
-      return res.status(400).json({ message: 'No ids provided' });
-    }
-
-    // Delegate to service; it returns totals + updated id list
+    if (!ids.length) return res.status(400).json({ message: 'No ids provided' });
     const result = await invoicingService.invoiceMany(ids);
-
-    //console.log('[INVOICE][HTTP][OUT] ->', result);
     return res.status(200).json(result);
-  } catch (e) {
-    //console.error('[INVOICE][HTTP][ERR]', e);
-    next(e);
-  }
+  } catch (e) { next(e); }
 };
 
 

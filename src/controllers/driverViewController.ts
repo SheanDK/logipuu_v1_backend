@@ -2,7 +2,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import * as driverViewService from '../services/driverViewService';
-import * as loadService from '../services/loadService'; // Import loadService
+import * as loadService from '../services/loadService';
 
 export const getMapDataHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
@@ -17,7 +17,7 @@ export const getMapDataHandler = async (req: AuthenticatedRequest, res: Response
         if (isNaN(vehicleId)) {
             return res.status(400).json({ message: "Bad Request: A valid 'vehicleId' query parameter is required." });
         }
-        
+
         const mapData = await driverViewService.getMapDataForDriver(driverId, vehicleId);
         res.status(200).json(mapData);
 
@@ -30,7 +30,7 @@ export const getLoadForEditHandler = async (req: AuthenticatedRequest, res: Resp
     try {
         const id = parseInt(req.params.id, 10);
         if (isNaN(id)) return res.status(400).json({ message: "Invalid Load ID." });
-        
+
         const loadData = await driverViewService.getSingleLoadForEdit(id);
         if (!loadData) return res.status(404).json({ message: "Load not found." });
 
@@ -51,7 +51,7 @@ export const getConsignmentsHandler = async (req: AuthenticatedRequest, res: Res
         if (typeof driverId !== 'number') {
             return res.status(403).json({ message: "Forbidden: User is not a valid driver." });
         }
-        
+
         const consignments = await driverViewService.getConsignmentsForDriver(driverId);
         res.status(200).json(consignments);
 
@@ -66,7 +66,7 @@ export const getActiveTripHandler = async (req: AuthenticatedRequest, res: Respo
         if (typeof driverId !== 'number') {
             return res.status(403).json({ message: "Forbidden: User is not a valid driver." });
         }
-        
+
         const activeTrip = await driverViewService.getActiveTripForDriver(driverId);
         res.status(200).json(activeTrip);
 
@@ -79,12 +79,12 @@ export const getActiveTripHandler = async (req: AuthenticatedRequest, res: Respo
 export const updateTimberEntryStatusHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const puulaaniId = parseInt(req.params.id, 10);
-        const timberEntries = req.body.timberEntries; 
+        const timberEntries = req.body.timberEntries;
 
         if (isNaN(puulaaniId) || !Array.isArray(timberEntries)) {
             return res.status(400).json({ message: "Invalid request data." });
         }
-        
+
         await driverViewService.updateTimberEntryStatus(puulaaniId, timberEntries);
         res.status(200).json({ message: 'Statuses updated successfully.' });
 
@@ -93,7 +93,6 @@ export const updateTimberEntryStatusHandler = async (req: AuthenticatedRequest, 
     }
 };
 
-// --- FIX IS HERE ---
 export const getCompletedTripByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const driverId = req.user!.driverNumericId!;
@@ -108,7 +107,7 @@ export const getCompletedTripByIdHandler = async (req: AuthenticatedRequest, res
         if (!tripDetails) {
             return res.status(404).json({ message: 'Completed trip not found or you are not authorized to view it.' });
         }
-        
+
 
         res.status(200).json(tripDetails);
     } catch (error) {
