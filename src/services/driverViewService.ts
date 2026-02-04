@@ -1,6 +1,5 @@
 // backend/src/services/driverViewService.ts
 import pool from '../config/db';
-import camelcaseKeys from 'camelcase-keys';
 
 // ... (Interfaces: MapLocation, DriverMapData - no change)
 interface MapLocation {
@@ -21,7 +20,7 @@ export const getMapDataForDriver = async (driverId: number, vehicleId: number): 
     const client = await pool.connect();
     try {
         const [puulaanitResult, purkupaikatResult] = await Promise.all([
-            
+
             client.query(`
                 SELECT 
                     p.puulaani_id AS id, 
@@ -107,7 +106,7 @@ export const getSingleLoadForEdit = async (id: number): Promise<any | null> => {
     try {
         const result = await pool.query(query, [id]);
         if (result.rowCount === 0) return null;
-        return camelcaseKeys(result.rows[0]);
+        return result.rows[0];
     } catch (error) {
         console.error(`Error fetching single load for edit with ID ${id}:`, error);
         throw new Error(`DB query for fetching single load with ID ${id} failed.`);
@@ -137,7 +136,7 @@ export const getConsignmentsForDriver = async (driverId: number): Promise<any[]>
     `;
     try {
         const result = await pool.query(queryText, [driverId]);
-        return camelcaseKeys(result.rows);
+        return result.rows;
     } catch (error) {
         console.error(`[Service Error] Failed to get consignments for driver ${driverId}:`, error);
         throw new Error('Database query for consignments failed.');
@@ -203,7 +202,7 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
             ORDER BY k.kuorma_id ASC;
         `;
         const allLegsResult = await client.query(allLegsQuery, [ajomaaraysNro, driverId]);
-        
+
         if (allLegsResult.rowCount === 0) { return null; }
 
         // Step 3: Construct the final trip object (this part is correct).
@@ -212,7 +211,7 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
             ajomaaraysNro: ajomaaraysNro,
             asiakkaanNimi: firstLeg.asiakkaan_nimi,
             rekNro: firstLeg.rek_nro,
-            legs: camelcaseKeys(allLegsResult.rows) 
+            legs: allLegsResult.rows
         };
 
     } catch (error) {
@@ -235,9 +234,9 @@ export const updateTimberEntryStatus = async (puulaaniId: number, timberEntries:
             const updateQuery = 'UPDATE public.puutavaralaji SET valmis = $1 WHERE puutavara_id = $2 AND puulaani_id = $3';
             await client.query(updateQuery, [entry.valmis, entry.puutavaraId, puulaaniId]);
         }
-        
+
         await client.query('COMMIT');
-        
+
         return { message: `Statuses updated for puulaani ${puulaaniId}. Totals recalculated by trigger.` };
 
     } catch (error) {

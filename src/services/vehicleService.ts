@@ -57,11 +57,11 @@ export const updateVehicle = async (id: number, vehicleData: UpdateVehicleDto): 
         // Merge new data with existing data. `existingVehicle` is already typed as IVehicle.
         const updatedData = {
             registrationNo: vehicleData.registrationNo ?? existingVehicle.registrationNo,
-            previousInspectionDate: vehicleData.previousInspectionDate 
-                ? new Date(vehicleData.previousInspectionDate) 
+            previousInspectionDate: vehicleData.previousInspectionDate
+                ? new Date(vehicleData.previousInspectionDate)
                 : existingVehicle.previousInspectionDate,
-            nextInspectionDate: vehicleData.nextInspectionDate 
-                ? new Date(vehicleData.nextInspectionDate) 
+            nextInspectionDate: vehicleData.nextInspectionDate
+                ? new Date(vehicleData.nextInspectionDate)
                 : existingVehicle.nextInspectionDate,
             isActive: vehicleData.isActive ?? existingVehicle.isActive,
         };
@@ -87,9 +87,9 @@ export const deleteVehicle = async (id: number): Promise<{ vehicleNo: number; me
             return null;
         }
         // The returned row from the query is already camelCased by our middleware
-        return { 
-            vehicleNo: result.rows[0].vehicleNo, 
-            message: 'Vehicle deleted successfully' 
+        return {
+            vehicleNo: result.rows[0].vehicleNo,
+            message: 'Vehicle deleted successfully'
         };
     } catch (error) {
         console.error(`VEHICLE_SERVICE: Error deleting vehicle ID ${id}:`, error);

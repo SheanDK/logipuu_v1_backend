@@ -1,6 +1,5 @@
 // backend/src/services/timberLogService.ts
 import pool from '../config/db';
-import camelcaseKeys from 'camelcase-keys';
 
 /**
  * Fetches timber log entries for a specific timber stack (Puulaani)
@@ -28,7 +27,7 @@ export const getTimberLogsForStack = async (puulaaniId: number) => {
     `;
     try {
         const result = await pool.query(query, [puulaaniId]);
-        return camelcaseKeys(result.rows);
+        return result.rows;
     } catch (error) {
         console.error(`Database query failed in getTimberLogsForStack for puulaani ${puulaaniId}:`, error);
         throw error;

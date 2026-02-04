@@ -29,22 +29,17 @@ export const protect = (req: AuthenticatedRequest, res: Response, next: NextFunc
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
         try {
             token = req.headers.authorization.split(' ')[1];
-            
+
             // Verify the token and cast the entire decoded payload to UserPayload
             const decoded = jwt.verify(token, JWT_SECRET) as UserPayload;
 
-            // --- FOR DEBUGGING: Log what is decoded from the token ---
-            //console.log('--- Decoded Payload from Token in "protect" middleware ---');
-            //console.log(decoded);
-            // --- END DEBUGGING ---
 
             // CORRECTED: Assign the whole decoded object directly to req.user
             // This ensures that `permissions` and all other properties are passed on.
             req.user = decoded;
-            
+
             next();
         } catch (error) {
-            console.error('Token verification failed:', error);
             if (error instanceof jwt.TokenExpiredError) {
                 return res.status(401).json({ message: 'Not authorized, token expired' });
             }

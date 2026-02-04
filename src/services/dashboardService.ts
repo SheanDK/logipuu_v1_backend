@@ -1,5 +1,4 @@
 // backend/src/services/dashboardService.ts
-import camelcaseKeys from 'camelcase-keys';
 import pool from '../config/db';
 import * as adminQueries from '../queries/dashboardQueries/adminDashboardQueries';
 import * as dispatchQueries from '../queries/dashboardQueries/dispatchDashboardQueries';
@@ -132,9 +131,8 @@ export const getVolumeLast7Days = async (): Promise<IVolumeByDay[]> => {
 export const getActiveTripsList = async (): Promise<IActiveTripListItem[]> => {
     try {
         const result = await pool.query(dispatchQueries.GET_ACTIVE_TRIPS_LIST);
-        return camelcaseKeys(result.rows);
-    } catch (error)
- {
+        return result.rows;
+    } catch (error) {
         console.error('Error fetching active trips list:', error);
         throw error;
     }
@@ -144,7 +142,7 @@ export const getActiveTripsList = async (): Promise<IActiveTripListItem[]> => {
  * get customer data for dashboard
  */
 export const getCustomerDashboardData = async (customerId: number) => {
-    
+
     // 1. අද දින එම පාරිභෝගිකයා වෙනුවෙන් අවසන් කළ ලෝඩ් ගණන
     const COUNT_CUSTOMER_COMPLETED_TODAY = `
         SELECT COUNT(*) FROM public.kuorma 
