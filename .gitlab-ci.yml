@@ -1,4 +1,7 @@
-image: node:20
+image: node:18-alpine
+
+variables:
+  NPM_CONFIG_JOBS: 1
 
 stages:
   - build
@@ -6,7 +9,8 @@ stages:
 build-backend:
   stage: build
   script:
-    - npm install
+    - apk add --no-cache python3 make g++ 
+    - npm install --no-optional
     - npm run build
   artifacts:
     paths:
