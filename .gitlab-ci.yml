@@ -1,0 +1,14 @@
+image: node:20
+
+stages:
+  - build
+
+build-backend:
+  stage: build
+  script:
+    - npm install
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week

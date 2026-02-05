@@ -54,7 +54,21 @@ export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILo
             k.ajomaarays_nro,
             k.vastaanotto_nro, kal.rek_nro, kul.nimi AS kuljettajan_nimi,
             p.nimi AS puulaani_nimi, a.asiakkaan_nimi, pt.puutavara AS timber_type,
-            k.reitti, k.m3, k.km, k.tunnit, k.kpl, k.lisatiedot, k.status, k.is_active, k.tyyppi,
+            k.reitti, 
+            CASE WHEN k.tyyppi = 1 
+                 THEN COALESCE((SELECT SUM(m3) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id), 0) 
+                 ELSE k.m3 
+            END as m3,
+            CASE WHEN k.tyyppi = 1 
+                 THEN COALESCE((SELECT SUM(km) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id), 0) 
+                 ELSE k.km 
+            END as km,
+            k.tunnit, 
+            CASE WHEN k.tyyppi = 1 
+                 THEN COALESCE((SELECT SUM(kpl) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id), 0) 
+                 ELSE k.kpl 
+            END as kpl,
+            k.lisatiedot, k.status, k.is_active, k.tyyppi,
             p.sijainti_lat as origin_lat, p.sijainti_long as origin_lng,
             (SELECT COUNT(*) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id) as waybill_count
         FROM public.kuorma k
@@ -158,7 +172,19 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
                 k.pvm,
                 k.status,
                 k.lisatiedot,
-                k.m3, k.km, k.kpl, k.tunnit, 
+                CASE WHEN k.tyyppi = 1 
+                     THEN COALESCE((SELECT SUM(m3) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id), 0) 
+                     ELSE k.m3 
+                END as m3,
+                CASE WHEN k.tyyppi = 1 
+                     THEN COALESCE((SELECT SUM(km) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id), 0) 
+                     ELSE k.km 
+                END as km,
+                CASE WHEN k.tyyppi = 1 
+                     THEN COALESCE((SELECT SUM(kpl) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id), 0) 
+                     ELSE k.kpl 
+                END as kpl,
+                k.tunnit, 
                 k.tyyppi,
                 k.kulj_id,
                 k.kalusto_nro,
@@ -754,10 +780,19 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
             a.asiakkaan_nimi,
             pt.puutavara AS timber_type,
             k.reitti,
-            k.m3,
-            k.km,
+            CASE WHEN k.tyyppi = 1 
+                 THEN COALESCE((SELECT SUM(m3) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id), 0) 
+                 ELSE k.m3 
+            END as m3,
+            CASE WHEN k.tyyppi = 1 
+                 THEN COALESCE((SELECT SUM(km) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id), 0) 
+                 ELSE k.km 
+            END as km,
             k.tunnit,
-            k.kpl,
+            CASE WHEN k.tyyppi = 1 
+                 THEN COALESCE((SELECT SUM(kpl) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id), 0) 
+                 ELSE k.kpl 
+            END as kpl,
             k.lisatiedot,
             k.status,
             k.is_active,
@@ -798,8 +833,13 @@ export const acceptLoadsForInvoicing = async (loadIds: number[]) => {
 
 export const getMyCompletedLoadsForList = async (driverId: number) => {
     const query = `
-        SELECT k.kuorma_id, k.pvm, a.asiakkaan_nimi, k.tyyppi,
-               COALESCE(p.nimi, k.lahto) AS lahto, COALESCE(pp.purkupaikka, k.kohde) AS kohde
+        SELECT k.kuorma_id, k.pvm, a.asiakkaan_nimi, k.tyyppi, 
+               CASE WHEN k.tyyppi = 1 
+                    THEN COALESCE((SELECT SUM(m3) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id), 0) 
+                    ELSE k.m3 
+               END as m3,
+               COALESCE(p.nimi, k.lahto) AS lahto, COALESCE(pp.purkupaikka, k.kohde) AS kohde,
+               (SELECT COUNT(*) FROM public.rahtikirja r WHERE r.kuorma_id = k.kuorma_id) as waybill_count
         FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
         LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id

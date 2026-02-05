@@ -27,9 +27,9 @@ export const COUNT_UPCOMING_LOADS_TODAY = `
 // -- Active Trips List for Dispatcher --
 export const GET_ACTIVE_TRIPS_LIST = `
     SELECT
-        k.ajomaarays_nro,
-        kul.nimi as driver_name,
-        kal.rek_nro as vehicle_reg_no,
+        k.ajomaarays_nro as "ajomaaraysNro",
+        kul.nimi as "driverName",
+        kal.rek_nro as "vehicleRegNo",
         -- Get the most "active" status for the trip (e.g., 'In Progress' is more important than 'At Origin')
         MIN(k.status) as status,
         -- Calculate progress based on ALL loads in the trip
