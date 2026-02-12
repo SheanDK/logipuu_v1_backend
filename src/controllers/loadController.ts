@@ -24,7 +24,7 @@ export const getAllLoadsHandler = async (req: AuthenticatedRequest, res: Respons
 // --- THIS IS THE UPDATED HANDLER WITH A SECURITY CHECK ---
 export const getLoadByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseInt(req.params.id as string, 10);
         if (isNaN(id)) {
             return res.status(400).json({ message: "Invalid Load ID format." });
         }
@@ -66,7 +66,7 @@ export const createLoadHandler = async (req: AuthenticatedRequest, res: Response
 
 export const updateLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseInt(req.params.id as string, 10);
         console.log(`[CONTROLLER DEBUG] updateLoadHandler received request to update ID: ${id}`);
 
         if (isNaN(id)) {
@@ -90,7 +90,7 @@ export const updateLoadHandler = async (req: AuthenticatedRequest, res: Response
 
 export const deleteLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseInt(req.params.id as string, 10);
         if (isNaN(id)) {
             return res.status(400).json({ message: "Invalid Load ID format." });
         }
@@ -131,7 +131,7 @@ export const getMyLoadsHandler = async (req: AuthenticatedRequest, res: Response
 export const updateLoadStatusHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const user = req.user;
-        const loadId = parseInt(req.params.id, 10);
+        const loadId = parseInt(req.params.id as string, 10);
         const { status } = req.body as UpdateLoadStatusDto;
 
         if (isNaN(loadId)) {
@@ -157,7 +157,7 @@ export const updateLoadStatusHandler = async (req: AuthenticatedRequest, res: Re
 export const completeLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const user = req.user!;
-        const loadId = parseInt(req.params.id, 10);
+        const loadId = parseInt(req.params.id as string, 10);
         const dto = req.body as CompleteLoadDto;
 
         if (isNaN(loadId)) {
@@ -247,7 +247,7 @@ export const updateTripHandler = async (req: AuthenticatedRequest, res: Response
         }
 
         const updatedTrip = await loadService.updateTripByLoadId(
-            parseInt(initialLoadId, 10),
+            parseInt(initialLoadId as string, 10),
             tripData,
             user.driverNumericId
         );
@@ -298,7 +298,7 @@ export const updateTripStatusHandler = async (req: AuthenticatedRequest, res: Re
             return res.status(400).json({ message: "Driving Order Number is required." });
         }
 
-        const result = await loadService.updateTripStatus(ajomaaraysNro, status, user.driverNumericId);
+        const result = await loadService.updateTripStatus(ajomaaraysNro as string, status, user.driverNumericId);
         res.status(200).json({ message: `Trip status updated to '${status}'.`, ...result });
     } catch (error) {
         next(error);

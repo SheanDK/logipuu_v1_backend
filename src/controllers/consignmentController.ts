@@ -35,7 +35,7 @@ export const searchConsignmentsHandler = async (req: AuthenticatedRequest, res: 
  */
 export const getConsignmentByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseInt(req.params.id as string, 10);
 
         if (isNaN(id)) {
             return res.status(400).json({ message: "Invalid ID format." });
@@ -69,7 +69,7 @@ export const createConsignmentHandler = async (req: AuthenticatedRequest, res: R
  */
 export const updateConsignmentHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseInt(req.params.id as string, 10);
         if (isNaN(id)) return res.status(400).json({ message: "Invalid ID format." });
 
         const success = await consignmentService.updateConsignment(id, req.body);
@@ -87,7 +87,7 @@ export const updateConsignmentHandler = async (req: AuthenticatedRequest, res: R
  */
 export const deleteConsignmentHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseInt(req.params.id as string, 10);
         if (isNaN(id)) return res.status(400).json({ message: "Invalid ID format." });
 
         // Check if billed before delete

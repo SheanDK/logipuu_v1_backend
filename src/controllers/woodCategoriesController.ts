@@ -23,7 +23,7 @@ export const getWoodCategoryByIdHandler = async (
   next: NextFunction
 ) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) return res.status(400).json({ message: 'Invalid wood category ID format.' });
 
     const item = await woodService.getWoodCategoryById(id);
@@ -55,7 +55,7 @@ export const updateWoodCategoryHandler = async (
   next: NextFunction
 ) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) return res.status(400).json({ message: 'Invalid wood category ID format.' });
 
     const payload = req.body as UpdateWoodCategoryDto;
@@ -74,7 +74,7 @@ export const deleteWoodCategoryHandler = async (
   next: NextFunction
 ) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(req.params.id as string, 10);
     if (isNaN(id)) return res.status(400).json({ message: 'Invalid wood category ID format.' });
 
     const result = await woodService.deleteWoodCategory(id);

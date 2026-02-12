@@ -16,7 +16,7 @@ export const getAllDriversHandler = async (req: AuthenticatedRequest, res: Respo
 
 export const getDriverByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const driverId = parseInt(req.params.id, 10);
+        const driverId = parseInt(req.params.id as string, 10);
         if (isNaN(driverId)) {
             return res.status(400).json({ message: "Invalid driver ID format." });
         }
@@ -42,7 +42,7 @@ export const createDriverHandler = async (req: AuthenticatedRequest, res: Respon
 
 export const updateDriverHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const driverId = parseInt(req.params.id, 10);
+        const driverId = parseInt(req.params.id as string, 10);
         if (isNaN(driverId)) {
             return res.status(400).json({ message: "Invalid driver ID format." });
         }
@@ -59,7 +59,7 @@ export const updateDriverHandler = async (req: AuthenticatedRequest, res: Respon
 
 export const deleteDriverHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const driverId = parseInt(req.params.id, 10);
+        const driverId = parseInt(req.params.id as string, 10);
         if (isNaN(driverId)) {
             return res.status(400).json({ message: "Invalid driver ID format." });
         }

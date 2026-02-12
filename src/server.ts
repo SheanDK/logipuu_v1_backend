@@ -1,8 +1,8 @@
-import 'reflect-metadata'; 
+import 'reflect-metadata';
 import express, { Application, Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import http from 'http'; 
+import http from 'http';
 import db from './config/db';
 import { socketService } from './services/socketService';
 
@@ -14,13 +14,13 @@ import driverRoutes from './routes/driverRoutes';
 import timberStackRoutes from './routes/timberStackRoutes';
 import dashboardRoute from './routes/dashboardRoute';
 import userRoutes from './routes/userRoutes';
-import rolePermissionRoutes from './routes/rolePermissionRoutes'; 
+import rolePermissionRoutes from './routes/rolePermissionRoutes';
 import adminUserRoutes from './routes/adminUserRoutes';
 import unloadingSiteRoutes from './routes/unloadingSiteRoutes';
 import waybillRoutes from './routes/waybillRoutes';
 import puutavaraRoutes from './routes/puutavaraRoutes';
 import locationRoutes from './routes/locationRoutes';
-import otherMarkerRoutes from './routes/otherMarkerRoutes'; 
+import otherMarkerRoutes from './routes/otherMarkerRoutes';
 import puutavaralajiRoutes from './routes/timberLogRoutes';
 import loadRoutes from './routes/loadRoutes';
 import invoicingRoutes from './routes/invoicingRoutes';
@@ -28,6 +28,9 @@ import consignmentRoutes from './routes/consignmentRoutes';
 import driverViewRoutes from './routes/driverViewRoutes';
 import consignmentDriverRoutes from './routes/consignmentDriverRoutes';
 import woodCategoryRoutes from './routes/woodCategoryRoutes';
+import chipOrderRoutes from './routes/chipOrderRoutes';
+import chipTitleRoutes from './routes/chipTitleRoutes';
+import chipPlanningRoutes from './routes/chipPlanningRoutes';
 
 import { globalErrorHandler } from './middlewares/errorHandler';
 
@@ -67,27 +70,31 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // --- API Routes ---
 const apiRouter = express.Router();
-apiRouter.use('/auth', authRoutes);       
-apiRouter.use('/users', userRoutes);      
+apiRouter.use('/auth', authRoutes);
+apiRouter.use('/users', userRoutes);
 apiRouter.use('/clients', clientRoutes);
 apiRouter.use('/vehicles', vehicleRoutes);
 apiRouter.use('/drivers', driverRoutes);
 apiRouter.use('/timber-stacks', timberStackRoutes);
 apiRouter.use('/dashboard', dashboardRoute);
-apiRouter.use('/role-permissions', rolePermissionRoutes); 
+apiRouter.use('/role-permissions', rolePermissionRoutes);
 apiRouter.use('/admin/users', adminUserRoutes);
 apiRouter.use('/unloading-sites', unloadingSiteRoutes);
 apiRouter.use('/waybills', waybillRoutes);
 apiRouter.use('/wood-types', puutavaraRoutes);
 apiRouter.use('/locations', locationRoutes);
 apiRouter.use('/other-markers', otherMarkerRoutes);
-apiRouter.use('/timber-logs', puutavaralajiRoutes); 
+apiRouter.use('/timber-logs', puutavaralajiRoutes);
 apiRouter.use('/loads', loadRoutes);
 apiRouter.use('/wood-categories', woodCategoryRoutes);
 apiRouter.use('/invoicing', invoicingRoutes);
 apiRouter.use('/consignments', consignmentRoutes);
 apiRouter.use('/driver', driverViewRoutes);
 apiRouter.use('/driver/consignments', consignmentDriverRoutes);
+apiRouter.use('/chip-orders', chipOrderRoutes);
+apiRouter.use('/chip-titles', chipTitleRoutes);
+apiRouter.use('/chip-planning', chipPlanningRoutes);
+
 
 app.use('/api', apiRouter);
 

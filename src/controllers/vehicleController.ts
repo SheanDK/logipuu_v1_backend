@@ -16,7 +16,7 @@ export const getAllVehiclesHandler = async (req: AuthenticatedRequest, res: Resp
 
 export const getVehicleByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const vehicleId = parseInt(req.params.id, 10);
+        const vehicleId = parseInt(req.params.id as string, 10);
         if (isNaN(vehicleId)) {
             return res.status(400).json({ message: "Invalid vehicle ID format." });
         }
@@ -47,7 +47,7 @@ export const createVehicleHandler = async (req: AuthenticatedRequest, res: Respo
 
 export const updateVehicleHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const vehicleId = parseInt(req.params.id, 10);
+        const vehicleId = parseInt(req.params.id as string, 10);
         if (isNaN(vehicleId)) {
             return res.status(400).json({ message: "Invalid vehicle ID format." });
         }
@@ -64,7 +64,7 @@ export const updateVehicleHandler = async (req: AuthenticatedRequest, res: Respo
 
 export const deleteVehicleHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const vehicleId = parseInt(req.params.id, 10);
+        const vehicleId = parseInt(req.params.id as string, 10);
         if (isNaN(vehicleId)) {
             return res.status(400).json({ message: "Invalid vehicle ID format." });
         }
@@ -82,8 +82,8 @@ export const deleteVehicleHandler = async (req: AuthenticatedRequest, res: Respo
 export const checkRegistrationNoExistsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         // req.query now has the correct type because req is AuthenticatedRequest.
-        const { registrationNo, VehicleId } = req.query; 
-        
+        const { registrationNo, VehicleId } = req.query;
+
         // Ensure registrationNo is a string
         if (typeof registrationNo !== 'string' || registrationNo.trim() === '') {
             return res.status(400).json({ message: 'Registration number is required for this check.' });

@@ -13,7 +13,7 @@ export const getAllWaybillsHandler = async (req: AuthenticatedRequest, res: Resp
 
 export const getWaybillByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseInt(req.params.id as string, 10);
         if (isNaN(id)) return res.status(400).json({ message: "Invalid ID format." });
         const waybill = await waybillService.getWaybillById(id);
         if (!waybill) return res.status(404).json({ message: 'Waybill not found' });
@@ -31,7 +31,7 @@ export const createWaybillHandler = async (req: AuthenticatedRequest, res: Respo
 
 export const updateWaybillHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseInt(req.params.id as string, 10);
         if (isNaN(id)) return res.status(400).json({ message: "Invalid ID format." });
         const dto = req.body as UpdateWaybillDto;
         const updatedWaybill = await waybillService.updateWaybill(id, dto);
@@ -42,7 +42,7 @@ export const updateWaybillHandler = async (req: AuthenticatedRequest, res: Respo
 
 export const deleteWaybillHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseInt(req.params.id as string, 10);
         if (isNaN(id)) return res.status(400).json({ message: "Invalid ID format." });
         const result = await waybillService.deleteWaybill(id);
         if (!result) return res.status(404).json({ message: 'Waybill not found for deletion' });

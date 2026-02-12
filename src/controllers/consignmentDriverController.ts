@@ -21,7 +21,7 @@ export const getAllConsignmentsHandler = async (req: AuthenticatedRequest, res: 
 // Handles GET /api/driver/consignments/:id
 export const getConsignmentByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = parseInt(req.params.id as string, 10);
         if (isNaN(id)) { return res.status(400).json({ message: "Invalid ID format." }); }
         const driverId = req.user!.driverNumericId!;
         const data: any | null = await consignmentDriverService.getConsignmentById(id, driverId);
@@ -60,10 +60,10 @@ export const createConsignmentHandler = async (req: AuthenticatedRequest, res: R
 // Handles PUT /api/driver/consignments/:id
 export const updateConsignmentHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (isNaN(id)) { return res.status(400).json({ message: "Invalid ID format." });}
+        const id = parseInt(req.params.id as string, 10);
+        if (isNaN(id)) { return res.status(400).json({ message: "Invalid ID format." }); }
         const driverId = req.user!.driverNumericId!;
-        
+
         const data = await consignmentDriverService.updateConsignment(id, req.body, driverId);
         res.status(200).json(data);
     } catch (error) {

@@ -33,15 +33,15 @@ export const getAllPermissionsHandler = async (req: AuthenticatedRequest, res: R
  */
 export const updatePermissionsForRoleHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const roleId = parseInt(req.params.roleId, 10);
-        
+        const roleId = parseInt(req.params.roleId as string, 10);
+
         // Backend DTO expects permissionIds (array of numbers)
-        const { permissionIds } = req.body; 
+        const { permissionIds } = req.body;
 
         if (isNaN(roleId) || !Array.isArray(permissionIds)) {
             return res.status(400).json({ message: 'Invalid role ID or permissions format (must be an array of numbers).' });
         }
-        
+
         const result = await service.updatePermissionsForRole(roleId, permissionIds);
         res.status(200).json(result);
     } catch (error) {

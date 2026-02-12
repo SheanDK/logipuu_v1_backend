@@ -22,7 +22,7 @@ export const getAllUsersHandler = async (req: Request, res: Response, next: Next
 export const getUserByTunnusHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { username } = req.params;
-        const user = await adminUserService.adminGetUserByTunnus(username);
+        const user = await adminUserService.adminGetUserByTunnus(username as string);
 
         //console.log('[GET /admin/users/:tunnus] user =', JSON.stringify(user, null, 2));
 
@@ -68,7 +68,7 @@ export const updateUserHandler = async (req: Request, res: Response, next: NextF
             return res.status(400).json({ message: 'No update data provided.' });
         }
 
-        const updatedUser = await adminUserService.adminUpdateUser(username, updateData);
+        const updatedUser = await adminUserService.adminUpdateUser(username as string, updateData);
         if (!updatedUser) { // This check is now valid.
             return res.status(404).json({ message: 'User not found for update.' });
         }
@@ -100,7 +100,7 @@ export const deleteUserHandler = async (req: Request, res: Response, next: NextF
             return res.status(400).json({ message: 'User identifier (username) is required.' });
         }
 
-        const result = await adminUserService.adminDeleteUser(username);
+        const result = await adminUserService.adminDeleteUser(username as string);
         return res.status(200).json(result);
     } catch (error: any) {
         const msg = typeof error?.message === 'string' ? error.message : '';

@@ -7,7 +7,7 @@ import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 
 export const getTimberLogsForStackHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const puulaaniId = parseInt(req.params.puulaaniId, 10);
+        const puulaaniId = parseInt(req.params.puulaaniId as string, 10);
         if (isNaN(puulaaniId)) {
             return res.status(400).json({ message: "Invalid Puulaani ID format." });
         }
