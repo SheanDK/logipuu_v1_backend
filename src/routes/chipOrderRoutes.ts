@@ -1,6 +1,6 @@
 //backend/src/routes/chipTransportRoutes.ts
 import { Router } from 'express';
-import { createChipOrder, getActiveChipOrders, getWeeklyPlan, scheduleChipLoad } from '../controllers/chipOrderController';
+import { createChipOrder, deleteChipOrder, getActiveChipOrders, getWeeklyPlan, scheduleChipLoad, updateChipOrder } from '../controllers/chipOrderController';
 
 
 const router = Router();
@@ -16,5 +16,11 @@ router.post('/schedule-load', scheduleChipLoad);
 
 // Office Side: Get Weekly Plan
 router.get('/weekly-plan', getWeeklyPlan);
+
+// Office Side: Update Chip Order
+router.put('/orders/:orderId', updateChipOrder);
+
+// Office Side: Delete Chip Order
+router.delete('/orders/:orderId', deleteChipOrder);
 
 export default router;

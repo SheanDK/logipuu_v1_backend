@@ -225,6 +225,7 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
         const waybillsResult = await pool.query(waybillsQuery, [id]);
 
         loadData.rahtikirjat = waybillsResult.rows;
+        loadData.kuormaId = id; // Ensure ID is present
 
         return loadData;
     }
@@ -287,6 +288,7 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
         // Construct Trip Details Object
         const tripDetails = {
             tripId: ajomaaraysNro || `Trip #${id}`,
+            kuormaId: id, // ADDED: Critical for identifying the correct row for updates
             ajomaaraysNro: row.ajomaaraysNro,
             vastaanottoNro: row.vastaanottoNro,
             asiakasId: asiakasId,
@@ -374,8 +376,16 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
         // --- AUTHORIZATION & STATUS CHECKS ---
 
         if (isDriver) {
+            console.log(`[SERVICE DEBUG] Driver Authorization Check:`, {
+                loadId: id,
+                existingKuljId: existingLoad.kuljId,
+                userDriverId: user.driverNumericId,
+                status: existingLoad.status
+            });
+
             // Driver Check 1: Must own the load
             if (existingLoad.kuljId !== user.driverNumericId) {
+                console.warn(`[SERVICE DEBUG] Driver ${user.driverNumericId} blocked: Not owner of load ${id}.`);
                 throw new Error('You are not authorized to edit this load.');
             }
 
@@ -391,9 +401,15 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
             }
 
         } else {
+            console.log(`[SERVICE DEBUG] Office User Authorization Check:`, {
+                loadId: id,
+                status: existingLoad.status,
+                laskutukseen: existingLoad.laskutukseen
+            });
             // Office User Check: Cannot edit if already invoiced (laskutukseen = 1)
             // They CAN edit 'Completed' loads as long as they are pending inspection (laskutukseen = 0)
             if (existingLoad.status === 'Completed' && existingLoad.laskutukseen === 1) {
+                console.warn(`[SERVICE DEBUG] Office user blocked: Load ${id} is already invoiced.`);
                 throw new Error('Cannot edit a load that has already been accepted for invoicing.');
             }
         }

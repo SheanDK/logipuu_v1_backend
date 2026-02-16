@@ -67,20 +67,21 @@ export const createLoadHandler = async (req: AuthenticatedRequest, res: Response
 export const updateLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
-        console.log(`[CONTROLLER DEBUG] updateLoadHandler received request to update ID: ${id}`);
+        const dto = req.body as UpdateLoadDto;
+        const user = req.user!;
+
+        console.log(`[CONTROLLER DEBUG] updateLoadHandler request:`, { id, body: req.body, user: { id: user.id, driverId: user.driverNumericId } });
 
         if (isNaN(id)) {
+            console.error(`[CONTROLLER DEBUG] Invalid Load ID format: ${req.params.id}`);
             return res.status(400).json({ message: "Invalid Load ID format." });
         }
-
-        const dto = req.body as UpdateLoadDto;
-
-        const user = req.user!;
 
         const updatedLoad = await loadService.updateLoad(id, dto, user);
         res.status(200).json(updatedLoad);
 
     } catch (error: any) {
+        console.error(`[CONTROLLER DEBUG] updateLoadHandler Error:`, error.message);
         if (error.message.includes('not found') || error.message.includes('not authorized')) {
             return res.status(403).json({ message: error.message });
         }

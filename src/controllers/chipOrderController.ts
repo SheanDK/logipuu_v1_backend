@@ -6,22 +6,52 @@ import { ChipOrder } from '../types/chipTransportTypes';
 // 1. Create Order
 export const createChipOrder = async (req: Request, res: Response) => {
     try {
-        const { asiakas_id, pvm_alku, pvm_loppu, kuormia_tavoite, tuote_tyyppi, lisatiedot } = req.body as ChipOrder;
+        const {
+            asiakas_id,
+            title_id,
+            pvm_alku,
+            pvm_loppu,
+            kuormia_tavoite,
+            tuote_tyyppi,
+            further_info,
+            flexibility_type,
+            pcs_per_day,
+            weeks_left,
+            valid_until_notice,
+            distribution
+        } = req.body;
+
+        const endDate = pvm_loppu || pvm_alku;
 
         const query = `
-      INSERT INTO chip_orders 
-      (asiakas_id, pvm_alku, pvm_loppu, kuormia_tavoite, tuote_tyyppi, lisatiedot)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *;
-    `;
+            INSERT INTO public.chip_orders 
+            (asiakas_id, title_id, pvm_alku, pvm_loppu, kuormia_tavoite, tuote_tyyppi, lisatiedot, 
+             flexibility_type, pcs_per_day, weeks_full, valid_until_notice, weekly_distribution)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            RETURNING *;
+        `;
 
-        const values = [asiakas_id, pvm_alku, pvm_loppu, kuormia_tavoite, tuote_tyyppi, lisatiedot];
+        const values = [
+            asiakas_id,
+            title_id || null,
+            pvm_alku,
+            endDate,
+            kuormia_tavoite || 1,
+            tuote_tyyppi || '',
+            further_info || '',
+            flexibility_type || 'No Flexibility',
+            pcs_per_day || 0,
+            weeks_left || 1,
+            valid_until_notice || false,
+            JSON.stringify(distribution || {})
+        ];
+
         const result = await pool.query(query, values);
-
         res.status(201).json(result.rows[0]);
-    } catch (error) {
-        console.error('Error creating chip order:', error);
-        res.status(500).json({ error: 'Internal server error' });
+
+    } catch (error: any) {
+        console.error('Error creating chip order:', error.message);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
     }
 };
 
@@ -33,8 +63,16 @@ export const getActiveChipOrders = async (req: Request, res: Response) => {
                 co.order_id as "orderId", 
                 co.asiakas_id as "asiakasId", 
                 co.title_id as "titleId",
+                TO_CHAR(co.pvm_alku, 'DD.MM.YYYY') as "startDate",
+                TO_CHAR(co.pvm_loppu, 'DD.MM.YYYY') as "endDate",
                 co.kuormia_tavoite as "targetQty", 
                 co.tuote_tyyppi as "productType",
+                co.lisatiedot as "lisatiedot",
+                co.flexibility_type as "flexibility_type",
+                co.pcs_per_day as "pcsPerDay",
+                co.weeks_full as "weeksFull",
+                co.valid_until_notice as "valid_until_notice",
+                co.weekly_distribution as "weeklyDistribution",
                 a.asiakkaan_nimi as "customerName",
                 ct.nimike_nimi as "titleName",
                 ct.lyhenne as "lyhenne"
@@ -52,12 +90,9 @@ export const getActiveChipOrders = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
-
-// 3. Get Weekly Plan (Complex Query Implementation)
+// 3. Get Weekly Plan 
 export const getWeeklyPlan = async (req: Request, res: Response) => {
     try {
-        // get the week and year from the Frontend 
-        // Example: /api/chip-orders/weekly-plan?week=7&year=2026
         const { week, year } = req.query;
 
         if (!week || !year) {
@@ -114,11 +149,9 @@ export const getWeeklyPlan = async (req: Request, res: Response) => {
 
         const result = await pool.query(query, [week, year]);
 
-        // DEBUG: Check the first row from the database
         console.log("First Row from DB:", result.rows[0]);
 
         const formattedData = result.rows.reduce((acc: any[], row) => {
-            // Check if the program_id already exists in the accumulator
             const programId = row.program_id || row.programId;
             const weekNum = row.viikko_nro || row.viikkoNro;
             const yearNum = row.vuosi;
@@ -158,7 +191,6 @@ export const getWeeklyPlan = async (req: Request, res: Response) => {
                 acc.push(program);
             }
 
-            // If there is a load (not NULL), add it to the loads array
             if (loadId) {
                 program.loads.push({
                     load_id: loadId,
@@ -222,5 +254,50 @@ export const scheduleChipLoad = async (req: Request, res: Response) => {
             error: 'Internal server error',
             details: error.message
         });
+    }
+};
+
+export const updateChipOrder = async (req: Request, res: Response) => {
+    try {
+        const { orderId } = req.params;
+        const {
+            asiakas_id, title_id, pvm_alku, pvm_loppu, kuormia_tavoite,
+            tuote_tyyppi, further_info, flexibility_type, pcs_per_day,
+            weeks_left, valid_until_notice, distribution
+        } = req.body;
+
+        const query = `
+            UPDATE public.chip_orders 
+            SET asiakas_id = $1, title_id = $2, pvm_alku = $3, pvm_loppu = $4, 
+                kuormia_tavoite = $5, tuote_tyyppi = $6, lisatiedot = $7, 
+                flexibility_type = $8, pcs_per_day = $9, weeks_full = $10, 
+                valid_until_notice = $11, weekly_distribution = $12
+            WHERE order_id = $13
+            RETURNING *;
+        `;
+
+        const values = [
+            asiakas_id, title_id, pvm_alku, pvm_loppu || pvm_alku,
+            kuormia_tavoite, tuote_tyyppi, further_info,
+            flexibility_type, pcs_per_day, weeks_left,
+            valid_until_notice, JSON.stringify(distribution),
+            orderId
+        ];
+
+        const result = await pool.query(query, values);
+        res.status(200).json(result.rows[0]);
+    } catch (error: any) {
+        res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+};
+
+export const deleteChipOrder = async (req: Request, res: Response) => {
+    try {
+        const { orderId } = req.params;
+        const query = 'DELETE FROM public.chip_orders WHERE order_id = $1 RETURNING *;';
+        const result = await pool.query(query, [orderId]);
+        res.status(200).json(result.rows[0]);
+    } catch (error: any) {
+        res.status(500).json({ error: 'Internal server error', details: error.message });
     }
 };

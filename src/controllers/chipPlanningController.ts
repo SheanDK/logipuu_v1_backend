@@ -52,16 +52,13 @@ export const assignTitleToVehicle = async (req: Request, res: Response) => {
         let lahtoId = null;
         let purkuId = null;
 
-        // 1. Resolve Location and Title details
         if (order_id && order_id !== 0) {
-            // SUBS පවරන විට - Order එක හරහා සියලුම විස්තර ලබා ගනී
             const orderInfo = await chipPlanningService.getOrderDetails(Number(order_id));
             if (!orderInfo) return res.status(404).json({ error: 'Order link to title not found' });
             finalTitleId = orderInfo.title_id;
             lahtoId = orderInfo.lahto_paikka_id;
             purkuId = orderInfo.purku_paikka_id;
         } else if (title_id && title_id !== 0) {
-            // TITLES පවරන විට - සෘජුවම Title විස්තර ලබා ගනී
             const title = await chipPlanningService.getTitleDetails(Number(title_id));
             if (!title) return res.status(404).json({ error: 'Title not found' });
             lahtoId = title.lahto_paikka_id;
@@ -70,7 +67,6 @@ export const assignTitleToVehicle = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Either Title ID or Order ID is required' });
         }
 
-        // 2. Create the Load Record
         const newLoad = await chipPlanningService.createLoadRecord({
             program_id: Number(program_id),
             title_id: Number(finalTitleId),
@@ -88,7 +84,6 @@ export const assignTitleToVehicle = async (req: Request, res: Response) => {
     }
 };
 
-// අනෙකුත් functions එලෙසම පවතී
 export const dispatchRow = async (req: Request, res: Response) => {
     try {
         const { programId } = req.body;
@@ -123,9 +118,13 @@ export const deleteAssignedLoad = async (req: Request, res: Response) => {
     try {
         const { loadId } = req.params;
         await chipPlanningService.deleteLoadRecord(Number(loadId));
-        res.status(200).json({ success: true });
-    } catch (error) { res.status(500).json({ error: 'Internal server error' }); }
+        res.status(200).json({ success: true, message: 'Load deleted successfully' });
+    } catch (error: any) {
+        console.error("Delete Controller Error:", error.message);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 };
+
 
 export const updateAssignedLoad = async (req: Request, res: Response) => {
     try {
