@@ -22,27 +22,17 @@ const updateLocationInDatabase = async (
     longitude: number,
     timestamp: number
 ) => {
-    //
-    // IMPORTANT: Choose the correct identifier for your 'kalusto' table.
-    // Assuming 'rek_nro' (registration number) is the `vehicleId` sent from the frontend.
-    // If you send 'kalusto_nro', change the WHERE clause to `WHERE kalusto_nro = $1`.
-    //
-    // Also, ensure your 'kalusto' table has 'viim_sijainti_lat', 'viim_sijainti_long',
-    // and 'viim_sijainti_aika' columns.
-    //
     const query = `
         UPDATE public.kalusto
         SET
             viim_sijainti_lat = $2,
             viim_sijainti_long = $3,
-            viim_sijainti_aika = to_timestamp($4 / 1000.0) -- Convert JS timestamp (ms) to PostgreSQL timestamp
+            viim_sijainti_aika = to_timestamp($4 / 1000.0)
         WHERE rek_nro = $1;
     `;
 
-    // Log the database update action for debugging purposes.
     console.log(`DB_UPDATE: Updating location for vehicle [${vehicleId}] to [Lat: ${latitude}, Lng: ${longitude}]`);
-    
-    // Execute the query.
+
     await pool.query(query, [vehicleId, latitude, longitude, timestamp]);
 };
 
@@ -53,21 +43,16 @@ const updateLocationInDatabase = async (
  */
 export const updateVehicleLocationHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-        // 1. Get validated data from the previous middleware (validateDto).
         const dto = res.locals.validatedDto as UpdateLocationDto;
-        const user = req.user; // Get authenticated user details from the 'protect' middleware.
+        const user = req.user;
 
-        // 2. Prepare the data for database and socket emission.
-        // We use parseFloat to ensure latitude/longitude are numbers.
         const locationData = {
             vehicleId: dto.vehicleId,
             latitude: parseFloat(dto.latitude),
             longitude: parseFloat(dto.longitude),
-            timestamp: dto.timestamp || Date.now(), // Use provided timestamp or current time.
+            timestamp: dto.timestamp || Date.now(),
         };
 
-        // 3. Perform the database update.
-        // This is an async operation; we wait for it to complete.
         await updateLocationInDatabase(
             locationData.vehicleId,
             locationData.latitude,
@@ -75,22 +60,67 @@ export const updateVehicleLocationHandler = async (req: AuthenticatedRequest, re
             locationData.timestamp
         );
 
-        // 4. After a successful database update, emit the event via Socket.IO to all clients.
-        // This allows other users (e.g., dispatchers) to see the location change in real-time.
         socketService.emitLocationUpdate({
-            vehicleId: locationData.vehicleId, // Use the same identifier (e.g., registration number)
+            vehicleId: locationData.vehicleId,
             lat: locationData.latitude,
             lng: locationData.longitude,
             timestamp: locationData.timestamp,
-            updatedBy: user?.userId, // Optionally, include which user triggered the update.
+            updatedBy: user?.userId,
         });
-        
-        // 5. Send a success response back to the client who made the API request.
+
         res.status(200).json({ message: 'Location updated and broadcasted successfully.' });
 
     } catch (error) {
-        // 6. If any step fails, pass the error to the global error handler middleware.
         console.error("Error in updateVehicleLocationHandler:", error);
+        next(error);
+    }
+};
+
+export const createQuickPuulaaniHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { name, address, lat, lng, instructions, customer_ids } = req.body;
+
+        const primaryCustomerId = customer_ids && customer_ids.length > 0 ? customer_ids[0] : null;
+
+        if (!primaryCustomerId) {
+            res.status(400).json({ error: 'At least one customer must be selected.' });
+            return;
+        }
+
+        const query = `
+            INSERT INTO public.puulaani (asiakas_id, pvm, nimi, lisatiedot, sijainti_lat, sijainti_long, aktiivinen)
+            VALUES ($1, CURRENT_DATE, $2, $3, $4, $5, true)
+            RETURNING puulaani_id as id;
+        `;
+
+        const fullDetails = `${address || ''} ${instructions || ''}`;
+        const result = await pool.query(query, [primaryCustomerId, name, fullDetails, lat, lng]);
+
+        console.log("✅ Quick Loading Point Created:", result.rows[0].id);
+        res.status(201).json({ id: result.rows[0].id });
+    } catch (error) {
+        console.error("❌ DB ERROR in createQuickPuulaani:", error);
+        next(error);
+    }
+};
+
+export const createQuickPurkupaikkaHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { name, lat, lng, customer_ids } = req.body;
+        const primaryCustomerId = customer_ids && customer_ids.length > 0 ? customer_ids[0] : null;
+
+        const query = `
+            INSERT INTO public.purkupaikka (asiakas_id, purkupaikka, sijainti_lat, sijainti_long, is_active, is_visible_on_map)
+            VALUES ($1, $2, $3, $4, true, true)
+            RETURNING purkupaikka_id as id;
+        `;
+
+        const result = await pool.query(query, [primaryCustomerId, name, lat, lng]);
+
+        console.log("✅ Quick Unloading Point Created:", result.rows[0].id);
+        res.status(201).json({ id: result.rows[0].id });
+    } catch (error) {
+        console.error("❌ DB ERROR in createQuickPurkupaikka:", error);
         next(error);
     }
 };

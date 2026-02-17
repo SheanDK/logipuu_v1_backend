@@ -294,10 +294,16 @@ export const updateChipOrder = async (req: Request, res: Response) => {
 export const deleteChipOrder = async (req: Request, res: Response) => {
     try {
         const { orderId } = req.params;
-        const query = 'DELETE FROM public.chip_orders WHERE order_id = $1 RETURNING *;';
-        const result = await pool.query(query, [orderId]);
-        res.status(200).json(result.rows[0]);
+        await pool.query(`DELETE FROM public.chip_loads WHERE order_id = $1`, [orderId]);
+        const result = await pool.query(`DELETE FROM public.chip_orders WHERE order_id = $1`, [orderId]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        res.status(200).json({ success: true, message: 'Subscription deleted successfully' });
     } catch (error: any) {
-        res.status(500).json({ error: 'Internal server error', details: error.message });
+        console.error("Delete Order Error:", error.message);
+        res.status(500).json({ error: 'Internal server error' });
     }
 };

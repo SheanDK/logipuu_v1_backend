@@ -1,6 +1,7 @@
 //backend/src/controllers/chipPlanningController.ts
 import { Request, Response } from 'express';
 import { chipPlanningService } from '../services/chipPlanningService';
+import pool from '../config/db';
 
 export const getWeeklyPlanning = async (req: Request, res: Response) => {
     try {
@@ -139,6 +140,29 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
         const { loadId, newProgramId, newDate } = req.body;
         const result = await chipPlanningService.moveLoadRecord(Number(loadId), Number(newProgramId), newDate);
         res.status(200).json(result);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+export const createQuickArea = async (req: Request, res: Response) => {
+    try {
+        const { name, address, lat, lng, type, instructions } = req.body;
+
+        let query = "";
+        let values = [name, lat, lng];
+
+        if (type === 'puulaani') {
+            query = `INSERT INTO public.puulaani (nimi, lisatiedot, sijainti_lat, sijainti_long, aktiivinen, pvm) 
+                     VALUES ($1, $2, $3, $4, true, CURRENT_DATE) RETURNING puulaani_id as id`;
+            values = [name, address + " " + instructions, lat, lng];
+        } else {
+            query = `INSERT INTO public.purkupaikka (purkupaikka, sijainti_lat, sijainti_long, is_active) 
+                     VALUES ($1, $2, $3, true) RETURNING purkupaikka_id as id`;
+        }
+
+        const result = await pool.query(query, values);
+        res.status(201).json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Internal server error' });
     }

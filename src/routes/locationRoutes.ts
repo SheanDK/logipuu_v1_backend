@@ -4,20 +4,17 @@ import { protect } from '../middlewares/authMiddleware';
 import { authorize } from '../middlewares/rbacMiddleware';
 import { validateDto } from '../middlewares/validationMiddleware';
 import { UpdateLocationDto } from '../dto/location.dto';
-import { updateVehicleLocationHandler } from '../controllers/locationController'; // Ensure this points to the updated controller
+import {
+    updateVehicleLocationHandler,
+    createQuickPuulaaniHandler,
+    createQuickPurkupaikkaHandler
+} from '../controllers/locationController';
 
 const router = Router();
+const allowedRoles = ['Admin', 'Superuser'];
 
-// Define roles that are allowed to update vehicle locations
-// Typically drivers, or a system service if updates are automated
-const allowedUpdateRoles = ['Kuljettaja', 'Admin', 'Superuser']; // Adjust as per your application's roles
-
-router.post(
-    '/update',
-    protect, // Ensures the user is authenticated
-    authorize(allowedUpdateRoles), // Ensures the user has the required role
-    validateDto(UpdateLocationDto), // Validates the request body against the DTO
-    updateVehicleLocationHandler // The handler function in the controller
-);
+router.post('/update', protect, authorize(['Kuljettaja', 'Admin', 'Superuser']), validateDto(UpdateLocationDto), updateVehicleLocationHandler);
+router.post('/quick-puulaani', protect, authorize(allowedRoles), createQuickPuulaaniHandler);
+router.post('/quick-purkupaikka', protect, authorize(allowedRoles), createQuickPurkupaikkaHandler);
 
 export default router;
