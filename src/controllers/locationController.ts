@@ -124,3 +124,32 @@ export const createQuickPurkupaikkaHandler = async (req: AuthenticatedRequest, r
         next(error);
     }
 };
+
+/**
+ * Proxies address search to Nominatim to avoid CORS/User-Agent issues on the frontend.
+ */
+export const searchAddressHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { q } = req.query;
+        if (!q) {
+            res.status(400).json({ error: 'Search query is required.' });
+            return;
+        }
+
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(String(q))}&limit=1`, {
+            headers: {
+                'User-Agent': 'KuromaERP/1.0 (contact@kuroma.fi)'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Nominatim search failed with status ${response.status}`);
+        }
+
+        const data = await response.json();
+        res.status(200).json(data);
+    } catch (error: any) {
+        console.error("❌ Proxy Geocoding Error:", error.message);
+        res.status(500).json({ error: 'Geocoding failed', details: error.message });
+    }
+};
