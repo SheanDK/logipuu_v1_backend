@@ -4,17 +4,17 @@ import pool from '../config/db';
 
 // 1. Create Chip Order (Subscription)
 export const createChipOrder = async (req: Request, res: Response) => {
-    console.log("📥 [BACKEND] Received Payload:", req.body); // ලැබෙන දත්ත Terminal එකේ බලන්න
+    console.log("📥 [BACKEND] Received Payload:", req.body);
 
     try {
         const { title_id, start_date, target_qty, weekly_dist } = req.body;
 
-        // Validation පරීක්ෂා කිරීම
+        // Check Validation
         if (!title_id || isNaN(Number(title_id))) {
-            return res.status(400).json({ error: "පද්ධතියට Title ID එක ලැබී නැත. කරුණාකර නැවත තෝරන්න." });
+            return res.status(400).json({ error: "Title ID is required." });
         }
         if (!start_date) {
-            return res.status(400).json({ error: "ආරම්භක දිනය (Start Date) අනිවාර්ය වේ." });
+            return res.status(400).json({ error: "Start Date is required." });
         }
 
         const query = `

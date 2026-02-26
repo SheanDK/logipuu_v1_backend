@@ -1,27 +1,25 @@
 // backend/src/controllers/authController.ts
-import { Request, Response, NextFunction, RequestHandler } from 'express'; // RequestHandler import 
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import * as authService from '../services/authService';
 import { UserLoginDTO } from '../dto/auth.dto';
 
-// Ensure this function signature matches RequestHandler or an async equivalent
 export const loginUser: RequestHandler = async (req, res, next): Promise<void> => {
     try {
         const loginData: UserLoginDTO = req.body;
 
         if (!loginData.username || !loginData.password) {
             res.status(400).json({ message: 'Username and password are required' });
-            return; // Important: Exit after sending response
+            return;
         }
 
         const result = await authService.loginUserService(loginData);
         res.status(200).json(result);
-        // No return after this, function implicitly returns Promise<void>
     } catch (error: any) {
         console.error(`Login attempt failed for user ${req.body?.username || 'unknown'}: ${error.message}`);
         if (error.message === 'Invalid username or password' || error.message === 'User account is inactive') {
             res.status(401).json({ message: error.message });
-            return; // Important: Exit after sending response
+            return;
         }
-        next(error); // Pass to global error handler
+        next(error);
     }
 };

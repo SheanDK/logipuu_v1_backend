@@ -117,7 +117,7 @@ export const getAllChipTitles = async (req: Request, res: Response) => {
         `;
         const result = await pool.query(query);
 
-        // Debugging: Backend එකට දත්ත ලැබෙනවාදැයි පරීක්ෂා කිරීමට
+        // Debugging: data received in Backend
         console.log(`✅ [BACKEND] Fetched ${result.rows.length} titles`);
 
         res.status(200).json(result.rows);
