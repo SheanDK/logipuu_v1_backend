@@ -52,6 +52,7 @@ export const getActiveChipOrders = async (req: Request, res: Response) => {
                 TO_CHAR(co.start_date, 'DD.MM.YYYY') as "startDate",
                 TO_CHAR(co.end_date, 'DD.MM.YYYY') as "endDate",
                 co.target_qty as "targetQty", 
+                co.notes as "notes",
                 co.weekly_dist as "weeklyDistribution",
                 (SELECT COUNT(*) FROM public.chip_loads cl WHERE cl.order_id = co.order_id) as "scheduledCount"
             FROM public.chip_orders co
@@ -101,14 +102,27 @@ export const getWeeklyPlan = async (req: Request, res: Response) => {
 // 4. Schedule a New Load 
 export const scheduleChipLoad = async (req: Request, res: Response) => {
     try {
-        const { kalusto_nro, title_id, order_id, pvm } = req.body;
-        const query = `
-            INSERT INTO public.chip_loads (kalusto_nro, title_id, order_id, pvm, status)
-            VALUES ($1, $2, $3, $4, 'NOT_SENT') RETURNING *;
-        `;
-        const result = await pool.query(query, [kalusto_nro, title_id, order_id || null, pvm]);
-        res.status(201).json(result.rows[0]);
+        const { kalusto_nro, title_id, order_id, pvm, lahto_paikka, purku_paikka, planned_m3 } = req.body;
+
+        if (!kalusto_nro || !title_id || !pvm) {
+            return res.status(400).json({ error: 'kalusto_nro, title_id, and pvm are required' });
+        }
+
+        // We use chipPlanningService to handle serial_no and correct column names
+        const { chipPlanningService } = require('../services/chipPlanningService');
+        const newLoad = await chipPlanningService.createLoadRecord({
+            vehicle_number: Number(kalusto_nro),
+            title_id: Number(title_id),
+            order_id: order_id ? Number(order_id) : null,
+            scheduled_date: pvm,
+            loading_point_id: lahto_paikka ? Number(lahto_paikka) : null,
+            unloading_point_id: purku_paikka ? Number(purku_paikka) : null,
+            planned_m3: planned_m3 ? Number(planned_m3) : null
+        });
+
+        res.status(201).json(newLoad);
     } catch (error: any) {
+        console.error("Error in scheduleChipLoad:", error.message);
         res.status(500).json({ error: 'Internal server error' });
     }
 };

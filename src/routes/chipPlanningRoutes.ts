@@ -8,7 +8,10 @@ import {
     deleteAssignedLoad,
     moveAssignedLoad,
     addVehicleToPlan,
-    getChipMapData
+    getChipMapData,
+    renameGroup,
+    deleteGroup,
+    updateVehicleGroup
 } from '../controllers/chipPlanningController';
 
 const router = Router();
@@ -28,5 +31,11 @@ router.patch('/move-load', moveAssignedLoad);
 router.post('/add-vehicle', addVehicleToPlan);
 
 router.get('/map-data', getChipMapData);
+
+router.put('/rename-group', renameGroup);
+
+router.delete('/delete-group/:groupName', deleteGroup);
+
+router.put('/update-vehicle-group', updateVehicleGroup);
 
 export default router;

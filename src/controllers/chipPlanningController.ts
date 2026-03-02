@@ -113,3 +113,36 @@ export const getChipMapData = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
+
+// 9. Rename Group
+export const renameGroup = async (req: Request, res: Response) => {
+    try {
+        const { oldName, newName } = req.body;
+        await chipPlanningService.renameGroup(oldName, newName);
+        res.status(200).json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// 10. Delete Group
+export const deleteGroup = async (req: Request, res: Response) => {
+    try {
+        const { groupName } = req.params;
+        await chipPlanningService.deleteGroup(groupName as string);
+        res.status(200).json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// 11. Update Vehicle Group
+export const updateVehicleGroup = async (req: Request, res: Response) => {
+    try {
+        const { kalustoNro, groupName } = req.body;
+        await chipPlanningService.updateVehicleGroup(Number(kalustoNro), groupName);
+        res.status(200).json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};

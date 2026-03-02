@@ -5,34 +5,38 @@ export const chipPlanningService = {
     // 1. Get Weekly Planning Data
     getWeeklyPlanningData: async (week: number, year: number) => {
         const query = `
-            SELECT 
-                k.kalusto_nro as "kalustoNro", 
-                k.rek_nro as "rekNro", 
-                cl.load_id as "loadId", 
-                cl.order_id as "orderId",
-                TO_CHAR(cl.scheduled_date, 'YYYY-MM-DD') as "date", 
-                cl.status, 
-                cl.serial_no as "serialNo",
-                cl.actual_m3 as "actualM3",
-                cl.actual_ton as "actualTon",
-                cl.actual_details as "driverNotes",
-                COALESCE(ct.title_name, '') as "titleName", 
-                COALESCE(ct.abbreviation, '') as "abbreviation"
-            FROM public.kalusto k
-            LEFT JOIN public.chip_loads cl ON k.kalusto_nro = cl.vehicle_number 
-                AND EXTRACT(WEEK FROM cl.scheduled_date) = $1 
-                AND EXTRACT(YEAR FROM cl.scheduled_date) = $2
-            LEFT JOIN public.chip_titles ct ON cl.title_id = ct.title_id
-            WHERE k.aktiivinen = true
-            ORDER BY k.rek_nro, cl.scheduled_date, cl.serial_no;
-        `;
+        SELECT 
+            k.kalusto_nro as "kalustoNro", 
+            k.rek_nro as "rekNro", 
+            k.planning_group as "planning_group",
+            cl.load_id as "loadId", 
+            cl.order_id as "orderId",
+            TO_CHAR(cl.scheduled_date, 'YYYY-MM-DD') as "date", 
+            cl.status, 
+            cl.serial_no as "serialNo",
+            cl.actual_m3 as "actualM3",
+            cl.actual_ton as "actualTon",
+            cl.actual_details as "driverNotes",
+            COALESCE(ct.title_name, '') as "titleName", 
+            COALESCE(ct.abbreviation, '') as "abbreviation",
+            co.target_qty as "targetQty", 
+            co.weekly_dist as "weeklyDist"  
+        FROM public.kalusto k
+        LEFT JOIN public.chip_loads cl ON k.kalusto_nro = cl.vehicle_number 
+            AND EXTRACT(WEEK FROM cl.scheduled_date) = $1 
+            AND EXTRACT(YEAR FROM cl.scheduled_date) = $2
+        LEFT JOIN public.chip_titles ct ON cl.title_id = ct.title_id
+        LEFT JOIN public.chip_orders co ON cl.order_id = co.order_id
+        WHERE k.aktiivinen = true
+        ORDER BY k.rek_nro, cl.scheduled_date, cl.serial_no;
+    `;
         const result = await pool.query(query, [week, year]);
         return result.rows;
     },
 
     // 2. Create Load Record
     createLoadRecord: async (payload: any) => {
-        const { vehicle_number, title_id, order_id, scheduled_date } = payload;
+        const { vehicle_number, title_id, order_id, scheduled_date, loading_point_id, unloading_point_id, planned_m3 } = payload;
 
         const seqRes = await pool.query(
             `SELECT COALESCE(MAX(serial_no), -1) + 1 as next_seq 
@@ -42,12 +46,19 @@ export const chipPlanningService = {
         );
         const nextSerial = seqRes.rows[0].next_seq;
 
+        // NOTE: We only insert confirmed columns. If loading_point_id etc. are verified to exist, they can be added here.
         const query = `
             INSERT INTO public.chip_loads (vehicle_number, title_id, order_id, scheduled_date, serial_no, status)
             VALUES ($1, $2, $3, $4, $5, 'NOT_SENT')
             RETURNING *;
         `;
-        const result = await pool.query(query, [vehicle_number, title_id, order_id || null, scheduled_date, nextSerial]);
+        const result = await pool.query(query, [
+            vehicle_number,
+            title_id,
+            order_id || null,
+            scheduled_date,
+            nextSerial
+        ]);
         return result.rows[0];
     },
 
@@ -131,5 +142,20 @@ export const chipPlanningService = {
         `;
         const result = await pool.query(query, [kalustoNro, week, year]);
         return result.rows;
+    },
+
+    // Rename Group (Update all vehicles in that group)
+    renameGroup: async (oldName: string, newName: string) => {
+        await pool.query(`UPDATE public.kalusto SET planning_group = $1 WHERE planning_group = $2`, [newName, oldName]);
+    },
+
+    // Delete Group (Reset those vehicles to 'General')
+    deleteGroup: async (groupName: string) => {
+        await pool.query(`UPDATE public.kalusto SET planning_group = 'General' WHERE planning_group = $1`, [groupName]);
+    },
+
+    // Add vehicle to group
+    updateVehicleGroup: async (kalustoNro: number, groupName: string) => {
+        await pool.query(`UPDATE public.kalusto SET planning_group = $1 WHERE kalusto_nro = $2`, [groupName, kalustoNro]);
     }
 };
