@@ -2,6 +2,7 @@
 import pool from '../config/db';
 import { chipQueries } from '../queries/chipQueries/chipQueries';
 
+// --- CHIP ORDER SERVICE ---
 export const chipOrderService = {
     getActive: async () => {
         const res = await pool.query(chipQueries.getActiveOrders);
