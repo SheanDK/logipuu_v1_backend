@@ -1,4 +1,6 @@
 // backend/src/queries/waybillQueries/createWaybillQueries.ts
+
+// 1. INSERT_WAYBILL
 export const INSERT_WAYBILL = `
     INSERT INTO public.rahtikirja (
         pvm, kuorma_id, rahtikirjan_nro, reitti, m3, m3_hinta, km, km_hinta,

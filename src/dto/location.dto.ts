@@ -2,21 +2,22 @@
 import { IsNotEmpty, IsString, IsLatitude, IsLongitude, IsNumber, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
+// 1. --- UPDATE LOCATION DTO ---
 export class UpdateLocationDto {
-    @IsString() // Or IsNumber, depending on how vehicleId is represented
+    @IsString()
     @IsNotEmpty()
-    vehicleId!: string; // This could be KalustoNro (vehicleNo) or RekNro (registrationNo)
+    vehicleId!: string;
 
     @IsLatitude()
     @IsNotEmpty()
-    latitude!: string; // Frontend might send as string
+    latitude!: string;
 
     @IsLongitude()
     @IsNotEmpty()
-    longitude!: string; // Frontend might send as string
+    longitude!: string;
 
     @IsNumber()
     @IsOptional()
     @Type(() => Number)
-    timestamp?: number; // Optional: Timestamp of the location update
+    timestamp?: number;
 }

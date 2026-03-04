@@ -1,44 +1,41 @@
 // backend/src/routes/clientRoutes.ts
 import { Router } from 'express';
-import * as clientController from '../controllers/clientController'; 
-import { protect } from '../middlewares/authMiddleware'; 
+import * as clientController from '../controllers/clientController';
+import { protect } from '../middlewares/authMiddleware';
 import { authorize } from '../middlewares/rbacMiddleware';
 import { validateDto } from '../middlewares/validationMiddleware';
-import { CreateClientDto, UpdateClientDto } from '../dto/client.dto'; 
+import { CreateClientDto, UpdateClientDto } from '../dto/client.dto';
 
 const router = Router();
 
-// --- Define Roles ---
+// 1. Define Roles
 const officeRoles = ['Superuser', 'Admin', 'Office', 'Ajojärjestelijä'];
 const driverRoles = ['Kuljettaja'];
-// A combined list for routes accessible by both
 const allStaffRoles = [...officeRoles, ...driverRoles];
 
-// --- Define Permissions ---
+// 2. Define Permissions
 const VIEW_CLIENT_PERMISSION = ['clients_view'];
 const CREATE_CLIENT_PERMISSION = ['clients_create'];
 const EDIT_CLIENT_PERMISSION = ['clients_edit'];
 const DELETE_CLIENT_PERMISSION = ['clients_delete'];
 
-// Get check if color is already in use
+// 3. Get check if color is already in use
 router.get(
-  '/check-color',
-  protect,
-  authorize(allStaffRoles, VIEW_CLIENT_PERMISSION),
-  clientController.checkColorExistsHandler
+    '/check-color',
+    protect,
+    authorize(allStaffRoles, VIEW_CLIENT_PERMISSION),
+    clientController.checkColorExistsHandler
 );
 
-// GET all clients: Requires 'clients_view' permission, accessible by all staff
+// 4. GET all clients: Requires 'clients_view' permission, accessible by all staff
 router.get(
     '/',
-    protect, 
-    // --- THIS IS THE FIX ---
-    // Pass both the roles and the permission for a more robust check.
-    authorize(allStaffRoles, VIEW_CLIENT_PERMISSION), 
+    protect,
+    authorize(allStaffRoles, VIEW_CLIENT_PERMISSION),
     clientController.getAllClientsHandler
 );
 
-// GET client by ID: Also requires 'clients_view' permission, accessible by all staff
+// 5. GET client by ID: Also requires 'clients_view' permission, accessible by all staff
 router.get(
     '/:id',
     protect,
@@ -46,16 +43,16 @@ router.get(
     clientController.getClientByIdHandler
 );
 
-// POST a new client: Restricted to office roles with create permission
+// 6. POST a new client: Restricted to office roles with create permission
 router.post(
     '/',
     protect,
-    authorize(officeRoles, CREATE_CLIENT_PERMISSION), 
+    authorize(officeRoles, CREATE_CLIENT_PERMISSION),
     validateDto(CreateClientDto),
     clientController.createClientHandler
 );
 
-// PUT to update a client: Restricted to office roles with edit permission
+// 7. PUT to update a client: Restricted to office roles with edit permission
 router.put(
     '/:id',
     protect,
@@ -64,7 +61,7 @@ router.put(
     clientController.updateClientHandler
 );
 
-// DELETE a client: Restricted to office roles with delete permission
+// 8. DELETE a client: Restricted to office roles with delete permission
 router.delete(
     '/:id',
     protect,

@@ -16,6 +16,7 @@ import * as getQueries from '../queries/timberStackQueries/getTimberStackQueries
 import * as createQueries from '../queries/timberStackQueries/createTimberStackQueries';
 import * as updateQueries from '../queries/timberStackQueries/updateTimberStackQueries';
 
+// 1. Fetches all timber stacks with optional filtering.
 export const getAllTimberStacks = async (filters: ITimberStackFilters): Promise<ITimberStack[]> => {
 
     console.log('--- Service received filters:', filters);
@@ -114,11 +115,13 @@ export const getAllTimberStacks = async (filters: ITimberStackFilters): Promise<
     }
 };
 
+// 2. Fetches a single timber stack by its ID.
 export const getTimberStackById = async (id: number): Promise<ITimberStack | null> => {
     const result = await pool.query(getQueries.SELECT_TIMBER_STACK_BY_ID, [id]);
     return result.rows.length > 0 ? result.rows[0] : null;
 };
 
+// 3. Creates a new timber stack with associated vehicles and wood entries.
 export const createTimberStack = async (data: CreateTimberStackDto): Promise<ITimberStack> => {
     const client = await pool.connect();
     try {
@@ -181,7 +184,7 @@ export const createTimberStack = async (data: CreateTimberStackDto): Promise<ITi
     }
 };
 
-// --- getTimberStackFullDetails ---
+// 4. Fetches detailed information for a specific timber stack, including associated vehicles and wood entries.
 export const getTimberStackFullDetails = async (id: number): Promise<IPuulaaniFullDetails | null> => {
     const client = await pool.connect();
     try {
@@ -235,6 +238,7 @@ export const getTimberStackFullDetails = async (id: number): Promise<IPuulaaniFu
     }
 };
 
+// 5. Updates a timber stack with associated vehicles and wood entries.
 
 export const updateTimberStackFull = async (id: number, data: IUpdateTimberStackFullDto): Promise<void> => {
     const client = await pool.connect();
@@ -350,6 +354,7 @@ export const updateTimberStackFull = async (id: number, data: IUpdateTimberStack
     }
 };
 
+// 6. Deactivates a timber stack.
 export const deactivateTimberStack = async (id: number): Promise<{ puulaaniId: number; message: string } | null> => {
     try {
         const result = await pool.query(updateQueries.DEACTIVATE_TIMBER_STACK_BY_ID, [id]);
@@ -371,6 +376,7 @@ export const deactivateTimberStack = async (id: number): Promise<{ puulaaniId: n
     }
 };
 
+// 7. Updates the location of a timber stack.
 export const updateTimberStackLocation = async (id: number, data: UpdateTimberStackLocationDto) => {
     const { latitude, longitude } = data;
     const result = await pool.query(updateQueries.UPDATE_TIMBER_STACK_LOCATION, [latitude, longitude, id]);
@@ -381,6 +387,7 @@ export const updateTimberStackLocation = async (id: number, data: UpdateTimberSt
     return result.rows[0];
 };
 
+// 8. Fetches a paginated list of timber stacks with optional filtering.
 export const getTimberStackList = async (filters: ITimberStackListFilters): Promise<ITimberStackListItem[]> => {
 
     const queryText = `
@@ -452,6 +459,7 @@ export const getTimberStackList = async (filters: ITimberStackListFilters): Prom
     }
 };
 
+// 9. Fetches timber types for a specific timber stack.
 export const getTimberTypesForStack = async (id: number): Promise<any[]> => {
     const query = `
         SELECT 
@@ -473,6 +481,7 @@ export const getTimberTypesForStack = async (id: number): Promise<any[]> => {
     }
 };
 
+// 10. Fetches active timber stacks for a specific client.
 export const getActiveTimberStacksByClient = async (clientId: number) => {
     console.log(`--- Fetching ACTIVE timber stacks for client ID: ${clientId} ---`);
     const query = `
@@ -497,6 +506,7 @@ export const getActiveTimberStacksByClient = async (clientId: number) => {
     }
 };
 
+// 11. Fetches wood entries for a specific timber stack.
 export const getWoodEntriesByPuulaaniId = async (puulaaniId: number) => {
     const query = `
         SELECT DISTINCT ON (pl.puutavara_id)

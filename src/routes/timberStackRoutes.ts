@@ -8,7 +8,7 @@ import { validateDto } from '../middlewares/validationMiddleware';
 
 const router = Router();
 
-// Define Roles and Permissions
+// 1. Define Roles and Permissions
 const officeRoles = ['Superuser', 'Admin', 'Office', 'Ajärjestelijä'];
 const driverRoles = ['Kuljettaja'];
 const allStaffRoles = [...officeRoles, ...driverRoles];
@@ -17,9 +17,9 @@ const TIMBER_MAP_CREATE = ['timber map_create'];
 const TIMBER_MAP_EDIT = ['timber map_edit'];
 const TIMBER_MAP_DELETE = ['timber map_delete'];
 
-// --- ROUTES ---
+// 2. ROUTES
 
-// Main list for map view (accepts query params like ?clientId=1)
+// Main list for map view 
 router.get('/',
     protect,
     authorize(allStaffRoles, TIMBER_MAP_VIEW),
@@ -27,13 +27,11 @@ router.get('/',
 );
 
 // The route for getting active stacks for a specific client.
-// The `:clientId` makes it a URL parameter, which is what the controller expects.
 router.get('/active/by-client/:clientId',
     protect,
-    authorize(driverRoles), // Assuming only drivers need this for the create/edit form
+    authorize(driverRoles),
     timberStackController.getActiveTimberStacksByClientHandler
 );
-// ------------------------------------
 
 // Get the list of wood entries/tasks for a specific Puulaani
 router.get('/:id/wood-entries',
@@ -60,7 +58,7 @@ router.put('/:id/full',
 router.patch('/:id/location',
     protect,
     authorize(officeRoles, TIMBER_MAP_EDIT),
-    timberStackController.updateLocationHandler 
+    timberStackController.updateLocationHandler
 );
 
 // Get a single stack by its ID

@@ -13,9 +13,9 @@ const VIEW_VEHICLE_PERMISSION = ['vehicles_view'];
 const CREATE_VEHICLE_PERMISSION = ['vehicles_create'];
 const EDIT_VEHICLE_PERMISSION = ['vehicles_edit'];
 const DELETE_VEHICLE_PERMISSION = ['vehicles_delete'];
-const officeRoles = ['Superuser', 'Admin', 'Office']; // Roles that can use check-reg-no
+const officeRoles = ['Superuser', 'Admin', 'Office'];
 
-// This route can be restricted to office staff roles or a specific permission
+// 1. GET Routes
 router.get('/check-reg-no', protect, authorize(officeRoles), vehicleController.checkRegistrationNoExistsHandler);
 
 // GET all vehicles: Requires 'vehicle_view' permission

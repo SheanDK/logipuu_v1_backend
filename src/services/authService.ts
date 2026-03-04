@@ -10,6 +10,7 @@ const JWT_SECRET: Secret = process.env.JWT_SECRET || 'your_fallback_secret_for_d
 type JwtTimeString = `${number}${'s' | 'm' | 'h' | 'd'}`;
 const ACCESS_TOKEN_EXPIRES_IN_CONFIG: string = process.env.ACCESS_TOKEN_EXPIRES_IN || '8h';
 
+// --- LOGIN OPERATION ---
 export const loginUserService = async (loginData: UserLoginDTO) => {
     const { username, password } = loginData;
 
@@ -21,7 +22,6 @@ export const loginUserService = async (loginData: UserLoginDTO) => {
 
     const userFromDb = userResult.rows[0];
 
-    // The database pool now handles camelCasing automatically.
     console.log("--- CAMELCASED OBJECT (after pool transform) ---", userFromDb);
 
     if (!userFromDb.salasana) {

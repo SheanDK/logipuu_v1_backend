@@ -3,6 +3,7 @@ import { Request, Response, NextFunction, RequestHandler } from 'express';
 import * as authService from '../services/authService';
 import { UserLoginDTO } from '../dto/auth.dto';
 
+// Login handler
 export const loginUser: RequestHandler = async (req, res, next): Promise<void> => {
     try {
         const loginData: UserLoginDTO = req.body;

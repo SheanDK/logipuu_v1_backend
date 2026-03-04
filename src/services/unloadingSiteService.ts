@@ -5,25 +5,27 @@ import { CreateUnloadingSiteDto, UpdateUnloadingSiteDto } from '../dto/unloading
 import * as getQueries from '../queries/unloadingSiteQueries/getUnloadingSiteQueries';
 import * as createQueries from '../queries/unloadingSiteQueries/createUnloadingSiteQueries';
 import * as updateQueries from '../queries/unloadingSiteQueries/updateUnloadingSiteQueries';
-// We are no longer using the hard delete queries from here
-// import * as deleteQueries from '../queries/unloadingSiteQueries/deleteUnloadingSiteQueries';
 
+// 1. Fetches all unloading sites.
 export const getAllUnloadingSites = async (): Promise<IUnloadingSite[]> => {
     const result = await pool.query(getQueries.SELECT_ALL_UNLOADING_SITES);
     return result.rows;
 };
 
+// 2. Fetches an unloading site by its ID.
 export const getUnloadingSiteById = async (id: number): Promise<IUnloadingSite | null> => {
     const result = await pool.query(getQueries.SELECT_UNLOADING_SITE_BY_ID, [id]);
     if (result.rows.length === 0) return null;
     return result.rows[0];
 };
 
+// 3. Fetches unloading sites for a specific client.
 export const getUnloadingSitesByClientId = async (clientId: number): Promise<IUnloadingSite[]> => {
     const result = await pool.query(getQueries.SELECT_UNLOADING_SITES_BY_CLIENT_ID, [clientId]);
     return result.rows;
 };
 
+// 4. Creates a new unloading site.
 export const createUnloadingSite = async (data: CreateUnloadingSiteDto): Promise<IUnloadingSite> => {
     const checkQuery = `
         SELECT 1 
@@ -50,6 +52,7 @@ export const createUnloadingSite = async (data: CreateUnloadingSiteDto): Promise
     throw new Error('Unloading site creation failed.');
 };
 
+// 5. Updates an unloading site.
 export const updateUnloadingSite = async (id: number, data: UpdateUnloadingSiteDto): Promise<IUnloadingSite | null> => {
     const existing = await getUnloadingSiteById(id);
     if (!existing || !existing.isActive) return null; // Can't update an inactive site
@@ -65,7 +68,7 @@ export const updateUnloadingSite = async (id: number, data: UpdateUnloadingSiteD
     return getUnloadingSiteById(id);
 };
 
-
+// 6. Soft deletes an unloading site.
 export const deleteUnloadingSite = async (id: number): Promise<{ purkupaikkaId: number; message: string } | null> => {
 
     console.log(`--- Performing SOFT DELETE for unloading site ID: ${id} ---`);
@@ -91,7 +94,7 @@ export const deleteUnloadingSite = async (id: number): Promise<{ purkupaikkaId: 
     }
 };
 
-
+// 7. Updates the visibility of an unloading site on the map.
 export const updateUnloadingSiteVisibility = async (id: number, isVisible: boolean): Promise<IUnloadingSite | null> => {
     const query = 'UPDATE public.purkupaikka SET is_visible_on_map = $1 WHERE purkupaikka_id = $2 RETURNING *';
 

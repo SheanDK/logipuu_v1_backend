@@ -7,7 +7,6 @@ import pool from '../config/db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_for_dev_change_this';
 
-// Singleton class to manage the Socket.IO server instance
 class SocketService {
     emit(arg0: string, updatedLoad: any) {
         throw new Error('Method not implemented.');
@@ -15,7 +14,7 @@ class SocketService {
     private static instance: SocketService;
     private io: Server | null = null;
 
-    private constructor() {}
+    private constructor() { }
 
     public static getInstance(): SocketService {
         if (!SocketService.instance) {
@@ -24,22 +23,18 @@ class SocketService {
         return SocketService.instance;
     }
 
-    /**
-     * Initializes the Socket.IO server with CORS options.
-     * @param httpServer The HTTP server instance from Express.
-     * @param frontendUrl The allowed origin for CORS.
-     */
+    // Initializes the Socket.IO server with CORS options.
+    // @param httpServer The HTTP server instance from Express.
+    // @param frontendUrl The allowed origin for CORS.
     public initialize(httpServer: HttpServer, frontendUrl: string): void {
         if (this.io) {
             console.warn("Socket.IO server is already initialized.");
             return;
         }
 
-        // --- THE FIX IS HERE ---
-        // Initialize the Server with a configuration object that includes CORS settings.
         this.io = new Server(httpServer, {
             cors: {
-                origin: frontendUrl, // Use the provided frontend URL for the origin
+                origin: frontendUrl,
                 methods: ["GET", "POST"]
             }
         });
@@ -48,7 +43,7 @@ class SocketService {
 
         this.io.on('connection', (socket: Socket) => {
             console.log(`🔌 New client connected: ${socket.id}`);
-            
+
             try {
                 const { token, vehicleId } = socket.handshake.auth;
 
@@ -60,7 +55,7 @@ class SocketService {
                 if (!decoded.driverNumericId) {
                     throw new Error("Token is invalid for a tracking session (missing driver ID)");
                 }
-                
+
                 (socket as any).user = {
                     ...decoded,
                     kalustoNro: parseInt(vehicleId, 10)
@@ -88,16 +83,14 @@ class SocketService {
         });
     }
 
-    /**
-     * Private helper to encapsulate event listeners for an authenticated socket.
-     */
-     private handleLocationUpdates(socket: Socket): void {
+    // Private helper to encapsulate event listeners for an authenticated socket.
+    private handleLocationUpdates(socket: Socket): void {
         socket.on('updateLocation', (coords: { lat: number; lng: number }) => {
             const user = (socket as any).user as UserPayload;
             if (!user || !user.kalustoNro) return;
 
             console.log(`📍 Received location from Driver ${user.driverNumericId} for Vehicle ${user.kalustoNro}:`, coords);
-            
+
             this.updateVehicleLocationInDb(user.kalustoNro, coords.lat, coords.lng);
 
             const locationPayload = {
@@ -111,9 +104,7 @@ class SocketService {
         });
     }
 
-    /**
-     * Updates the vehicle's last known location in the 'kalusto' table.
-     */
+    // Updates the vehicle's last known location in the 'kalusto' table.
     private async updateVehicleLocationInDb(vehicleId: number, lat: number, lng: number): Promise<void> {
         const query = `
             UPDATE public.kalusto
@@ -131,6 +122,7 @@ class SocketService {
         }
     }
 
+    // Emits the location update to all connected dispatchers.
     public emitLocationUpdate(locationPayload: any) {
         if (this.io) {
             this.io.to('dispatchers').emit('newDriverLocation', locationPayload);
@@ -138,6 +130,7 @@ class SocketService {
         }
     }
 
+    // Returns the Socket.IO server instance.
     public getIO(): Server {
         if (!this.io) {
             throw new Error("Socket.IO not initialized. Call initialize() first.");

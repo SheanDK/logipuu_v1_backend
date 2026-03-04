@@ -1,4 +1,4 @@
-// backend/src/queries/unloadingSiteQueries/index.ts (නව file එක)
+// backend/src/queries/unloadingSiteQueries/index.ts
 export * from './createUnloadingSiteQueries';
 export * from './deleteUnloadingSiteQueries';
 export * from './getUnloadingSiteQueries';

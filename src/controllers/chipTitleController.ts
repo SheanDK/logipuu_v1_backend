@@ -83,6 +83,7 @@ export const createChipTitle = async (req: Request, res: Response) => {
     }
 };
 
+// 2. Get All Chip Titles
 export const getAllChipTitles = async (req: Request, res: Response) => {
     try {
         const query = `
@@ -127,8 +128,7 @@ export const getAllChipTitles = async (req: Request, res: Response) => {
     }
 };
 
-
-
+// 3. Update Chip Title
 export const updateChipTitle = async (req: Request, res: Response) => {
     console.log("📥 [BACKEND] Received Update Request. Body:", req.body);
     try {

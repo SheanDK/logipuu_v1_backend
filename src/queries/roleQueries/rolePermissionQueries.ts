@@ -1,5 +1,6 @@
 // backend/src/queries/rolePermissionQueries.ts
 
+// 1. SELECT_ALL_ROLES_WITH_PERMISSIONS
 export const SELECT_ALL_ROLES_WITH_PERMISSIONS = `
     SELECT
         r.rooli_id as "rooliId",
@@ -14,15 +15,16 @@ export const SELECT_ALL_ROLES_WITH_PERMISSIONS = `
     GROUP BY r.rooli_id, r.roolin_nimi ORDER BY r.rooli_id;
 `;
 
+// 2. SELECT_ALL_PERMISSIONS
 export const SELECT_ALL_PERMISSIONS = `
     SELECT permission_id as "permissionId", permission_name as "permissionName", description, category
     FROM public.permissions ORDER BY permission_name;
 `;
 
+// 3. DELETE_PERMISSIONS_FOR_ROLE
 export const DELETE_PERMISSIONS_FOR_ROLE = `DELETE FROM public.role_permissions WHERE rooli_id = $1;`;
 
-// <<<--- CORRECTED AND SIMPLIFIED QUERY ---<<<
-// This query now directly accepts the permission ID.
+// 4. INSERT_PERMISSION_FOR_ROLE
 export const INSERT_PERMISSION_FOR_ROLE = `
     INSERT INTO public.role_permissions (rooli_id, permission_id)
     VALUES ($1, $2) ON CONFLICT DO NOTHING;

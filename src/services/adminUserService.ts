@@ -22,7 +22,7 @@ export const adminGetUserByTunnus = async (username: string) => {
 
 
 // --- CREATE OPERATION ---
-export const adminCreateNewUser = async (data: any) => { // data is the data from the frontend
+export const adminCreateNewUser = async (data: any) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -92,9 +92,6 @@ export const adminUpdateUser = async (tunnus: string, data: AdminUpdateUserDto) 
 
         await client.query('COMMIT');
 
-        // --- KEY CORRECTION IS HERE ---
-        // Always return the result of fetching the user.
-        // This function returns a user object or null, ensuring the return type is not void.
         return adminGetUserByTunnus(tunnus);
 
     } catch (error: any) {
@@ -106,7 +103,7 @@ export const adminUpdateUser = async (tunnus: string, data: AdminUpdateUserDto) 
     }
 };
 
-// --- DELETE OPERATION --- (No changes needed)
+// --- DELETE OPERATION ---
 export const adminDeleteUser = async (tunnus: string) => {
     const client = await pool.connect();
     try {

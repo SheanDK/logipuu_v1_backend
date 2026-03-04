@@ -4,6 +4,7 @@ import * as waybillService from '../services/waybillService';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import { CreateWaybillDto, UpdateWaybillDto } from '../dto/waybill.dto';
 
+// 1. --- GET ALL WAYBILLS ---
 export const getAllWaybillsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const waybills = await waybillService.getAllWaybills();
@@ -11,6 +12,7 @@ export const getAllWaybillsHandler = async (req: AuthenticatedRequest, res: Resp
     } catch (error) { next(error); }
 };
 
+// 2. --- GET WAYBILL BY ID ---
 export const getWaybillByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -21,6 +23,7 @@ export const getWaybillByIdHandler = async (req: AuthenticatedRequest, res: Resp
     } catch (error) { next(error); }
 };
 
+// 3. --- CREATE WAYBILL ---
 export const createWaybillHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const dto = req.body as CreateWaybillDto;
@@ -29,6 +32,7 @@ export const createWaybillHandler = async (req: AuthenticatedRequest, res: Respo
     } catch (error) { next(error); }
 };
 
+// 4. --- UPDATE WAYBILL ---
 export const updateWaybillHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -40,6 +44,7 @@ export const updateWaybillHandler = async (req: AuthenticatedRequest, res: Respo
     } catch (error) { next(error); }
 };
 
+// 5. --- DELETE WAYBILL ---
 export const deleteWaybillHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);

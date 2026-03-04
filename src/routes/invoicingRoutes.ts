@@ -6,17 +6,17 @@ import { authorize } from '../middlewares/rbacMiddleware';
 
 const router = Router();
 
-// Healthcheck for connectivity/debugging
+// 1. Healthcheck for connectivity/debugging
 router.get('/__ping', (_req, res) => {
   console.log('[PING] /api/invoicing/__ping hit');
   res.json({ ok: true });
 });
 
-// Permissions required to see invoicing data
+// 2. Permissions required to see invoicing data
 const VIEW_INVOICING_PERMISSION = ['puulaani invoicing_view'];
 const EDIT_INVOICING_PERMISSION = ['puulaani invoicing_edit'];
 
-// Protected search endpoint
+// 3. Protected search endpoint
 router.get(
   '/search',
   protect,
@@ -24,15 +24,15 @@ router.get(
   invoicingController.searchInvoicingHandler
 );
 
-// update endpoint
+// 4. update endpoint
 router.patch(
-  '/:id', 
-  protect, 
-  authorize(EDIT_INVOICING_PERMISSION ),  
+  '/:id',
+  protect,
+  authorize(EDIT_INVOICING_PERMISSION),
   invoicingController.updateInvoicingHandler
 );
 
-// Post change billing status
+// 5. Post change billing status
 router.post(
   '/invoice',
   protect,

@@ -1,21 +1,13 @@
 // backend/src/queries/loadQueries.ts
 
-
-// backend/src/queries/loadQueries/index.ts OR getLoadQueries.ts
-
+// 1. SELECT_ALL_LOADS_FOR_LIST
 export const SELECT_ALL_LOADS_FOR_LIST = `
     SELECT
         k.kuorma_id,
         TO_CHAR(k.pvm, 'YYYY-MM-DD') AS pvm,
         a.asiakkaan_nimi,
         COALESCE(p.nimi, k.lahto, 'N/A') AS lahto,
-        
-        -- --- THIS IS THE ROBUST FIX ---
-        -- 1. Try to get the destination name via the JOINED puutavaralaji -> purkupaikka table.
-        -- 2. If that fails (e.g., it's a non-timber load), fall back to the text in kuorma.kohde.
-        -- 3. If both are null, show 'N/A'.
         COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
-        
         kal.rek_nro,
         kul.nimi AS kuljettajan_nimi,
         CASE
@@ -34,7 +26,6 @@ export const SELECT_ALL_LOADS_FOR_LIST = `
         public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
     LEFT JOIN
         public.kuljettajat kul ON k.kulj_id = kul.kulj_id
-    -- --- ADD THESE TWO CRITICAL JOINS ---
     LEFT JOIN
         public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
     LEFT JOIN 

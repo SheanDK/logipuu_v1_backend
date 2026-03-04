@@ -1,4 +1,6 @@
 // backend/src/queries/waybillQueries/updateWaybillQueries.ts
+
+// 1. UPDATE_WAYBILL_BY_ID
 export const UPDATE_WAYBILL_BY_ID = `
     UPDATE public.rahtikirja
     SET

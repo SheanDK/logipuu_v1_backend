@@ -1,15 +1,13 @@
 // backend/src/services/vehicleService.ts
 import pool from '../config/db';
 import { CreateVehicleDto, UpdateVehicleDto } from '../dto/vehicle.dto';
-import { IVehicle } from '../types/vehicle.types'; // Import the IVehicle interface
-
-// Import queries from the index file for consistency
+import { IVehicle } from '../types/vehicle.types';
 import * as vehicleQueries from '../queries/vehicleQueries';
 
+// 1. Fetches all vehicles.
 export const getAllVehicles = async (): Promise<IVehicle[]> => {
     try {
         const result = await pool.query(vehicleQueries.SELECT_ALL_VEHICLES);
-        // The camelcase-keys middleware handles the conversion automatically
         return result.rows as IVehicle[];
     } catch (error) {
         console.error("VEHICLE_SERVICE: Error fetching all vehicles:", error);
@@ -17,6 +15,7 @@ export const getAllVehicles = async (): Promise<IVehicle[]> => {
     }
 };
 
+// 2. Fetches a vehicle by its ID.
 export const getVehicleById = async (id: number): Promise<IVehicle | null> => {
     try {
         const result = await pool.query(vehicleQueries.SELECT_VEHICLE_BY_ID, [id]);
@@ -30,7 +29,7 @@ export const getVehicleById = async (id: number): Promise<IVehicle | null> => {
     }
 };
 
-
+// 3. Creates a new vehicle.
 export const createVehicle = async (vehicleData: CreateVehicleDto): Promise<IVehicle> => {
     const { registrationNo, previousInspectionDate, nextInspectionDate, isActive } = vehicleData;
     try {
@@ -47,14 +46,14 @@ export const createVehicle = async (vehicleData: CreateVehicleDto): Promise<IVeh
     }
 };
 
+// 4. Updates a vehicle.
 export const updateVehicle = async (id: number, vehicleData: UpdateVehicleDto): Promise<IVehicle | null> => {
     try {
         const existingVehicle = await getVehicleById(id);
         if (!existingVehicle) {
-            return null; // Vehicle not found
+            return null;
         }
 
-        // Merge new data with existing data. `existingVehicle` is already typed as IVehicle.
         const updatedData = {
             registrationNo: vehicleData.registrationNo ?? existingVehicle.registrationNo,
             previousInspectionDate: vehicleData.previousInspectionDate
@@ -80,13 +79,13 @@ export const updateVehicle = async (id: number, vehicleData: UpdateVehicleDto): 
     }
 };
 
+// 5. Soft deletes a vehicle.
 export const deleteVehicle = async (id: number): Promise<{ vehicleNo: number; message: string } | null> => {
     try {
         const result = await pool.query(vehicleQueries.DELETE_VEHICLE_BY_ID, [id]);
         if (result.rowCount === 0) {
             return null;
         }
-        // The returned row from the query is already camelCased by our middleware
         return {
             vehicleNo: result.rows[0].vehicleNo,
             message: 'Vehicle deleted successfully'
@@ -97,13 +96,10 @@ export const deleteVehicle = async (id: number): Promise<{ vehicleNo: number; me
     }
 };
 
+// 6. Checks if a registration number already exists in the database.
 export const checkRegistrationNoExists = async (registrationNo: string, existingVehicleId?: string): Promise<boolean> => {
     try {
-        // Query to check if registration number exists, excluding the current vehicle if provided.
         const result = await pool.query(
-            // --- KEY CORRECTION: Query for uniqueness check ---
-            // This query assumes you have a SELECT_VEHICLE_BY_REG_NO_EXCLUDING_ID in your queries file.
-            // If not, you need to add it or use a direct query here.
             `SELECT COUNT(*) FROM public.kalusto WHERE rek_nro = $1 ${existingVehicleId ? 'AND kalusto_nro != $2' : ''}`,
             existingVehicleId ? [registrationNo, existingVehicleId] : [registrationNo]
         );

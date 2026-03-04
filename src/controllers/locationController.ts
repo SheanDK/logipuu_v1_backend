@@ -4,18 +4,9 @@ import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import { UpdateLocationDto } from '../dto/location.dto';
 import { socketService } from '../services/socketService';
-import pool from '../config/db'; // Import the database pool for direct updates
+import pool from '../config/db';
 
-/**
- * Updates the current location for a given vehicle in the database.
- * In a larger application, this logic would reside in its own `locationService.ts`.
- * For simplicity here, we perform the direct database update.
- * @param vehicleId - The identifier of the vehicle (e.g., KalustoNro or RekNro).
- * @param latitude - The new latitude.
- * @param longitude - The new longitude.
- * @param timestamp - The UNIX timestamp of the location update.
- * @returns A promise that resolves when the update is complete.
- */
+// 1. --- UPDATE VEHICLE LOCATION ---
 const updateLocationInDatabase = async (
     vehicleId: string,
     latitude: number,
@@ -37,10 +28,7 @@ const updateLocationInDatabase = async (
 };
 
 
-/**
- * Handles the request to update a vehicle's location.
- * It validates the input, updates the database, and emits a real-time event.
- */
+// 2. --- UPDATE VEHICLE LOCATION HANDLER ---
 export const updateVehicleLocationHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
         const dto = res.locals.validatedDto as UpdateLocationDto;
@@ -76,6 +64,7 @@ export const updateVehicleLocationHandler = async (req: AuthenticatedRequest, re
     }
 };
 
+// 3. --- CREATE QUICK PUULAANI ---
 export const createQuickPuulaaniHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
         const { name, address, lat, lng, instructions, customer_ids } = req.body;
@@ -104,6 +93,7 @@ export const createQuickPuulaaniHandler = async (req: AuthenticatedRequest, res:
     }
 };
 
+// 4. --- CREATE QUICK PURKUUPAIKKA ---
 export const createQuickPurkupaikkaHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
         const { name, lat, lng, customer_ids } = req.body;
@@ -125,9 +115,7 @@ export const createQuickPurkupaikkaHandler = async (req: AuthenticatedRequest, r
     }
 };
 
-/**
- * Proxies address search to Nominatim to avoid CORS/User-Agent issues on the frontend.
- */
+// 5. --- SEARCH ADDRESS ---
 export const searchAddressHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
         const { q } = req.query;

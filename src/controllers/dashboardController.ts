@@ -3,6 +3,7 @@ import { Response, NextFunction } from 'express';
 import * as dashboardService from '../services/dashboardService';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 
+// Admin Dashboard
 export const getAdminDashboardHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         console.log(`User ${req.user?.userId} (Role: ${req.user?.roles.join(', ')}) accessing Admin Dashboard.`);
@@ -13,6 +14,7 @@ export const getAdminDashboardHandler = async (req: AuthenticatedRequest, res: R
     }
 };
 
+// Dispatch Dashboard
 export const getDispatchDashboardHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         console.log(`User ${req.user?.userId} (Role: ${req.user?.roles.join(', ')}) accessing Dispatch Dashboard.`);
@@ -23,6 +25,7 @@ export const getDispatchDashboardHandler = async (req: AuthenticatedRequest, res
     }
 };
 
+// Driver Dashboard
 export const getDriverDashboardHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const driverId = req.user?.driverNumericId;
@@ -39,6 +42,7 @@ export const getDriverDashboardHandler = async (req: AuthenticatedRequest, res: 
     }
 };
 
+// Volume by Day
 export const getVolumeByDayHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const data = await dashboardService.getVolumeLast7Days();
@@ -48,6 +52,7 @@ export const getVolumeByDayHandler = async (req: AuthenticatedRequest, res: Resp
     }
 };
 
+// Active Trips List
 export const getActiveTripsListHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const list = await dashboardService.getActiveTripsList();
@@ -57,6 +62,7 @@ export const getActiveTripsListHandler = async (req: AuthenticatedRequest, res: 
     }
 };
 
+// Customer Dashboard
 export const getCustomerDashboardHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const customerId = parseInt(req.params.id as string, 10);

@@ -2,6 +2,7 @@
 import { IsInt, IsNotEmpty, IsString, MaxLength, IsNumber, IsLatitude, IsLongitude, IsOptional, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
+// 1. --- CREATE UNLOADING SITE DTO ---
 export class CreateUnloadingSiteDto {
     @IsInt() @IsNotEmpty() @Type(() => Number)
     clientId!: number;
@@ -9,26 +10,25 @@ export class CreateUnloadingSiteDto {
     @IsString() @IsNotEmpty() @MaxLength(100)
     name!: string;
 
-    // --- CHANGES START HERE ---
-    @IsOptional() // Make this field optional
+    @IsOptional()
     @IsNumber()
     @IsLatitude()
-    latitude?: number | null; // Allow the type to be number or null
+    latitude?: number | null;
 
-    @IsOptional() // Make this field optional
+    @IsOptional()
     @IsNumber()
     @IsLongitude()
-    longitude?: number | null; // Allow the type to be number or null
-    // --- CHANGES END HERE ---
+    longitude?: number | null;
 }
 
+// 2. --- UPDATE UNLOADING SITE DTO ---
 export class UpdateUnloadingSiteDto {
     @IsInt() @IsOptional() @Type(() => Number)
     clientId?: number;
 
     @IsString() @IsOptional() @MaxLength(100)
     name?: string;
-    
+
     @IsNumber() @IsOptional() @IsLatitude()
     latitude?: number;
 

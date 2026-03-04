@@ -1,5 +1,6 @@
 import { IsString, IsNotEmpty, IsEmail, IsBoolean, IsOptional, MinLength, MaxLength } from 'class-validator';
 
+// 1. --- CREATE DRIVER DTO ---
 export class CreateDriverDto {
     @IsString()
     @IsNotEmpty()
@@ -22,6 +23,7 @@ export class CreateDriverDto {
     hasAlerts?: boolean = true;
 }
 
+// 2. --- UPDATE DRIVER DTO ---
 export class UpdateDriverDto {
     @IsString()
     @IsOptional()

@@ -2,12 +2,11 @@
 import {
     IsString, IsNotEmpty, IsDateString, IsBoolean, IsOptional,
     IsNumber, Min, MaxLength, IsLatitude, IsLongitude, IsInt,
-    IsArray, ValidateNested // <<<--- CORRECTION 1: Import the missing decorators
+    IsArray, ValidateNested
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-// A small DTO for a single wood entry within the main DTO
-// This needs to be defined before it is used in CreateTimberStackDto
+// 1. --- WOOD ENTRY DTO ---
 class WoodEntryDto {
     @IsInt()
     @IsNotEmpty()
@@ -24,6 +23,7 @@ class WoodEntryDto {
     totalVolume!: number;
 }
 
+// 2. --- CREATE TIMBER STACK DTO ---
 export class CreateTimberStackDto {
     @IsInt() @IsNotEmpty() @Type(() => Number)
     clientId!: number;
@@ -33,7 +33,7 @@ export class CreateTimberStackDto {
 
     @IsString() @IsNotEmpty() @MaxLength(200)
     name!: string;
-    
+
     @IsString() @IsOptional() @MaxLength(500)
     auto_nro?: string | null;
 
@@ -61,7 +61,7 @@ export class CreateTimberStackDto {
 
     @IsNumber() @IsNotEmpty() @IsLongitude()
     longitude!: number;
-    
+
     @IsString() @IsOptional() @MaxLength(45)
     dispatchOrderNo?: string | null;
 
@@ -82,7 +82,7 @@ export class CreateTimberStackDto {
     markerStyle?: string;
 }
 
-// Ensure the Update DTO also uses the same consistent names
+// 3. --- UPDATE TIMBER STACK DTO ---
 export class UpdateTimberStackDto {
     @IsInt() @IsOptional() @Type(() => Number)
     clientId?: number;
@@ -92,7 +92,7 @@ export class UpdateTimberStackDto {
 
     @IsString() @IsOptional() @MaxLength(200)
     name?: string;
-    
+
     @IsString() @IsOptional() @MaxLength(500)
     vehicleNumbers?: string;
 
@@ -119,12 +119,12 @@ export class UpdateTimberStackDto {
 
     @IsNumber() @IsOptional() @IsLongitude() @Type(() => Number)
     longitude?: number;
-    
+
     @IsString() @IsOptional() @MaxLength(45)
     consignmentNoteNo?: string;
 }
 
-// --- DTO for location updates ---
+// 4. --- UPDATE TIMBER STACK LOCATION DTO ---
 export class UpdateTimberStackLocationDto {
     @IsLatitude()
     @IsNotEmpty()

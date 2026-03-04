@@ -46,7 +46,6 @@ export const chipPlanningService = {
         );
         const nextSerial = seqRes.rows[0].next_seq;
 
-        // NOTE: We only insert confirmed columns. If loading_point_id etc. are verified to exist, they can be added here.
         const query = `
             INSERT INTO public.chip_loads (vehicle_number, title_id, order_id, scheduled_date, serial_no, status)
             VALUES ($1, $2, $3, $4, $5, 'NOT_SENT')

@@ -1,5 +1,6 @@
 // backend/src/queries/timberStackQueries/createTimberStackQueries.ts
 
+// 1. INSERT_TIMBER_STACK
 export const INSERT_TIMBER_STACK = `
     INSERT INTO public.puulaani (
         asiakas_id, pvm, nimi, auto_nro, lisatiedot,

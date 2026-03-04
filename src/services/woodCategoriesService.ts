@@ -8,7 +8,7 @@ import {
 } from '../dto/woodCategory.dto';
 import * as woodQueries from '../queries/woodCategoryQueries/woodCategoryQueries';
 
-/** Fetch all wood categories. */
+// 1. Fetches all wood categories.
 export const getAllWoodCategories = async (): Promise<IWoodCategory[]> => {
   try {
     const result = await pool.query(woodQueries.SELECT_ALL_WOOD_CATEGORIES);
@@ -19,7 +19,7 @@ export const getAllWoodCategories = async (): Promise<IWoodCategory[]> => {
   }
 };
 
-/** Fetch a single wood category by id. */
+// 2. Fetches a single wood category by id.
 export const getWoodCategoryById = async (id: number): Promise<IWoodCategory | null> => {
   try {
     const result = await pool.query(woodQueries.SELECT_WOOD_CATEGORY_BY_ID, [id]);
@@ -31,7 +31,7 @@ export const getWoodCategoryById = async (id: number): Promise<IWoodCategory | n
   }
 };
 
-/** Create a new wood category. */
+// 3. Creates a new wood category.
 export const createWoodCategory = async (
   data: CreateWoodCategoryDto
 ): Promise<IWoodCategory> => {
@@ -49,7 +49,7 @@ export const createWoodCategory = async (
   }
 };
 
-/** Update an existing wood category (partial update). */
+// 4. Updates an existing wood category (partial update).
 export const updateWoodCategory = async (
   id: number,
   data: UpdateWoodCategoryDto
@@ -79,7 +79,7 @@ export const updateWoodCategory = async (
   }
 };
 
-/** Delete a wood category by id. */
+// 5. Deletes a wood category by id.
 export const deleteWoodCategory = async (
   id: number
 ): Promise<{ woodCategoryId: number; message: string } | null> => {

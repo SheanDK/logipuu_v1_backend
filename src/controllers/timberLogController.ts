@@ -1,10 +1,9 @@
 // backend/src/controllers/timberLogController.ts
 import { Response, NextFunction } from 'express';
-// --- THIS IS THE FIX ---
-// Changed the import from the non-existent 'woodspeciesService' to the correct 'timberLogService'.
 import * as puutavaralajiService from '../services/timberLogService';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 
+// 1. --- GET TIMBER LOGS FOR STACK ---
 export const getTimberLogsForStackHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const puulaaniId = parseInt(req.params.puulaaniId as string, 10);

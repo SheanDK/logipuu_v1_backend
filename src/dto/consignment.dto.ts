@@ -2,7 +2,7 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsDateString, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
-// FIX: This class now expects camelCase properties to perfectly match the frontend.
+// 1. --- CREATE CONSignment ITEM DTO ---
 class CreateRahtikirjaItemDto {
     @IsString()
     @IsNotEmpty()
@@ -18,7 +18,7 @@ class CreateRahtikirjaItemDto {
 
     @IsString()
     @IsOptional()
-    rahtikirjanNumero?: string; // Expects camelCase
+    rahtikirjanNumero?: string;
 
     @IsNumber()
     @IsOptional()
@@ -40,6 +40,7 @@ class CreateRahtikirjaItemDto {
     lisatiedot?: string;
 }
 
+// 2. --- CREATE CONSignment DTO ---
 export class CreateConsignmentDto {
     @IsInt()
     @Type(() => Number)

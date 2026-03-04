@@ -3,10 +3,8 @@ import { PoolClient } from 'pg';
 import pool from '../config/db';
 import { executeTransaction } from '../utils/dbUtils';
 
-/**
- * Fetches a list of parent consignment loads for a specific driver.
- * ONLY fetches 'Draft' status loads (Assigned loads go to office inspection).
- */
+// --- CONSIGNMENT DRIVER SERVICE ---
+//1. Get Consignments for Driver
 export const getConsignmentsForDriver = async (driverId: number, vehicleId: number) => {
     const query = `
         SELECT
@@ -31,25 +29,19 @@ export const getConsignmentsForDriver = async (driverId: number, vehicleId: numb
     return result.rows;
 };
 
-/**
- * Fetches the full details of a single consignment load.
- * Includes Customer Names for each Waybill.
- */
+//2. Get Consignment by ID
 export const getConsignmentById = async (id: number, driverId: number): Promise<any | null> => {
-    // 1. Get Parent Load Info
     const kuormaQuery = `
         SELECT k.*, k.kuorma_id as "kuormaId", k.asiakas_id as "asiakasId" 
         FROM public.kuorma k 
         WHERE k.kuorma_id = $1::bigint AND k.kulj_id = $2 AND k.tyyppi = 1;
     `;
 
-    // 2. Get Waybills with Customer Names
-    // We JOIN with asiakkaat table to get the name for the frontend dropdown display
     const rahtikirjatQuery = `
         SELECT 
             r.rahti_id as "rahtiId",
             r.asiakas_id as "asiakasId",
-            a.asiakkaan_nimi as "customerName", -- Needed for frontend display
+            a.asiakkaan_nimi as "customerName",
             r.rahtikirjan_nro as "rahtikirjanNro",
             r.reitti,
             r.m3, r.km, r.kpl, r.jako, r.tievero, r.lisatiedot
@@ -79,16 +71,10 @@ export const getConsignmentById = async (id: number, driverId: number): Promise<
     }
 };
 
-/**
- * Creates a new consignment load (parent) and its associated waybills (children).
- * Accepts 'status' to distinguish between Draft and Assigned.
- */
+//3. Create Consignment
 export const createConsignment = async (dto: any, driverId: number, vehicleId: number) => {
     return executeTransaction(async (client: PoolClient) => {
-        // Determine Status: Default to 'Draft' if not provided
         const status = dto.status || 'Draft';
-
-        // 1. Insert Parent Load (Kuorma)
         const kuormaInsertQuery = `
             INSERT INTO public.kuorma (
                 tyyppi, pvm, kulj_id, kalusto_nro, asiakas_id, 
@@ -102,7 +88,7 @@ export const createConsignment = async (dto: any, driverId: number, vehicleId: n
             dto.pvm,
             driverId,
             vehicleId,
-            dto.asiakasId || null, // Primary customer (often 0 or first waybill's customer)
+            dto.asiakasId || null,
             Number(dto.m3) || 0,
             Number(dto.km) || 0,
             Number(dto.kpl) || 0,
@@ -114,7 +100,6 @@ export const createConsignment = async (dto: any, driverId: number, vehicleId: n
         const kuormaResult = await client.query(kuormaInsertQuery, kuormaParams);
         const newKuormaId = kuormaResult.rows[0].kuormaId;
 
-        // 2. Insert Waybills (Rahtikirja)
         if (dto.rahtikirjat && dto.rahtikirjat.length > 0) {
             for (const r of dto.rahtikirjat) {
                 const rahtikirjaInsertQuery = `
@@ -126,7 +111,7 @@ export const createConsignment = async (dto: any, driverId: number, vehicleId: n
                 const params = [
                     newKuormaId,
                     dto.pvm,
-                    r.asiakasId || null, // Specific customer for this waybill
+                    r.asiakasId || null,
                     r.rahtikirjanNumero || '',
                     r.reitti || '',
                     Number(r.m3) || 0, Number(r.km) || 0, Number(r.kpl) || 0,
@@ -139,10 +124,7 @@ export const createConsignment = async (dto: any, driverId: number, vehicleId: n
     });
 };
 
-/**
- * Updates an existing consignment.
- * Used for both saving draft changes and sending the load (updating status).
- */
+//4. Update Consignment
 export const updateConsignment = async (id: number, dto: any, driverId: number) => {
     return executeTransaction(async (client: PoolClient) => {
         const ownerCheck = await client.query('SELECT kulj_id FROM public.kuorma WHERE kuorma_id = $1', [id]);

@@ -1,17 +1,18 @@
 // backend/src/routes/consignmentRoutes.ts
 import { Router } from 'express';
-import * as consignmentController from '../controllers/consignmentController'; 
+import * as consignmentController from '../controllers/consignmentController';
 import { protect } from '../middlewares/authMiddleware';
 import { authorize } from '../middlewares/rbacMiddleware';
 
 const router = Router();
 
-// PERMISSIONS
+// 1. Define Permissions
 const VIEW_PERMISSION = ['consignment invoicing_view'];
 const CREATE_PERMISSION = ['consignment invoice_create'];
 const EDIT_PERMISSION = ['consignment invoicing_edit'];
 const DELETE_PERMISSION = ['consignment invoicing_delete'];
 
+// 2. Search consignments
 router.get(
   '/search',
   protect,
@@ -19,7 +20,7 @@ router.get(
   consignmentController.searchConsignmentsHandler
 );
 
-
+// 3. Invoice consignments
 router.post(
   '/invoice',
   protect,
@@ -27,7 +28,7 @@ router.post(
   consignmentController.invoiceManyHandler
 );
 
-
+// 4. Get consignment by ID
 router.get(
   '/:id',
   protect,
@@ -35,6 +36,7 @@ router.get(
   consignmentController.getConsignmentByIdHandler
 );
 
+// 5. Update consignment
 router.patch(
   '/:id',
   protect,
@@ -42,6 +44,7 @@ router.patch(
   consignmentController.updateConsignmentHandler
 );
 
+// 6. Delete consignment
 router.delete(
   '/:id',
   protect,
@@ -49,7 +52,7 @@ router.delete(
   consignmentController.deleteConsignmentHandler
 );
 
-
+// 7. Create consignment
 router.post(
   '/',
   protect,

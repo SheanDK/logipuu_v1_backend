@@ -7,12 +7,12 @@ dotenv.config();
 
 const JWT_SECRET: Secret = process.env.JWT_SECRET || 'your_fallback_secret_for_dev';
 
-// CORRECTED: UserPayload interface now includes the 'permissions' property
+// UserPayload interface now includes the 'permissions' property
 export interface UserPayload extends JwtPayload {
     userId: string;
     fullName: string;
     roles: string[];
-    permissions: string[]; // <-- THIS IS THE CRITICAL FIX
+    permissions: string[];
     userLevel: number;
     driverNumericId?: number;
     // kalustoNro?: number;
@@ -23,6 +23,7 @@ export interface AuthenticatedRequest extends Request {
     user?: UserPayload;
 }
 
+// Protect routes
 export const protect = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     let token;
 
@@ -30,12 +31,7 @@ export const protect = (req: AuthenticatedRequest, res: Response, next: NextFunc
         try {
             token = req.headers.authorization.split(' ')[1];
 
-            // Verify the token and cast the entire decoded payload to UserPayload
             const decoded = jwt.verify(token, JWT_SECRET) as UserPayload;
-
-
-            // CORRECTED: Assign the whole decoded object directly to req.user
-            // This ensures that `permissions` and all other properties are passed on.
             req.user = decoded;
 
             next();

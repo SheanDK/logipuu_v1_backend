@@ -6,6 +6,7 @@ import { CreateLoadDto, UpdateLoadDto, CompleteLoadDto, CreateBulkLoadDto } from
 import { UserPayload } from '../middlewares/authMiddleware';
 import { socketService } from './socketService';
 
+// 1. Load List Filters
 export interface ILoadListFilters {
     asiakasId?: string;
     kalustoNro?: string;
@@ -13,7 +14,8 @@ export interface ILoadListFilters {
     status?: 'active' | 'pending_inspection' | 'all';
     loadType?: number;
 }
-// Helper function to recalculate totals for a given puulaani_id
+
+// 2. Helper function to recalculate totals for a given puulaani_id
 const recalculatePuulaaniTotals = async (client: any, puulaaniId: number) => {
     if (!puulaaniId) return;
 
@@ -46,6 +48,7 @@ const recalculatePuulaaniTotals = async (client: any, puulaaniId: number) => {
     await client.query(recalculateQuery, [puulaaniId]);
 };
 
+// 3. Get All Loads for List
 export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILoadListItem[]> => {
     let queryText = `
         SELECT
@@ -115,9 +118,8 @@ export const getAllLoadsForList = async (filters: ILoadListFilters): Promise<ILo
     }
 };
 
-
+// 4. Get Load by ID
 export const getLoadById = async (id: number): Promise<ILoadDetails | null> => {
-    // Basic fetch for single load details (used in some edits)
     const query = `
         SELECT k.*, a.asiakkaan_nimi, kal.rek_nro, kul.nimi AS kuljettajan_nimi,
             p.nimi AS origin_name, p.osoite AS origin_address, p.sijainti_lat AS origin_lat,
@@ -146,7 +148,7 @@ export const getLoadById = async (id: number): Promise<ILoadDetails | null> => {
     }
 };
 
-// IMPORTANT: This is the function called by your controller based on the logs.
+// 5. Get Trip by Load ID
 export const getTripByLoadId = async (id: number): Promise<any> => {
 
     // 1. Check Load Type
@@ -160,9 +162,7 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
 
     const loadType = typeCheckResult.rows[0].tyyppi;
 
-    // =========================================================
-    // CASE A: CONSIGNMENT (Rahtikirja) - tyyppi = 1
-    // =========================================================
+    // 6. Case A: Consignment (Rahtikirja) - tyyppi = 1
     if (loadType === 1) {
         console.log(`[getTripByLoadId] Fetching Consignment details for ID ${id}`);
 
@@ -203,7 +203,7 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
         const loadResult = await pool.query(loadQuery, [id]);
         const loadData = loadResult.rows[0];
 
-        // Fetch Waybills with Customer Names
+        // 7. Fetch Waybills with Customer Names
         const waybillsQuery = `
             SELECT 
                 r.rahti_id as "rahtiId",
@@ -230,9 +230,7 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
         return loadData;
     }
 
-    // =========================================================
-    // CASE B: TIMBER LOAD (Puukuorma) - tyyppi = 0
-    // =========================================================
+    // 8. Case B: Timber Load (Puukuorma) - tyyppi = 0
     else {
         console.log(`[getTripByLoadId] Fetching Timber Trip details for ID ${id}`);
 
@@ -242,8 +240,7 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
         const { ajomaaraysNro, asiakasId, kuljId, kalustoNro } = initialLoadResult.rows[0];
         const drivingOrderNumber = ajomaaraysNro;
 
-        // Fetch details for the specific row (for completed trip view)
-        // Or fetch all legs if needed. For detail view, we fetch the specific load details.
+        // 9. Fetch details for the specific row (for completed trip view)
         const tripLegsQuery = `
             SELECT
                 k.kuorma_id as "kuormaId", 
@@ -285,10 +282,10 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
 
         const row = tripLegsResult.rows[0];
 
-        // Construct Trip Details Object
+        // 10. Construct Trip Details Object
         const tripDetails = {
             tripId: ajomaaraysNro || `Trip #${id}`,
-            kuormaId: id, // ADDED: Critical for identifying the correct row for updates
+            kuormaId: id,
             ajomaaraysNro: row.ajomaaraysNro,
             vastaanottoNro: row.vastaanottoNro,
             asiakasId: asiakasId,
@@ -308,11 +305,11 @@ export const getTripByLoadId = async (id: number): Promise<any> => {
             legs: []
         };
 
-        return tripDetails; // No need for camelcaseKeys if we use aliases correctly
+        return tripDetails;
     }
 };
 
-
+// 11. Create Load
 export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
     const {
         tyyppi, asiakasId, puulaaniId, kalustoNro, kuljId, pvm,
@@ -357,15 +354,13 @@ export const createLoad = async (data: CreateLoadDto): Promise<ILoad> => {
     }
 };
 
-
-
-// --- THIS IS THE UPDATED, SECURE updateLoad FUNCTION ---
+// 12. Update Load
 export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayload): Promise<ILoad> => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
-        // Step 1: Lock the target row and get its current state.
+        // 12.1 Lock the target row and get its current state.
         const { rows, rowCount } = await client.query('SELECT * FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [id]);
         if (rowCount === 0) {
             throw new Error(`Load with ID ${id} not found.`);
@@ -373,7 +368,7 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
         const existingLoad = rows[0];
         const isDriver = user.roles.includes('Kuljettaja');
 
-        // --- AUTHORIZATION & STATUS CHECKS ---
+        // 12.2 AUTHORIZATION & STATUS CHECKS
 
         if (isDriver) {
             console.log(`[SERVICE DEBUG] Driver Authorization Check:`, {
@@ -383,19 +378,18 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
                 status: existingLoad.status
             });
 
-            // Driver Check 1: Must own the load
+            // 12.2.1 Driver Check 1: Must own the load
             if (existingLoad.kuljId !== user.driverNumericId) {
                 console.warn(`[SERVICE DEBUG] Driver ${user.driverNumericId} blocked: Not owner of load ${id}.`);
                 throw new Error('You are not authorized to edit this load.');
             }
 
-            // Driver Check 2: Cannot edit if Completed
+            // 12.2.2 Driver Check 2: Cannot edit if Completed
             if (existingLoad.status === 'Completed') {
                 throw new Error('Cannot edit a completed load.');
             }
 
-            // Driver Check 3: Can only edit 'Assigned' loads (loads that haven't started moving)
-            // If you want drivers to edit Active loads, remove this check.
+            // 12.2.3 Driver Check 3: Can only edit 'Assigned' loads
             if (existingLoad.status !== 'Assigned') {
                 throw new Error('This load is already in progress and cannot be edited.');
             }
@@ -406,22 +400,18 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
                 status: existingLoad.status,
                 laskutukseen: existingLoad.laskutukseen
             });
-            // Office User Check: Cannot edit if already invoiced (laskutukseen = 1)
-            // They CAN edit 'Completed' loads as long as they are pending inspection (laskutukseen = 0)
+            // 12.2.4 Office User Check: Cannot edit if already invoiced (laskutukseen = 1)
             if (existingLoad.status === 'Completed' && existingLoad.laskutukseen === 1) {
                 console.warn(`[SERVICE DEBUG] Office user blocked: Load ${id} is already invoiced.`);
                 throw new Error('Cannot edit a load that has already been accepted for invoicing.');
             }
         }
 
-        // =========================================================
-        // SCENARIO 1: CONSIGNMENT UPDATE (tyyppi = 1)
-        // =========================================================
+        // 12.3 SCENARIO 1: CONSIGNMENT UPDATE (tyyppi = 1)
         if (existingLoad.tyyppi === 1) {
             console.log(`[updateLoad] Updating Consignment ID: ${id}`);
 
-            // 1. Update Parent Load (Kuorma)
-            // Aggregates (m3, km, kpl) should be calculated in frontend and passed here
+            // 12.3.1 Update Parent Load (Kuorma)
             const updateKuormaQuery = `
                 UPDATE public.kuorma 
                 SET pvm = $1, lisatiedot = $2, m3 = $3, km = $4, kpl = $5, tunnit = $6,  asiakas_id = $7
@@ -441,9 +431,8 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
             const kuormaResult = await client.query(updateKuormaQuery, kuormaParams);
             const updatedLoad = kuormaResult.rows[0];
 
-            // 2. Update Waybills (Rahtikirja)
+            // 12.3.2 Update Waybills (Rahtikirja)
             // Strategy: Delete All existing for this load and Insert New ones from payload
-            // This handles adds, edits, and deletes in one go.
             if (data.rahtikirjat && Array.isArray(data.rahtikirjat)) {
                 await client.query('DELETE FROM public.rahtikirja WHERE kuorma_id = $1', [id]);
 
@@ -456,7 +445,7 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
                     `;
                     const wbParams = [
                         id,
-                        data.pvm, // Waybills inherit date from parent
+                        data.pvm,
                         wb.asiakasId || null,
                         wb.rahtikirjanNumero || '',
                         wb.reitti || '',
@@ -475,16 +464,14 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
             return updatedLoad as ILoad;
         }
 
-        // =========================================================
-        // SCENARIO 2: TIMBER LOAD UPDATE (tyyppi = 0)
-        // =========================================================
+        // 12.4 SCENARIO 2: TIMBER LOAD UPDATE (tyyppi = 0)
         else {
-            // Step 3: Calculate volume change (m3 delta)
+            // 12.4.1 Calculate volume change (m3 delta)
             const oldM3 = Number(existingLoad.m3) || 0;
             const newM3 = data.m3 !== undefined ? Number(data.m3) : oldM3;
             const m3Delta = newM3 - oldM3;
 
-            // Step 4: Update timber entry if volume changed
+            // 12.4.2 Update timber entry if volume changed
             if (existingLoad.puutavaraId && m3Delta !== 0) {
                 const updateTimberEntryQuery = `
                     UPDATE public.puutavaralaji
@@ -494,7 +481,7 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
                 await client.query(updateTimberEntryQuery, [m3Delta, existingLoad.puutavaraId]);
             }
 
-            // Step 5: Construct update query
+            // 12.4.3 Construct update query
             let fieldsToUpdate: Partial<any>;
 
             if (isDriver) {
@@ -506,7 +493,7 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
                     lisatiedot: data.lisatiedot
                 };
             } else {
-                // Office users fields
+                // 12.4.4 Office users fields
                 fieldsToUpdate = {
                     tyyppi: data.tyyppi,
                     asiakas_id: data.asiakasId,
@@ -528,13 +515,14 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
                 };
             }
 
+            // 12.4.5 Update the load
             const updates: { [key: string]: any } = {};
             for (const [key, value] of Object.entries(fieldsToUpdate)) {
                 if (value !== undefined) {
                     updates[key] = value;
                 }
             }
-
+            //
             let updatedLoadRow;
             if (Object.keys(updates).length > 0) {
                 const setClauses = Object.keys(updates).map((key, index) => `${key} = $${index + 1}`).join(', ');
@@ -547,7 +535,7 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
                 updatedLoadRow = existingLoad;
             }
 
-            // Step 6: Recalculate totals
+            // 12.4.6 Recalculate totals
             if (updatedLoadRow.puulaaniId) {
                 await recalculatePuulaaniTotals(client, updatedLoadRow.puulaaniId);
             }
@@ -565,20 +553,20 @@ export const updateLoad = async (id: number, data: UpdateLoadDto, user: UserPayl
     }
 };
 
+// 13. Delete Load
 export const deleteLoad = async (id: number, user: UserPayload): Promise<{ kuormaId: number; message: string } | null> => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
-        // Step 1: Get the full load details to perform checks and get necessary IDs.
-        // Lock the row for the transaction.
+        // 13.1 Get the full load details to perform checks and get necessary IDs.
         const loadResult = await client.query('SELECT * FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [id]);
         if (loadResult.rowCount === 0) {
-            return null; // Not found
+            return null;
         }
         const existingLoad = loadResult.rows[0];
 
-        // --- Authorization Checks ---
+        // 13.2 Authorization Checks
         const isDriver = user.roles.includes('Kuljettaja');
         if (isDriver) {
             if (existingLoad.kuljId !== user.driverNumericId) {
@@ -589,8 +577,7 @@ export const deleteLoad = async (id: number, user: UserPayload): Promise<{ kuorm
             }
         }
 
-        // --- THE FIX IS HERE ---
-        // Step 2: Revert the 'haettu' (hauled) value in the corresponding timber log.
+        // 13.3 Revert the 'haettu' (hauled) value in the corresponding timber log.
         const m3ToRevert = Number(existingLoad.m3) || 0;
         if (existingLoad.puutavaraId && m3ToRevert > 0) {
             console.log(`Reverting ${m3ToRevert} m³ from timber entry ID: ${existingLoad.puutavaraId}...`);
@@ -604,11 +591,11 @@ export const deleteLoad = async (id: number, user: UserPayload): Promise<{ kuorm
             await client.query(updateTimberEntryQuery, [m3ToRevert, existingLoad.puutavaraId]);
         }
 
-        // Step 3: Soft-delete the load itself.
+        // 13.4 Soft-delete the load itself.
         const softDeleteQuery = 'UPDATE public.kuorma SET is_active = FALSE WHERE kuorma_id = $1 RETURNING kuorma_id;';
         const result = await client.query(softDeleteQuery, [id]);
 
-        // Step 4: Recalculate the grand totals for the parent puulaani.
+        // 13.5 Recalculate the grand totals for the parent puulaani.
         if (existingLoad.puulaaniId) {
             await recalculatePuulaaniTotals(client, existingLoad.puulaaniId);
         }
@@ -630,6 +617,7 @@ export const deleteLoad = async (id: number, user: UserPayload): Promise<{ kuorm
     }
 };
 
+// 14. Update Load Status
 export const updateLoadStatus = async (id: number, status: string, driverId: number): Promise<ILoad> => {
     const updateQuery = `UPDATE public.kuorma SET status = $1 WHERE kuorma_id = $2 AND kulj_id = $3 RETURNING *;`;
     try {
@@ -639,7 +627,6 @@ export const updateLoadStatus = async (id: number, status: string, driverId: num
         }
         const updatedLoad = result.rows[0];
 
-        // --- Emit socket event ---
         socketService.emit('loadStatusUpdated', updatedLoad);
 
         return updatedLoad;
@@ -649,15 +636,11 @@ export const updateLoadStatus = async (id: number, status: string, driverId: num
     }
 };
 
-// --- THIS IS THE NEW FUNCTION FOR THE DRIVER'S PORTAL ---
+// 15. Get My Loads for List
 export const getMyLoadsForList = async (driverId: number): Promise<ILoadListItem[]> => {
-    // This query now handles grouping in a way that is fully compatible with PostgreSQL.
     const queryText = `
         SELECT
-            -- Use the driving order number as the main identifier for the group.
             k.ajomaarays_nro,
-            
-            -- Aggregate functions for all other columns
             MIN(k.kuorma_id) AS kuorma_id,
             SUM(k.m3) AS m3,
             STRING_AGG(DISTINCT COALESCE(p.nimi, k.lahto, 'N/A'), ' -> ') AS lahto,
@@ -679,18 +662,14 @@ export const getMyLoadsForList = async (driverId: number): Promise<ILoadListItem
             k.is_active = TRUE 
             AND k.kulj_id = $1
             AND k.status NOT IN ('Completed', 'Cancelled')
-        
-        -- Group by the driving order number. All other columns must be aggregated.
         GROUP BY 
             k.ajomaarays_nro
-        
         ORDER BY 
             pvm ASC, k.kuorma_id ASC;
     `;
     try {
         const result = await pool.query(queryText, [driverId]);
 
-        // After fetching, manually create the trip identifier for the frontend if ajomaarays_nro is null
         const processedRows = result.rows.map(row => {
             const finalRow = { ...row };
             if (!finalRow.ajomaaraysNro) {
@@ -710,13 +689,13 @@ export const getMyLoadsForList = async (driverId: number): Promise<ILoadListItem
 
 
 
-// --- THIS IS THE NEW FUNCTION FOR COMPLETING A LOAD ---
+// 16. Complete Load
 export const completeLoad = async (loadId: number, driverId: number, data: CompleteLoadDto): Promise<ILoad> => {
     const client = await pool.connect();
     try {
-        await client.query('BEGIN'); // Start a database transaction
+        await client.query('BEGIN');
 
-        // Step 1: Fetch the load and ensure it's valid for completion
+        // 16.1 Fetch the load and ensure it's valid for completion
         const loadResult = await client.query('SELECT * FROM public.kuorma WHERE kuorma_id = $1 FOR UPDATE', [loadId]);
         if (loadResult.rowCount === 0) {
             throw new Error('Load not found.');
@@ -729,7 +708,7 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
             throw new Error(`Load cannot be completed from its current status: ${load.status}`);
         }
 
-        // Step 2: Update the kuorma table with actuals and set status to 'Completed'
+        // 16.2 Update the kuorma table with actuals and set status to 'Completed'
         const updateLoadQuery = `
             UPDATE public.kuorma 
             SET 
@@ -742,7 +721,7 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
         `;
         const updatedLoadResult = await client.query(updateLoadQuery, [data.actualM3, data.actualKm, loadId]);
 
-        // Step 3: Update the puutavaralaji table (the timber task)
+        // 16.3 Update the puutavaralaji table
         if (load.puutavaraId) {
             const updateTaskQuery = `
                 UPDATE public.puutavaralaji
@@ -754,7 +733,7 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
             await client.query(updateTaskQuery, [data.actualM3, load.puutavaraId]);
         }
 
-        // --- THIS IS THE FIX: Step 4: Update the parent puulaani's remaining volume ---
+        // 16.4 Update the parent puulaani's remaining volume
         if (load.puulaaniId) {
             const updatePuulaaniQuery = `
                 UPDATE public.puulaani
@@ -766,12 +745,12 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
             await client.query(updatePuulaaniQuery, [data.actualM3, load.puulaaniId]);
         }
 
-        await client.query('COMMIT'); // Commit all changes if successful
+        await client.query('COMMIT');
         console.log(`--- Load ${loadId} completed and ALL related tables updated ---`);
         return updatedLoadResult.rows[0];
 
     } catch (error) {
-        await client.query('ROLLBACK'); // Roll back all changes on any error
+        await client.query('ROLLBACK');
         console.error(`Error completing load ${loadId}:`, error);
         throw error;
     } finally {
@@ -779,14 +758,14 @@ export const completeLoad = async (loadId: number, driverId: number, data: Compl
     }
 };
 
-// --- THIS IS THE NEW FUNCTION FOR THE DRIVEN/INSPECTION PAGE ---
+// 17. Get Loads for Inspection
 export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
-    console.log('--- Fetching loads for inspection (Completed but not invoiced) ---');
+    console.log('--- Fetching loads for inspection ---');
 
     const queryText = `
         SELECT
             k.kuorma_id,
-            k.pvm, -- TO_CHAR ඉවත් කරන ලදී (Raw date එක එවීමට)
+            k.pvm,
             k.ajomaarays_nro,
             k.vastaanotto_nro,
             kal.rek_nro,
@@ -841,12 +820,14 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
     }
 };
 
+// 18. Accept Loads for Invoicing
 export const acceptLoadsForInvoicing = async (loadIds: number[]) => {
     const query = `UPDATE public.kuorma SET laskutukseen = 1 WHERE kuorma_id = ANY($1) RETURNING kuorma_id;`;
     const result = await pool.query(query, [loadIds]);
     return { count: result.rowCount, ids: result.rows.map(r => r.kuormaId) };
 };
 
+// 19. Get My Completed Loads for List
 export const getMyCompletedLoadsForList = async (driverId: number) => {
     const query = `
         SELECT k.kuorma_id, k.pvm, a.asiakkaan_nimi, k.tyyppi, 
@@ -868,12 +849,14 @@ export const getMyCompletedLoadsForList = async (driverId: number) => {
     return result.rows;
 };
 
+// 20. Get My Last Completed Load
 export const getMyLastCompletedLoad = async (driverId: number) => {
     const query = `SELECT * FROM public.kuorma WHERE kulj_id = $1 AND status = 'Completed' ORDER BY completion_timestamp DESC LIMIT 1;`;
     const result = await pool.query(query, [driverId]);
     return result.rows.length > 0 ? result.rows[0] : null;
 };
 
+// 21. Get Active Trips for Map
 export const getActiveTripsForMap = async () => {
     const query = `
         SELECT k.kuorma_id, k.status, k.pvm, a.asiakkaan_nimi,
@@ -890,8 +873,8 @@ export const getActiveTripsForMap = async () => {
     return result.rows;
 };
 
+// 22. Update Trip by Load ID
 export const updateTripByLoadId = async (initialLoadId: number, data: any, driverId: number) => {
-    // Basic implementation for restoration
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -907,6 +890,7 @@ export const updateTripByLoadId = async (initialLoadId: number, data: any, drive
     }
 };
 
+// 23. Create Bulk Load
 export const createBulkLoad = async (dto: CreateBulkLoadDto, user: UserPayload) => {
     const client = await pool.connect();
     try {
@@ -926,6 +910,7 @@ export const createBulkLoad = async (dto: CreateBulkLoadDto, user: UserPayload) 
     }
 };
 
+// 24. Update Trip Status
 export const updateTripStatus = async (ajomaaraysNro: string, status: string, driverId: number) => {
     const query = `UPDATE public.kuorma SET status = $1 WHERE ajomaarays_nro = $2 AND kulj_id = $3 RETURNING *;`;
     const result = await pool.query(query, [status, ajomaaraysNro, driverId]);

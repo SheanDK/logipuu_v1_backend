@@ -1,6 +1,7 @@
 // backend/src/dto/otherMarker.dto.ts
 import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Matches } from 'class-validator';
 
+// 1. --- CREATE OTHER MARKER DTO ---
 export class CreateOtherMarkerDto {
     @IsString()
     @IsNotEmpty()
@@ -30,6 +31,7 @@ export class CreateOtherMarkerDto {
     longitude!: number;
 }
 
+// 2. --- UPDATE OTHER MARKER DTO ---
 export class UpdateOtherMarkerDto {
     @IsString()
     @IsOptional()

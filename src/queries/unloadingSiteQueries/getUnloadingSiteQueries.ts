@@ -1,5 +1,6 @@
 // backend/src/queries/unloadingSiteQueries/getUnloadingSiteQueries.ts
 
+// 1. SELECT_ALL_UNLOADING_SITES
 export const SELECT_ALL_UNLOADING_SITES = `
     SELECT
         p.*,
@@ -12,7 +13,7 @@ export const SELECT_ALL_UNLOADING_SITES = `
     ORDER BY p.purkupaikka_id DESC;
 `;
 
-// This query can remain as is, to allow fetching a specific site even if it's inactive (for historical data)
+// 2. SELECT_UNLOADING_SITE_BY_ID
 export const SELECT_UNLOADING_SITE_BY_ID = `
     SELECT
         p.*,
@@ -23,6 +24,7 @@ export const SELECT_UNLOADING_SITE_BY_ID = `
     WHERE p.purkupaikka_id = $1;
 `;
 
+// 3. SELECT_UNLOADING_SITES_BY_CLIENT_ID
 export const SELECT_UNLOADING_SITES_BY_CLIENT_ID = `
     SELECT * 
     FROM public.purkupaikka 

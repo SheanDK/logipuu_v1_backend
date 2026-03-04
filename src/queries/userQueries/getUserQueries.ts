@@ -1,11 +1,6 @@
 // backend/src/queries/userQueries/getUserQueries.ts
 
-// backend/src/queries/userQueries/getUserQueries.ts
-
-// NOTE: We are REMOVING all "AS camelCase" aliases.
-// The `camelcase-keys` library in `db.ts` will automatically handle the conversion
-// from snake_case (e.g., kulj_id) to camelCase (e.g., kuljId).
-
+// 1. SELECT_USER_PROFILE_BY_tunnus
 export const SELECT_USER_PROFILE_BY_tunnus = `
     SELECT
         k.tunnus,
@@ -21,11 +16,12 @@ export const SELECT_USER_PROFILE_BY_tunnus = `
     GROUP BY k.tunnus, k.nimi, k.kulj_id, kj.email;
 `;
 
+// 2. SELECT_KAYTTAJAT_PASSWORD_BY_tunnus
 export const SELECT_KAYTTAJAT_PASSWORD_BY_tunnus = `
     SELECT salasana FROM public.kayttajat WHERE tunnus = $1 AND aktiivinen = TRUE;
 `;
 
-// CORRECTED: The query that caused the error is now fixed.
+// 3. SELECT_ALL_USERS_FOR_ADMIN
 export const SELECT_ALL_USERS_FOR_ADMIN = `
     SELECT
         k.tunnus,
@@ -41,6 +37,7 @@ export const SELECT_ALL_USERS_FOR_ADMIN = `
     ORDER BY k.nimi ASC;
 `;
 
+// 4. SELECT_USER_BY_tunnus_FOR_ADMIN
 export const SELECT_USER_BY_tunnus_FOR_ADMIN = `
     SELECT
         k.tunnus,
@@ -52,12 +49,14 @@ export const SELECT_USER_BY_tunnus_FOR_ADMIN = `
     WHERE k.tunnus = $1;
 `;
 
+// 5. SELECT_USER_ROLE_IDS_BY_TUNNUS
 export const SELECT_USER_ROLE_IDS_BY_TUNNUS = `
   SELECT kr.rooli_id AS "rooliId"
   FROM public.kayttaja_roolit kr
   WHERE kr.kayttaja_tunnus = $1;
 `;
 
+// 6. SELECT_USER_WITH_ROLES_FOR_ADMIN
 export const SELECT_USER_WITH_ROLES_FOR_ADMIN = `
   SELECT
     u.tunnus       AS "tunnus",

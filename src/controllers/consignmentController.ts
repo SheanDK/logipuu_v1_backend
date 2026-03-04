@@ -1,12 +1,10 @@
 // backend/src/controllers/consignmentController.ts
 import { Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../middlewares/authMiddleware'; // හෝ ඔබේ Request type එක
+import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import * as consignmentService from '../services/consignmentService';
 
-/**
- * GET /api/consignments/search
- * Handles searching via query parameters.
- */
+// GET /api/consignments/search
+// Handles searching via query parameters.
 export const searchConsignmentsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
 
@@ -29,10 +27,8 @@ export const searchConsignmentsHandler = async (req: AuthenticatedRequest, res: 
     }
 };
 
-/**
- * GET /api/consignments/:id
- * Handles fetching by ID.
- */
+// GET /api/consignments/:id
+// Handles fetching by ID.
 export const getConsignmentByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -51,9 +47,8 @@ export const getConsignmentByIdHandler = async (req: AuthenticatedRequest, res: 
     }
 };
 
-/**
- * POST /api/consignments
- */
+// POST /api/consignments
+// Handles creating a new consignment.
 export const createConsignmentHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const newId = await consignmentService.createConsignment(req.body);
@@ -64,9 +59,8 @@ export const createConsignmentHandler = async (req: AuthenticatedRequest, res: R
     }
 };
 
-/**
- * PATCH /api/consignments/:id
- */
+// PATCH /api/consignments/:id
+// Handles updating an existing consignment.
 export const updateConsignmentHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -82,15 +76,13 @@ export const updateConsignmentHandler = async (req: AuthenticatedRequest, res: R
     }
 };
 
-/**
- * DELETE /api/consignments/:id
- */
+// DELETE /api/consignments/:id
+// Handles deleting an existing consignment.
 export const deleteConsignmentHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
         if (isNaN(id)) return res.status(400).json({ message: "Invalid ID format." });
 
-        // Check if billed before delete
         const status = await consignmentService.checkConsignmentStatus(id);
         if (status === 'billed') {
             return res.status(409).json({ message: 'Cannot delete a billed consignment.' });
@@ -106,13 +98,11 @@ export const deleteConsignmentHandler = async (req: AuthenticatedRequest, res: R
     }
 };
 
-/**
- * POST /api/consignments/invoice
- */
+// POST /api/consignments/invoice
+// Handles invoicing multiple consignments.
 export const invoiceManyHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const { kuormaIds } = req.body;
-        // Ensure ids are numbers
         const ids = (Array.isArray(kuormaIds) ? kuormaIds : []).map((x: any) => Number(x)).filter((n: number) => !isNaN(n));
 
         const result = await consignmentService.invoiceKuormat(ids);

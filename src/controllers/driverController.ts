@@ -4,6 +4,7 @@ import * as driverService from '../services/driverService';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import { CreateDriverDto, UpdateDriverDto } from '../dto/driver.dto';
 
+// 1. Get All Drivers
 export const getAllDriversHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         console.log(`User ${req.user?.userId} fetching all drivers.`);
@@ -14,6 +15,7 @@ export const getAllDriversHandler = async (req: AuthenticatedRequest, res: Respo
     }
 };
 
+// 2. Get Driver By ID
 export const getDriverByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const driverId = parseInt(req.params.id as string, 10);
@@ -30,6 +32,7 @@ export const getDriverByIdHandler = async (req: AuthenticatedRequest, res: Respo
     }
 };
 
+// 3. Create Driver
 export const createDriverHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const driverData = req.body as CreateDriverDto;
@@ -40,6 +43,7 @@ export const createDriverHandler = async (req: AuthenticatedRequest, res: Respon
     }
 };
 
+// 4. Update Driver
 export const updateDriverHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const driverId = parseInt(req.params.id as string, 10);
@@ -57,6 +61,7 @@ export const updateDriverHandler = async (req: AuthenticatedRequest, res: Respon
     }
 };
 
+// 5. Delete Driver
 export const deleteDriverHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const driverId = parseInt(req.params.id as string, 10);
@@ -73,9 +78,7 @@ export const deleteDriverHandler = async (req: AuthenticatedRequest, res: Respon
     }
 };
 
-/**
- * driver without account
- */
+// 6. Get Drivers Without Account
 export const getDriversWithoutAccountHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const drivers = await driverService.getDriversWithoutAccount();

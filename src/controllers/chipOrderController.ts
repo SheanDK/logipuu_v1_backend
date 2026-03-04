@@ -40,6 +40,7 @@ export const createChipOrder = async (req: Request, res: Response) => {
     }
 };
 
+// 2. Get Active Chip Orders
 export const getActiveChipOrders = async (req: Request, res: Response) => {
     try {
         const query = `
@@ -108,7 +109,6 @@ export const scheduleChipLoad = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'kalusto_nro, title_id, and pvm are required' });
         }
 
-        // We use chipPlanningService to handle serial_no and correct column names
         const { chipPlanningService } = require('../services/chipPlanningService');
         const newLoad = await chipPlanningService.createLoadRecord({
             vehicle_number: Number(kalusto_nro),

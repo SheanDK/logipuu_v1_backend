@@ -11,10 +11,11 @@ import {
     createQuickPurkupaikkaHandler,
     searchAddressHandler
 } from '../controllers/locationController';
-
+// 1. Define Permissions
 const router = Router();
 const allowedRoles = ['Admin', 'Superuser'];
 
+// 2. Define Roles
 router.post('/update', protect, authorize(['Kuljettaja', 'Admin', 'Superuser']), validateDto(UpdateLocationDto), updateVehicleLocationHandler);
 router.post('/quick-puulaani', protect, authorize(allowedRoles), createQuickPuulaaniHandler);
 router.post('/quick-purkupaikka', protect, authorize(allowedRoles), createQuickPurkupaikkaHandler);

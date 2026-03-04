@@ -2,6 +2,7 @@
 import pool from '../config/db';
 import { chipQueries } from '../queries/chipQueries/chipQueries';
 
+// --- CHIP TITLE SERVICE ---
 export const chipTitleService = {
     getAll: async () => {
         const res = await pool.query(chipQueries.getAllTitles);

@@ -3,6 +3,7 @@ import { IsInt, IsNotEmpty, IsString, MaxLength, IsNumber, IsLatitude, IsLongitu
 import { Type } from 'class-transformer';
 import { OtherInfoTypeEnum } from '../types/otherInfo.types';
 
+// 1. --- CREATE OTHER INFO DTO ---
 export class CreateOtherInfoDto {
     @IsEnum(OtherInfoTypeEnum) @IsNotEmpty()
     type!: OtherInfoTypeEnum;
@@ -17,6 +18,7 @@ export class CreateOtherInfoDto {
     longitude!: number;
 }
 
+// 2. --- UPDATE OTHER INFO DTO ---
 export class UpdateOtherInfoDto {
     @IsEnum(OtherInfoTypeEnum) @IsOptional()
     type?: OtherInfoTypeEnum;
