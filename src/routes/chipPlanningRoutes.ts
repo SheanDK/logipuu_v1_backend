@@ -8,7 +8,9 @@ import {
     deleteAssignedLoad,
     moveAssignedLoad,
     addVehicleToPlan,
-    getChipMapData
+    getChipMapData,
+    getChipLoadsByWeek,
+    setChipLoad
 } from '../controllers/chipPlanningController';
 
 const router = Router();
@@ -28,5 +30,7 @@ router.patch('/move-load', moveAssignedLoad);
 router.post('/add-vehicle', addVehicleToPlan);
 
 router.get('/map-data', getChipMapData);
+router.get('/loads', getChipLoadsByWeek);
+router.post('/set-load', setChipLoad);
 
 export default router;
