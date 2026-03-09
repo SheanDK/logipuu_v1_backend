@@ -1,7 +1,7 @@
 // backend/src/types/chipTransportTypes.ts
 
 export type ChipLoadStatus = 'NOT_SENT' | 'DISPATCHED' | 'LOADED' | 'COMPLETED';
-
+//1. ChipTitle
 export interface ChipTitle {
     title_id?: number;
     title_number: string;
@@ -23,7 +23,7 @@ export interface ChipTitle {
     req_details_info?: string;
     is_active: boolean;
 }
-
+//2. ChipLoad
 export interface ChipLoad {
     load_id?: number;
     title_id: number;

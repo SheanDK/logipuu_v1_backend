@@ -1,6 +1,6 @@
 //backend/src/types/dashboard.types.ts
 
-// Admin Dashboard
+//1. Admin Dashboard
 export interface IAdminDashboardStats {
     activeTimberStacksCount: number;
     loadsCompletedTodayCount: number;
@@ -10,7 +10,7 @@ export interface IAdminDashboardStats {
     activeDriversCount: number;
 }
 
-// Dispatcher Dashboard 
+//2. Dispatcher Dashboard 
 export interface IDispatchDashboardStats {
     activeLoadsCount: number;
     availableDriversCount: number;
@@ -19,7 +19,7 @@ export interface IDispatchDashboardStats {
     upcomingLoadsTodayCount: number;
 }
 
-// Driver Dashboard 
+//3. Driver Dashboard 
 export interface IDriverDashboardStats {
     driverId: number;
     todayAssignedLoadsCount: number;
@@ -28,17 +28,17 @@ export interface IDriverDashboardStats {
     upcomingLoadsCount: number;
 }
 
-// Admin/Dispatch dashboards 
+//4. Admin/Dispatch dashboards 
 export interface IVolumeByDay {
-    date: string; // e.g., "Nov 13"
+    date: string;
     volume: number;
 }
 
-// Dispatch Dashboard
+//5. Dispatch Dashboard
 export interface IActiveTripListItem {
-    ajomaaraysNro: string; // Trip ID
+    ajomaaraysNro: string;
     driverName: string | null;
     vehicleRegNo: string | null;
     status: string;
-    progress: number; // 0-100
+    progress: number;
 }

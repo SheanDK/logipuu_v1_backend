@@ -1,4 +1,6 @@
 // backend/src/types/otherInfo.types.ts
+
+//1. This enum is API response for /api/otherInfo endpoint.
 export enum OtherInfoTypeEnum {
     WARNING = 'VAROITUS',
     STACK_SLOT = 'PINOAMISPAIKKA',
@@ -6,10 +8,11 @@ export enum OtherInfoTypeEnum {
     OTHER = 'MUU',
 }
 
+//2. This interface is API response for /api/otherInfo endpoint.
 export interface IOtherInfo {
-    muutietoId: number; // Primary Key
-    tyyppi: OtherInfoTypeEnum; // Type of info (e.g., Warning, Stack Slot)
-    lisatieto: string | null; // Additional details
-    sijaintiLat: number; // Latitude
-    sijaintiLong: number; // Longitude
+    muutietoId: number;
+    tyyppi: OtherInfoTypeEnum;
+    lisatieto: string | null;
+    sijaintiLat: number;
+    sijaintiLong: number;
 }

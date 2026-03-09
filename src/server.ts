@@ -5,8 +5,7 @@ import cors from 'cors';
 import http from 'http';
 import db from './config/db';
 import { socketService } from './services/socketService';
-
-// --- Import All Your Routes Here ---
+//1. Import All Routes Here
 import authRoutes from './routes/authRoutes';
 import clientRoutes from './routes/clientRoutes';
 import vehicleRoutes from './routes/vehicleRoutes';
@@ -31,8 +30,8 @@ import woodCategoryRoutes from './routes/woodCategoryRoutes';
 import chipOrderRoutes from './routes/chipOrderRoutes';
 import chipTitleRoutes from './routes/chipTitleRoutes';
 import chipPlanningRoutes from './routes/chipPlanningRoutes';
-
 import { globalErrorHandler } from './middlewares/errorHandler';
+import chipInvoicingRoutes from './routes/chipInvoicingRoutes';
 
 dotenv.config();
 
@@ -42,11 +41,8 @@ const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
 const httpServer = http.createServer(app);
 
-// --- FIX 1: Pass the string URL to the service. The service will handle options. ---
-// This matches the signature of your `socketService.ts` file.
 socketService.initialize(httpServer, frontendUrl);
 
-// --- FIX 2: Correct CORS setup for Express v5 ---
 const corsOptions = {
     origin: frontendUrl,
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
@@ -54,11 +50,7 @@ const corsOptions = {
     allowedHeaders: "Origin, X-Requested-With, Content-Type, Accept, Authorization"
 };
 
-// This one 'app.use(cors(corsOptions))' handles ALL requests, including pre-flight OPTIONS requests.
 app.use(cors(corsOptions));
-
-// This line is redundant and causes the error in Express v5.
-// app.options('*', cors(corsOptions)); // <-- REMOVED
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -68,7 +60,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     next();
 });
 
-// --- API Routes ---
+//2. API Routes
 const apiRouter = express.Router();
 apiRouter.use('/auth', authRoutes);
 apiRouter.use('/users', userRoutes);
@@ -94,7 +86,7 @@ apiRouter.use('/driver/consignments', consignmentDriverRoutes);
 apiRouter.use('/chip-orders', chipOrderRoutes);
 apiRouter.use('/chip-titles', chipTitleRoutes);
 apiRouter.use('/chip-planning', chipPlanningRoutes);
-
+apiRouter.use('/chip-invoicing', chipInvoicingRoutes);
 
 app.use('/api', apiRouter);
 
