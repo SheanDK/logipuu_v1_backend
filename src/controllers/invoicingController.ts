@@ -63,7 +63,7 @@ const mapRowToPayload = (r: any) => ({
 });
 
 
-// --- SEARCH ---
+// 1. --- SEARCH ---
 export const searchInvoicingHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { dateFrom, dateTo, customerId, vehicleId, woodTypeIds, unbilled, billed } =
@@ -87,6 +87,7 @@ export const searchInvoicingHandler = async (req: AuthenticatedRequest, res: Res
   } catch (e) { next(e); }
 };
 
+// 2. --- UPDATE ---
 export const updateInvoicingHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
@@ -114,6 +115,8 @@ export const updateInvoicingHandler = async (req: AuthenticatedRequest, res: Res
     res.status(200).json(payload);
   } catch (e) { next(e); }
 };
+
+// 3. --- INVOICE MANY ---
 export const invoiceManyHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const raw = (req.body?.ids ?? []) as Array<string | number>;

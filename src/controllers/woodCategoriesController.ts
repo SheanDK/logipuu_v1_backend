@@ -3,6 +3,7 @@ import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import * as woodService from '../services/woodCategoriesService';
 import { CreateWoodCategoryDto, UpdateWoodCategoryDto } from '../dto/woodCategory.dto';
 
+// 1. --- GET ALL WOOD CATEGORIES ---
 export const getAllWoodCategoriesHandler = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -17,6 +18,7 @@ export const getAllWoodCategoriesHandler = async (
   }
 };
 
+// 2. --- GET WOOD CATEGORY BY ID ---
 export const getWoodCategoryByIdHandler = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -35,6 +37,7 @@ export const getWoodCategoryByIdHandler = async (
   }
 };
 
+// 3. --- CREATE WOOD CATEGORY ---
 export const createWoodCategoryHandler = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -49,6 +52,7 @@ export const createWoodCategoryHandler = async (
   }
 };
 
+// 4. --- UPDATE WOOD CATEGORY ---
 export const updateWoodCategoryHandler = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -68,6 +72,7 @@ export const updateWoodCategoryHandler = async (
   }
 };
 
+// 5. --- DELETE WOOD CATEGORY ---
 export const deleteWoodCategoryHandler = async (
   req: AuthenticatedRequest,
   res: Response,

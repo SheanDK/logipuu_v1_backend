@@ -1,36 +1,42 @@
-//backend/src/types/chipTransportTypes.ts
+// backend/src/types/chipTransportTypes.ts
 
 export type ChipLoadStatus = 'NOT_SENT' | 'DISPATCHED' | 'LOADED' | 'COMPLETED';
-
-export interface ChipOrder {
-    order_id?: number;
-    asiakas_id: number;
-    pvm_alku: string; // Date string (YYYY-MM-DD)
-    pvm_loppu: string;
-    kuormia_tavoite: number;
-    tuote_tyyppi?: string;
-    lisatiedot?: string;
-    is_active?: boolean;
+//1. ChipTitle
+export interface ChipTitle {
+    title_id?: number;
+    title_number: string;
+    customer_id: number;
+    loading_point_id: number;
+    unloading_point_id: number;
+    product_number: number;
+    title_name: string;
+    abbreviation?: string;
+    invoicing_basis: 'Tons' | 'M3' | 'Pcs';
+    driver_instructions?: string;
+    req_pcs: boolean;
+    req_m3: boolean;
+    req_ton: boolean;
+    req_hr: boolean;
+    req_waiting: boolean;
+    req_km: boolean;
+    req_details: boolean;
+    req_details_info?: string;
+    is_active: boolean;
 }
-
-export interface WeeklyProgram {
-    program_id?: number;
-    kalusto_nro: number;
-    kulj_id: number;
-    viikko_nro: number;
-    vuosi: number;
-    created_at?: Date;
-}
-
+//2. ChipLoad
 export interface ChipLoad {
     load_id?: number;
-    program_id: number;
-    order_id: number;
-    pvm: string; // Date
+    title_id: number;
+    vehicle_number: number;
+    order_id?: number;
+    scheduled_date: string;
+    serial_no: number;
     status: ChipLoadStatus;
-    lahto_paikka: number; // puulaani_id
-    purku_paikka: number; // purkupaikka_id
-    planned_m3: number;
+    actual_ton?: number;
     actual_m3?: number;
-    completion_timestamp?: Date;
+    actual_pcs?: number;
+    actual_hr?: number;
+    actual_km?: number;
+    actual_waiting?: number;
+    actual_details?: string;
 }

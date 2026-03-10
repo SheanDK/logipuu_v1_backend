@@ -17,19 +17,19 @@ const CREATE_USERS = ['users_create'];
 const EDIT_USERS = ['users_edit'];
 const DELETE_USERS = ['users_delete'];
 
-// get all users
+// 3. Get all users
 router.get('/', protect, authorize(adminRoles, VIEW_USERS), adminUserController.getAllUsersHandler);
 
-// create new user
+// 4. Create new user
 router.post('/', protect, authorize(adminRoles, CREATE_USERS), validateDto(CreateUserDto), adminUserController.createUserHandler);
 
-// get details of a specific user by username
+// 5. Get details of a specific user by username
 router.get('/:username', protect, authorize(adminRoles, VIEW_USERS), adminUserController.getUserByTunnusHandler);
 
-// Update user
+// 6. Update user
 router.put('/:username', protect, authorize(adminRoles, EDIT_USERS), validateDto(AdminUpdateUserDto), adminUserController.updateUserHandler);
 
-// Delete user
+// 7. Delete user
 router.delete('/:username', protect, authorize(adminRoles, DELETE_USERS), adminUserController.deleteUserHandler);
 
 export default router;

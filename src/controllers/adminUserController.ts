@@ -4,29 +4,23 @@ import { Request, Response, NextFunction } from 'express';
 import * as adminUserService from '../services/adminUserService';
 import { CreateUserDto, AdminUpdateUserDto } from '../dto/user.dto';
 
-/**
- * Handler to get all users.
- */
+// Handler to get all users.
 export const getAllUsersHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const users = await adminUserService.adminGetAllUsers(); // Correctly calls adminGetAllUsers
+        const users = await adminUserService.adminGetAllUsers();
         res.status(200).json(users);
     } catch (error) {
         next(error);
     }
 };
 
-/**
- * Handler to get a single user by username (tunnus).
- */
+// Handler to get a single user by username (tunnus).
 export const getUserByTunnusHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { username } = req.params;
         const user = await adminUserService.adminGetUserByTunnus(username as string);
 
-        //console.log('[GET /admin/users/:tunnus] user =', JSON.stringify(user, null, 2));
-
-        if (!user) { // This check is now valid because the service returns a user or null.
+        if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
         res.status(200).json(user);
@@ -35,13 +29,9 @@ export const getUserByTunnusHandler = async (req: Request, res: Response, next: 
     }
 };
 
-
-/**
- * Handler to create a new user.
- */
+// Handler to create a new user.
 export const createUserHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        // req.body එකේ දැන් username, fullName, password, roleIds, isActive, kuljId 
         const newUser = await adminUserService.adminCreateNewUser(req.body);
         res.status(201).json(newUser);
     } catch (error: any) {
@@ -52,9 +42,7 @@ export const createUserHandler = async (req: Request, res: Response, next: NextF
     }
 };
 
-/**
- * Handler to update a user by an admin.
- */
+// Handler to update a user by an admin.
 export const updateUserHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { username } = req.params;
@@ -69,7 +57,7 @@ export const updateUserHandler = async (req: Request, res: Response, next: NextF
         }
 
         const updatedUser = await adminUserService.adminUpdateUser(username as string, updateData);
-        if (!updatedUser) { // This check is now valid.
+        if (!updatedUser) {
             return res.status(404).json({ message: 'User not found for update.' });
         }
 
@@ -89,9 +77,7 @@ export const updateUserHandler = async (req: Request, res: Response, next: NextF
 
 };
 
-/**
- * Handler to delete a user.
- */
+// Handler to delete a user.
 export const deleteUserHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { username } = req.params;

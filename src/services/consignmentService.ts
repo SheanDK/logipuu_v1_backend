@@ -5,6 +5,7 @@ import pool from '../config/db';
  * Interfaces
  * ---------------------------------------------------------------------------*/
 
+//1. Search Filters
 export interface SearchFilters {
     dateFrom: string;
     dateTo: string;
@@ -14,6 +15,7 @@ export interface SearchFilters {
     billed: boolean;
 }
 
+//2. Create Consignment
 export interface CreateConsignmentDto {
     kuormaId: number;
     pvm: string | null;
@@ -32,6 +34,7 @@ export interface CreateConsignmentDto {
     koko_hinta: number;
 }
 
+//3. Update Consignment
 export interface UpdateConsignmentDto {
     pvm?: string;
     rahtikirjanNro?: string;
@@ -53,6 +56,7 @@ export interface UpdateConsignmentDto {
  * Service Functions
  * ---------------------------------------------------------------------------*/
 
+//1. Search Consignments
 export const searchConsignments = async (filters: SearchFilters) => {
     const params: any[] = [];
     const where: string[] = [];
@@ -126,6 +130,7 @@ export const searchConsignments = async (filters: SearchFilters) => {
     return result.rows;
 };
 
+//2. Get Consignment by ID
 export const getConsignmentById = async (id: number) => {
     const query = `
         SELECT
@@ -163,6 +168,7 @@ export const getConsignmentById = async (id: number) => {
     return result.rows[0] || null;
 };
 
+//3. Create Consignment
 export const createConsignment = async (dto: CreateConsignmentDto) => {
     const query = `
         INSERT INTO public.rahtikirja (
@@ -193,6 +199,7 @@ export const createConsignment = async (dto: CreateConsignmentDto) => {
     return result.rows[0];
 };
 
+//4. Update Consignment
 export const updateConsignment = async (id: number, dto: UpdateConsignmentDto) => {
     const fields: string[] = [];
     const params: any[] = [id];
@@ -209,18 +216,14 @@ export const updateConsignment = async (id: number, dto: UpdateConsignmentDto) =
     addField('rahtikirjan_nro', dto.rahtikirjanNro);
     addField('reitti', dto.reitti);
     addField('lisatiedot', dto.lisatiedot);
-
     addField('m3', dto.m3);
     addField('km', dto.km);
     addField('kpl', dto.kpl);
     addField('jako', dto.jako);
-
-    // --- FIX: Ensure Prices are added ---
     addField('m3_hinta', dto.m3_hinta);
     addField('km_hinta', dto.km_hinta);
     addField('kpl_hinta', dto.kpl_hinta);
     addField('jako_hinta', dto.jako_hinta);
-
     addField('tievero', dto.tievero);
     addField('koko_hinta', dto.koko_hinta);
 
@@ -237,6 +240,7 @@ export const updateConsignment = async (id: number, dto: UpdateConsignmentDto) =
     }
 };
 
+//5. Check Consignment Status
 export const checkConsignmentStatus = async (id: number): Promise<'billed' | 'notfound' | 'ok'> => {
     const result = await pool.query('SELECT pvm_laskutus FROM public.rahtikirja WHERE rahti_id = $1', [id]);
     if (result.rowCount === 0) return 'notfound';
@@ -244,11 +248,13 @@ export const checkConsignmentStatus = async (id: number): Promise<'billed' | 'no
     return 'ok';
 };
 
+//6. Delete Consignment
 export const deleteConsignment = async (id: number) => {
     const result = await pool.query('DELETE FROM public.rahtikirja WHERE rahti_id = $1', [id]);
     return result.rowCount ? result.rowCount > 0 : false;
 };
 
+//7. Invoice Kuormat
 export const invoiceKuormat = async (kuormaIds: number[]) => {
     if (kuormaIds.length === 0) {
         return { updated: 0, updatedKuormaIds: [], alreadyBilled: 0, alreadyIds: [], notFound: 0, notFoundIds: [] };

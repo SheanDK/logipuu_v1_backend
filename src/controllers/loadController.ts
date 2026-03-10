@@ -4,6 +4,7 @@ import * as loadService from '../services/loadService';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import { CreateLoadDto, UpdateLoadDto, UpdateLoadStatusDto, CompleteLoadDto, AcceptLoadsDto, CreateBulkLoadDto } from '../dto/load.dto';
 
+// 1. --- GET ALL LOADS ---
 export const getAllLoadsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const filters: loadService.ILoadListFilters = {
@@ -21,7 +22,7 @@ export const getAllLoadsHandler = async (req: AuthenticatedRequest, res: Respons
     }
 };
 
-// --- THIS IS THE UPDATED HANDLER WITH A SECURITY CHECK ---
+// 2. --- THIS IS THE UPDATED HANDLER WITH A SECURITY CHECK ---
 export const getLoadByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -37,7 +38,6 @@ export const getLoadByIdHandler = async (req: AuthenticatedRequest, res: Respons
             return res.status(404).json({ message: `Trip details could not be found for load ID ${id}` });
         }
 
-        // Security check for driver role
         const user = req.user!;
         const isDriver = user.roles.includes('Kuljettaja');
         if (isDriver && trip.legs[0].kuljId !== user.driverNumericId) {
@@ -54,6 +54,7 @@ export const getLoadByIdHandler = async (req: AuthenticatedRequest, res: Respons
     }
 };
 
+// 3. --- CREATE LOAD ---
 export const createLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const dto = req.body as CreateLoadDto;
@@ -64,6 +65,7 @@ export const createLoadHandler = async (req: AuthenticatedRequest, res: Response
     }
 };
 
+// 4. --- UPDATE LOAD ---
 export const updateLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -89,6 +91,7 @@ export const updateLoadHandler = async (req: AuthenticatedRequest, res: Response
     }
 };
 
+// 5. --- DELETE LOAD ---
 export const deleteLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -109,7 +112,7 @@ export const deleteLoadHandler = async (req: AuthenticatedRequest, res: Response
     }
 };
 
-// --- THIS IS THE NEW HANDLER FOR THE DRIVER'S PORTAL ---
+// 6. --- MY LOADS ---
 export const getMyLoadsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const user = req.user;
@@ -128,7 +131,7 @@ export const getMyLoadsHandler = async (req: AuthenticatedRequest, res: Response
     }
 };
 
-// --- THIS IS THE NEW HANDLER FOR STATUS UPDATES ---
+// 7. --- STATUS UPDATES ---
 export const updateLoadStatusHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const user = req.user;
@@ -155,6 +158,7 @@ export const updateLoadStatusHandler = async (req: AuthenticatedRequest, res: Re
     }
 };
 
+// 8. --- COMPLETE LOAD ---
 export const completeLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const user = req.user!;
@@ -181,7 +185,7 @@ export const completeLoadHandler = async (req: AuthenticatedRequest, res: Respon
     }
 };
 
-// --- THIS IS THE NEW HANDLER FOR THE DRIVEN/INSPECTION PAGE ---
+// 9. --- DRIVEN/INSPECTION PAGE ---
 export const getLoadsForInspectionHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const loads = await loadService.getLoadsForInspection();
@@ -191,6 +195,7 @@ export const getLoadsForInspectionHandler = async (req: AuthenticatedRequest, re
     }
 };
 
+// 10. --- ACCEPT LOADS ---
 export const acceptLoadsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const { loadIds } = req.body as AcceptLoadsDto;
@@ -201,6 +206,7 @@ export const acceptLoadsHandler = async (req: AuthenticatedRequest, res: Respons
     }
 };
 
+// 11. --- MY COMPLETED LOADS ---
 export const getMyCompletedLoadsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const user = req.user;
@@ -215,6 +221,7 @@ export const getMyCompletedLoadsHandler = async (req: AuthenticatedRequest, res:
     }
 };
 
+// 12. --- MY LAST COMPLETED LOAD ---
 export const getMyLastCompletedLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const user = req.user;
@@ -228,6 +235,7 @@ export const getMyLastCompletedLoadHandler = async (req: AuthenticatedRequest, r
     }
 };
 
+// 13. --- ACTIVE TRIPS FOR MAP ---
 export const getActiveTripsForMapHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const trips = await loadService.getActiveTripsForMap();
@@ -237,6 +245,7 @@ export const getActiveTripsForMapHandler = async (req: AuthenticatedRequest, res
     }
 };
 
+// 14. --- UPDATE TRIP BY LOAD ID ---
 export const updateTripHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const user = req.user!;
@@ -263,8 +272,7 @@ export const updateTripHandler = async (req: AuthenticatedRequest, res: Response
     }
 };
 
-// --- NEW HANDLER ---
-
+// 15. --- CREATE BULK LOAD ---
 export const createBulkLoadHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const dto = req.body as CreateBulkLoadDto;
@@ -286,6 +294,7 @@ export const createBulkLoadHandler = async (req: AuthenticatedRequest, res: Resp
     }
 };
 
+// 16. --- UPDATE TRIP STATUS ---
 export const updateTripStatusHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const user = req.user!;

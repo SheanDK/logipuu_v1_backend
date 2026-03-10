@@ -2,12 +2,13 @@
 import { IsInt, IsNotEmpty, IsString, MaxLength, IsNumber, Min, IsOptional, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 
+// 1. --- CREATE WAYBILL DTO ---
 export class CreateWaybillDto {
     @IsDateString() @IsNotEmpty()
     pvm!: string;
 
     @IsInt() @IsNotEmpty() @Type(() => Number)
-    kuormaId!: number; // Foreign key to kuorma (Load)
+    kuormaId!: number;
 
     @IsString() @IsOptional() @MaxLength(45)
     rahtikirjanNro?: string | null;
@@ -49,6 +50,7 @@ export class CreateWaybillDto {
     lisatiedot?: string | null;
 }
 
+// 2. --- UPDATE WAYBILL DTO ---
 export class UpdateWaybillDto {
     @IsDateString() @IsOptional()
     pvm?: string;

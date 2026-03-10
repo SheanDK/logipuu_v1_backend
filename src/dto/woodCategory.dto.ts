@@ -1,26 +1,21 @@
 import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 
-/**
- * DTO for creating a wood category.
- * These are classes (not interfaces) so they can be used at runtime by validation middleware.
- */
+// 1. --- CREATE WOOD CATEGORY DTO ---
 export class CreateWoodCategoryDto {
   @IsString()
   @MaxLength(50)
-  puutavara!: string;       // required
+  puutavara!: string;
 
   @IsOptional()
   @IsString()
-  lisatiedot?: string;      // optional
+  lisatiedot?: string;
 
   @IsOptional()
   @IsBoolean()
-  aktiivinen?: boolean;     // optional (defaults to true in service)
+  aktiivinen?: boolean;
 }
 
-/**
- * DTO for updating a wood category (all fields optional).
- */
+// 2. --- UPDATE WOOD CATEGORY DTO ---
 export class UpdateWoodCategoryDto {
   @IsOptional()
   @IsString()

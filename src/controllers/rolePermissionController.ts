@@ -3,10 +3,7 @@ import { Response, NextFunction } from 'express';
 import * as service from '../services/rolePermissionService';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 
-/**
- * Handler to get all roles WITH their assigned permissions.
- * Used for the main settings page.
- */
+// 1. --- GET ALL ROLES WITH PERMISSIONS ---
 export const getRolesAndPermissionsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const data = await service.getRolesAndPermissions(); // Use the correct service function name
@@ -16,9 +13,7 @@ export const getRolesAndPermissionsHandler = async (req: AuthenticatedRequest, r
     }
 };
 
-/**
- * Handler to get all available permissions in the system.
- */
+// 2. --- GET ALL PERMISSIONS ---
 export const getAllPermissionsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const data = await service.getAllPermissions(); // Use the correct service function name
@@ -28,9 +23,7 @@ export const getAllPermissionsHandler = async (req: AuthenticatedRequest, res: R
     }
 };
 
-/**
- * Handler to update the permissions for a specific role.
- */
+// 3. --- UPDATE PERMISSIONS FOR ROLE ---
 export const updatePermissionsForRoleHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const roleId = parseInt(req.params.roleId as string, 10);
@@ -50,16 +43,10 @@ export const updatePermissionsForRoleHandler = async (req: AuthenticatedRequest,
 };
 
 
-// <<<--- CORRECTION IS HERE ---<<<
-// This is the correct implementation for the new handler.
-/**
- * Handler to get a simple list of all roles (ID and Name).
- * Used for populating dropdowns in the UI.
- */
+// 4. --- GET ALL ROLES LIST ---
 export const getAllRolesListHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        // This handler should call a specific service function for fetching just the role list.
-        const roles = await service.fetchAllRolesList(); // We need to create this service function
+        const roles = await service.fetchAllRolesList();
         res.status(200).json(roles);
     } catch (error) {
         next(error);

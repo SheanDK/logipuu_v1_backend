@@ -1,7 +1,7 @@
-// src/queries/invoicingQueries.ts
+// backend/src/queries/invoicingQueries.ts
 import { UpdateInvoicingDto } from "../services/invoicingService";
 
-/** SEARCH */
+// 1. buildInvoicingSearchQuery
 export function buildInvoicingSearchQuery(filters: {
   dateFrom: string;
   dateTo: string;
@@ -87,7 +87,7 @@ export function buildInvoicingSearchQuery(filters: {
   return { sql, params };
 }
 
-/** UPDATE kuorma – vain annetut kentät */
+// 2. buildUpdateInvoicingRowQuery
 export function buildUpdateInvoicingRowQuery(id: number, dto: UpdateInvoicingDto) {
   const sets: string[] = [];
   const params: any[] = [];
@@ -99,22 +99,22 @@ export function buildUpdateInvoicingRowQuery(id: number, dto: UpdateInvoicingDto
     i += 1;
   };
 
-  if (dto.waybillNumber !== undefined)   push('ajomaarays_nro = ?', dto.waybillNumber);
-  if (dto.vastaanottoNro !== undefined)  push('vastaanotto_nro = ?', dto.vastaanottoNro);
-  if (dto.route !== undefined)           push('reitti = ?', dto.route);
-  if (dto.notes !== undefined)           push('lisatiedot = ?', dto.notes);
+  if (dto.waybillNumber !== undefined) push('ajomaarays_nro = ?', dto.waybillNumber);
+  if (dto.vastaanottoNro !== undefined) push('vastaanotto_nro = ?', dto.vastaanottoNro);
+  if (dto.route !== undefined) push('reitti = ?', dto.route);
+  if (dto.notes !== undefined) push('lisatiedot = ?', dto.notes);
 
-  if (dto.m3 !== undefined)              push('m3 = ?', dto.m3);
-  if (dto.km !== undefined)              push('km = ?', dto.km);
-  if (dto.hours !== undefined)           push('tunnit = ?', dto.hours);
-  if (dto.pieces !== undefined)          push('kpl = ?', dto.pieces);
+  if (dto.m3 !== undefined) push('m3 = ?', dto.m3);
+  if (dto.km !== undefined) push('km = ?', dto.km);
+  if (dto.hours !== undefined) push('tunnit = ?', dto.hours);
+  if (dto.pieces !== undefined) push('kpl = ?', dto.pieces);
 
-  if (dto.unitPriceM3 !== undefined)     push('m3_hinta = ?', dto.unitPriceM3);
-  if (dto.unitPriceKm !== undefined)     push('km_hinta = ?', dto.unitPriceKm);
-  if (dto.unitPriceHour !== undefined)   push('tunnit_hinta = ?', dto.unitPriceHour);
-  if (dto.unitPricePiece !== undefined)  push('kpl_hinta = ?', dto.unitPricePiece);
+  if (dto.unitPriceM3 !== undefined) push('m3_hinta = ?', dto.unitPriceM3);
+  if (dto.unitPriceKm !== undefined) push('km_hinta = ?', dto.unitPriceKm);
+  if (dto.unitPriceHour !== undefined) push('tunnit_hinta = ?', dto.unitPriceHour);
+  if (dto.unitPricePiece !== undefined) push('kpl_hinta = ?', dto.unitPricePiece);
 
-  if (dto.kokohinta !== undefined)       push('kokohinta = ?', dto.kokohinta);
+  if (dto.kokohinta !== undefined) push('kokohinta = ?', dto.kokohinta);
 
   if (dto.billedDate !== undefined) {
     sets.push(`pvm_laskutus = $${i}::date`);
@@ -129,7 +129,7 @@ export function buildUpdateInvoicingRowQuery(id: number, dto: UpdateInvoicingDto
   return { sql, params };
 }
 
-/** GET BY ID – sama kenttälista kuin searchissa */
+// 3. buildGetInvoicingRowByIdQuery
 export function buildGetInvoicingRowByIdQuery(id: number) {
   const sql = `
     SELECT
@@ -172,7 +172,7 @@ export function buildGetInvoicingRowByIdQuery(id: number) {
   return { sql, params: [id] };
 }
 
-/** INVOICE PREFETCH — check existence and whether already billed */
+// 4. buildInvoicePrefetchQuery
 export function buildInvoicePrefetchQuery(ids: number[]) {
   const sql = `
     SELECT kuorma_id, pvm_laskutus
@@ -183,7 +183,7 @@ export function buildInvoicePrefetchQuery(ids: number[]) {
   return { sql, params };
 }
 
-/** INVOICE UPDATE — set pvm_laskutus = CURRENT_DATE for not-yet-billed rows */
+// 5. buildInvoiceManyUpdateQuery
 export function buildInvoiceManyUpdateQuery(ids: number[]) {
   const sql = `
     UPDATE kuorma

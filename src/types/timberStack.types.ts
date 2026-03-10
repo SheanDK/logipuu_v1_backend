@@ -1,6 +1,6 @@
 // backend/src/types/timberStack.types.ts
 
-// ... (ITimberStack, IPuutavaraItem, etc. interfaces remain here)
+//1. This interface is API response for /api/timberStack endpoint.
 export interface ITimberStack {
     puulaaniId: number;
     asiakasId: number;
@@ -20,26 +20,29 @@ export interface ITimberStack {
     clientColor?: string;
 }
 
+//2. This interface is API response for /api/timberStack endpoint.
 export interface IPuutavaraItem {
     puutavaraNro: number;
     puutavara: string;
 }
 
+//3. This interface is API response for /api/timberStack endpoint.
 export interface ITimberStackFilters {
     vehicleId: any;
     clientId?: string;
     status?: 'all' | 'active';
-    timberTypeId?: string;  
+    timberTypeId?: string;
 }
 
+//4. This interface is API response for /api/timberStack endpoint.
 export interface IPuulaaniFullDetails {
-    puulaani: any;      // We keep this flexible for now
-    autot: number[];    // This MUST be an array of numbers
-    timberEntries: any[]; // THIS IS THE FIX: Ensure this property exists
-    relatedLoads: any[];  // This property should also exist
+    puulaani: any;
+    autot: number[];
+    timberEntries: any[];
+    relatedLoads: any[];
 }
 
-// --- CORRECTION: Define the shape for the puulaani object within the DTO ---
+//5. This interface is API response for /api/timberStack endpoint.
 export interface IUpdateTimberStackFullDto {
     puulaani: {
         nimi: string;
@@ -49,7 +52,7 @@ export interface IUpdateTimberStackFullDto {
         aktiivinen: boolean;
         valmis: boolean;
         lisatiedot: string | null;
-        autoNro: string | null; // Corrected to autoNro (camelCase)
+        autoNro: string | null;
         km: number | null;
         sijaintiLat: number | null;
         sijaintiLong: number | null;
@@ -65,20 +68,20 @@ export interface IUpdateTimberStackFullDto {
     }[];
 }
 
-// Filters for the new List View
+//6. This interface is API response for /api/timberStack endpoint.
 export interface ITimberStackListFilters {
-  status?: 'all' | 'active' | 'completed';
-  clientId?: string;
-  vehicleId?: string;
-  timberTypeId?: string;
+    status?: 'all' | 'active' | 'completed';
+    clientId?: string;
+    vehicleId?: string;
+    timberTypeId?: string;
 }
 
-// The structure of a single row in the new List View
+//7. This interface is API response for /api/timberStack endpoint.
 export interface ITimberStackListItem {
-  puulaaniId: number;
-  nimi: string;         // Puulaani name from puulaani table
-  asiakkaanNimi: string; // Customer name from asiakkaat table
-  pvm: string;          // Date from puulaani table
-  kok: number;          // Total size from puulaani table
-  jaljella: number;     // Remaining size from puulaani table
+    puulaaniId: number;
+    nimi: string;
+    asiakkaanNimi: string;
+    pvm: string;
+    kok: number;
+    jaljella: number;
 }

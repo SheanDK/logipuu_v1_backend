@@ -7,7 +7,7 @@ import * as driverViewController from '../controllers/driverViewController';
 const router = Router();
 const driverRoles = ['Kuljettaja'];
 
-// A dedicated route for fetching all data needed for the driver's map view
+// 1. A dedicated route for fetching all data needed for the driver's map view
 router.get(
     '/map-locations',
     protect,
@@ -15,8 +15,7 @@ router.get(
     driverViewController.getMapDataHandler
 );
 
-// --- THIS IS THE NEW ROUTE, ADDED TO THIS FILE ---
-// The URL will be /api/driver/load-for-edit/:id
+// 2. Get load for edit
 router.get(
     '/load-for-edit/:id',
     protect,
@@ -24,7 +23,7 @@ router.get(
     driverViewController.getLoadForEditHandler
 );
 
-// Add this route to the file
+// 3. Get active trip
 router.get(
     '/active-trip',
     protect,
@@ -32,6 +31,7 @@ router.get(
     driverViewController.getActiveTripHandler
 );
 
+// 4. Update timber entry status
 router.put(
     '/puulaani/:id/statuses',
     protect,
@@ -39,6 +39,7 @@ router.put(
     driverViewController.updateTimberEntryStatusHandler
 );
 
+// 5. Get completed trip by ID
 router.get(
     '/completed-trips/:id',
     protect,

@@ -1,17 +1,12 @@
 // backend/src/types/driver.types.ts
 
-/**
- * Interface representing a Driver (Kuljettaja).
- * This should mirror your database table structure for a Driver
- * as returned by your queries (e.g., SELECT ... AS "propertyName").
- */
+//1. Interface is API response for /api/driver endpoint.
 export interface IDriver {
-    driverId: number; // KuljID (assuming it's a string, auto-increment)
-    name: string; // Nimi
-    phoneNo: string; // PuhelinNro
-    email: string; // Email
-    hasAlerts: boolean; // Halytys
-    // Add other fields if they exist, e.g., createdAt, updatedAt
-    createdAt?: Date; // Luotu
-    updatedAt?: Date; // Paivitetty
+    driverId: number;
+    name: string;
+    phoneNo: string;
+    email: string;
+    hasAlerts: boolean;
+    createdAt?: Date;
+    updatedAt?: Date;
 }

@@ -5,12 +5,12 @@ import { protect } from '../middlewares/authMiddleware';
 import { authorize } from '../middlewares/rbacMiddleware';
 
 const router = Router();
-const allowedRoles = ['Superuser', 'Admin', 'Office', 'Ajojärjestelijä']; // Adjust as needed
-
+const allowedRoles = ['Superuser', 'Admin', 'Office', 'Ajojärjestelijä'];
+// 1. Get timber logs for stack
 router.get(
-    '/for-stack/:puulaaniId', 
-    protect, 
-    authorize(allowedRoles), 
+    '/for-stack/:puulaaniId',
+    protect,
+    authorize(allowedRoles),
     puutavaralajiController.getTimberLogsForStackHandler
 );
 

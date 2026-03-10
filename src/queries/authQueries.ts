@@ -1,8 +1,6 @@
 // backend/src/queries/authQueries.ts
 
-// CORRECTED: All direct column aliases removed. 
-// The authService will now receive properties like 'tunnus', 'nimi', 'salasana', etc.
-// and will be responsible for mapping them to the JWT payload structure.
+// 1. findUserByTunnusWithRolesAndPermissionsQuery
 export const findUserByTunnusWithRolesAndPermissionsQuery = `
     SELECT
         k.tunnus,

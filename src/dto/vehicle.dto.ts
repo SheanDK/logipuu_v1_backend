@@ -1,6 +1,7 @@
 import { IsString, IsNotEmpty, IsDateString, IsBoolean, IsOptional, MinLength, MaxLength } from 'class-validator';
 // import { Transform } from 'class-transformer'; // Not used in this DTO, but could be for date parsing if needed
 
+// 1. --- CREATE VEHICLE DTO ---
 export class CreateVehicleDto {
     @IsString()
     @IsNotEmpty()
@@ -21,6 +22,7 @@ export class CreateVehicleDto {
     isActive?: boolean = true;
 }
 
+// 2. --- UPDATE VEHICLE DTO ---
 export class UpdateVehicleDto {
     @IsString()
     @IsOptional()

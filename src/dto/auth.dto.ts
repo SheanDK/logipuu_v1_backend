@@ -1,9 +1,7 @@
 // backend/src/dto/auth.dto.ts
 import { IsString, IsNotEmpty, MinLength, MaxLength, IsInt, IsOptional, Min, Max, IsBoolean } from 'class-validator';
 
-/**
- * DTO for user login validation.
- */
+// 1. --- USER LOGIN DTO ---
 export class UserLoginDTO {
     @IsString()
     @IsNotEmpty()
@@ -14,13 +12,11 @@ export class UserLoginDTO {
     @IsString()
     @IsNotEmpty()
     @MinLength(6)
-    @MaxLength(60) // Bcrypt hash is 60 chars, but this is for the raw password
+    @MaxLength(60)
     password!: string;
 }
 
-/**
- * Optional DTO for user registration.
- */
+// 2. --- USER REGISTER DTO ---
 export class UserRegisterDTO {
     @IsString()
     @IsNotEmpty()
@@ -36,7 +32,7 @@ export class UserRegisterDTO {
 
     @IsString()
     @IsNotEmpty()
-    @MinLength(8) // Recommend a stronger password for registration
+    @MinLength(8)
     @MaxLength(100)
     password!: string;
 
@@ -54,6 +50,3 @@ export class UserRegisterDTO {
     @IsOptional()
     driverKuljId?: number | null;
 }
-
-// NOTE: The 'ChangePasswordDto' has been intentionally and completely removed from this file.
-// Its single source of truth is now 'dto/user.dto.ts'.

@@ -7,17 +7,20 @@ import * as createQueries from '../queries/waybillQueries/createWaybillQueries';
 import * as updateQueries from '../queries/waybillQueries/updateWaybillQueries';
 import * as deleteQueries from '../queries/waybillQueries/deleteWaybillQueries';
 
+// 1. Fetches all waybills.
 export const getAllWaybills = async (): Promise<IWaybill[]> => {
     const result = await pool.query(getQueries.SELECT_ALL_WAYBILLS);
     return result.rows;
 };
 
+// 2. Fetches a waybill by its ID.
 export const getWaybillById = async (id: number): Promise<IWaybill | null> => {
     const result = await pool.query(getQueries.SELECT_WAYBILL_BY_ID, [id]);
     if (result.rows.length === 0) return null;
     return result.rows[0];
 };
 
+// 3. Creates a new waybill.
 export const createWaybill = async (data: CreateWaybillDto): Promise<IWaybill> => {
     const params = [
         data.pvm, data.kuormaId, data.rahtikirjanNro ?? null, data.reitti ?? null, data.m3,
@@ -32,10 +35,11 @@ export const createWaybill = async (data: CreateWaybillDto): Promise<IWaybill> =
     throw new Error('Waybill creation failed. Could not retrieve details.');
 };
 
+// 4. Updates a waybill.
 export const updateWaybill = async (id: number, data: UpdateWaybillDto): Promise<IWaybill | null> => {
     const existing = await getWaybillById(id);
     if (!existing) return null;
-    
+
     const params = [
         data.pvm ?? existing.pvm,
         data.kuormaId ?? existing.kuormaId,
@@ -62,6 +66,7 @@ export const updateWaybill = async (id: number, data: UpdateWaybillDto): Promise
     return null;
 };
 
+// 5. Soft deletes a waybill.
 export const deleteWaybill = async (id: number): Promise<{ rahtiId: number; message: string } | null> => {
     const result = await pool.query(deleteQueries.DELETE_WAYBILL_BY_ID, [id]);
     if (result.rowCount === 0) return null;

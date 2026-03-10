@@ -1,189 +1,216 @@
-// src/controllers/chipTitleController.ts
-
+// backend/src/controllers/chipTitleController.ts
 import { Request, Response } from 'express';
 import pool from '../config/db';
 
-// ලියාපදිංචි කළ සියලුම Nimikkeet ලබා ගැනීම
-export const getAllChipTitles = async (req: Request, res: Response) => {
-    try {
-        const query = `
-            SELECT 
-                ct.*, 
-                a.asiakkaan_nimi as customer_name,
-                p.nimi as origin_name,
-                pp.purkupaikka as destination_name,
-                pt.puutavara as product_name
-            FROM chip_titles ct
-            JOIN asiakkaat a ON ct.asiakas_id = a.asiakkaan_id
-            JOIN puulaani p ON ct.lahto_paikka_id = p.puulaani_id
-            JOIN purkupaikka pp ON ct.purku_paikka_id = pp.purkupaikka_id
-            JOIN puutavarat pt ON ct.tuote_nro = pt.puutavara_nro
-            ORDER BY ct.title_id DESC;
-        `;
-        const result = await pool.query(query);
-        res.status(200).json(result.rows);
-    } catch (error: any) {
-        console.error('ERROR in getAllChipTitles:', error.message);
-        res.status(500).json({
-            error: 'Internal server error',
-            details: error.message
-        });
-    }
-};
-
-// create new chip title
+// 1. create chip title
 export const createChipTitle = async (req: Request, res: Response) => {
+    console.log("📥 [BACKEND] Received Create Request. Body:", req.body);
     try {
-        // frontend data
         const {
-            asiakas_id,
-            lahto_paikka_id,
-            purku_paikka_id,
-            tuote_nro,
-            nimike_nimi,
-            lyhenne,
-            tuote_tyyppi_nimi,
-            laskutusperuste,
-            ohjeet_kuljettajalle,
-            req_kpl,
+            title_number,
+            customer_id,
+            loading_point_id,
+            unloading_point_id,
+            product_number,
+            title_name,
+            abbreviation,
+            invoicing_basis,
+            driver_instructions,
+            req_pcs,
             req_m3,
             req_ton,
-            req_h,
-            req_odotus,
+            req_hr,
+            req_waiting,
             req_km,
-            aktiivinen
+            req_details,
+            req_details_info,
+            is_active
         } = req.body;
-
-        // validation
-        if (!asiakas_id || !lahto_paikka_id || !purku_paikka_id || !tuote_nro || !nimike_nimi) {
-            return res.status(400).json({ error: 'Missing required fields. Please fill all mandatory fields.' });
-        }
 
         const query = `
             INSERT INTO public.chip_titles (
-                asiakas_id, 
-                lahto_paikka_id, 
-                purku_paikka_id, 
-                tuote_nro, 
-                nimike_nimi,
-                lyhenne,
-                tuote_tyyppi_nimi,
-                laskutusperuste,
-                ohjeet_kuljettajalle,
-                req_kpl,
-                req_m3,
-                req_ton,
-                req_h,
-                req_odotus,
-                req_km,
-                aktiivinen
+                title_number, 
+                customer_id, 
+                loading_point_id, 
+                unloading_point_id,
+                product_number, 
+                title_name, 
+                abbreviation, 
+                invoicing_basis,
+                driver_instructions, 
+                req_pcs, 
+                req_m3, 
+                req_ton, 
+                req_hr,
+                req_waiting, 
+                req_km, 
+                req_details, 
+                req_details_info,
+                is_active
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
             RETURNING *;
         `;
 
         const values = [
-            Number(asiakas_id),
-            Number(lahto_paikka_id),
-            Number(purku_paikka_id),
-            Number(tuote_nro),
-            nimike_nimi,
-            lyhenne || null,
-            tuote_tyyppi_nimi || null,
-            laskutusperuste || 'Tons',
-            ohjeet_kuljettajalle || null,
-            !!req_kpl,
+            title_number,
+            customer_id,
+            loading_point_id,
+            unloading_point_id,
+            product_number,
+            title_name,
+            abbreviation,
+            invoicing_basis,
+            driver_instructions,
+            !!req_pcs,
             !!req_m3,
             !!req_ton,
-            !!req_h,
-            !!req_odotus,
+            !!req_hr,
+            !!req_waiting,
             !!req_km,
-            aktiivinen !== false
+            !!req_details,
+            req_details_info,
+            !!is_active
         ];
 
+        console.log("🔍 [BACKEND] Executing Query:", query);
         const result = await pool.query(query, values);
+        console.log("✅ [BACKEND] Insert Success! Result:", result.rows[0]);
         res.status(201).json(result.rows[0]);
-
     } catch (error: any) {
-        console.error('ERROR in createChipTitle:', error.message);
-        res.status(500).json({ error: 'Internal server error', details: error.message });
+        console.error("❌ [BACKEND] Insert Error:", error);
+        res.status(500).json({ error: 'Database Error', details: error.message });
     }
 };
 
-// update chip title
+// 2. Get All Chip Titles
+export const getAllChipTitles = async (req: Request, res: Response) => {
+    try {
+        const query = `
+            SELECT 
+                ct.title_id,
+                ct.title_name,
+                ct.abbreviation,
+                ct.invoicing_basis,
+                ct.is_active,
+                ct.req_pcs,
+                ct.req_m3,
+                ct.req_ton,
+                ct.req_hr,
+                ct.req_waiting,
+                ct.req_km,
+                ct.customer_id,
+                ct.loading_point_id,
+                ct.unloading_point_id,
+                ct.product_number,
+                ct.title_number,
+                ct.driver_instructions,
+                a.asiakkaan_nimi as customer_name,
+                p.nimi as loading_point_name,
+                pp.purkupaikka as unloading_point_name,
+                pt.puutavara as product_name
+            FROM public.chip_titles ct
+            LEFT JOIN public.asiakkaat a ON ct.customer_id = a.asiakkaan_id
+            LEFT JOIN public.puulaani p ON ct.loading_point_id = p.puulaani_id
+            LEFT JOIN public.purkupaikka pp ON ct.unloading_point_id = pp.purkupaikka_id
+            LEFT JOIN public.puutavarat pt ON ct.product_number = pt.puutavara_nro
+            ORDER BY ct.title_id DESC;
+        `;
+        const result = await pool.query(query);
+
+        // Debugging: data received in Backend
+        console.log(`✅ [BACKEND] Fetched ${result.rows.length} titles`);
+
+        res.status(200).json(result.rows);
+    } catch (error: any) {
+        console.error('❌ [SERVER ERROR]:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 3. Update Chip Title
 export const updateChipTitle = async (req: Request, res: Response) => {
+    console.log("📥 [BACKEND] Received Update Request. Body:", req.body);
     try {
         const { id } = req.params;
         const {
-            asiakas_id,
-            lahto_paikka_id,
-            purku_paikka_id,
-            tuote_nro,
-            nimike_nimi,
-            lyhenne,
-            tuote_tyyppi_nimi,
-            laskutusperuste,
-            ohjeet_kuljettajalle,
-            req_kpl,
+            title_number,
+            customer_id,
+            loading_point_id,
+            unloading_point_id,
+            product_number,
+            title_name,
+            abbreviation,
+            invoicing_basis,
+            driver_instructions,
+            req_pcs,
             req_m3,
             req_ton,
-            req_h,
-            req_odotus,
+            req_hr,
+            req_waiting,
             req_km,
-            aktiivinen
+            req_details,
+            req_details_info,
+            is_active
         } = req.body;
 
         const query = `
             UPDATE public.chip_titles 
             SET 
-                asiakas_id = $1, 
-                lahto_paikka_id = $2, 
-                purku_paikka_id = $3, 
-                tuote_nro = $4, 
-                nimike_nimi = $5,
-                lyhenne = $6,
-                tuote_tyyppi_nimi = $7,
-                laskutusperuste = $8,
-                ohjeet_kuljettajalle = $9,
-                req_kpl = $10,
-                req_m3 = $11,
-                req_ton = $12,
-                req_h = $13,
-                req_odotus = $14,
-                req_km = $15,
-                aktiivinen = $16
-            WHERE title_id = $17
+                title_number = $1, 
+                customer_id = $2, 
+                loading_point_id = $3, 
+                unloading_point_id = $4, 
+                product_number = $5, 
+                title_name = $6,
+                abbreviation = $7, 
+                invoicing_basis = $8, 
+                driver_instructions = $9,
+                req_pcs = $10, 
+                req_m3 = $11, 
+                req_ton = $12, 
+                req_hr = $13,
+                req_waiting = $14, 
+                req_km = $15, 
+                req_details = $16,
+                req_details_info = $17, 
+                is_active = $18
+            WHERE title_id = $19
             RETURNING *;
         `;
 
         const values = [
-            Number(asiakas_id),
-            Number(lahto_paikka_id),
-            Number(purku_paikka_id),
-            Number(tuote_nro),
-            nimike_nimi,
-            lyhenne || null,
-            tuote_tyyppi_nimi || null,
-            laskutusperuste || 'Tons',
-            ohjeet_kuljettajalle || null,
-            !!req_kpl,
+            title_number,
+            customer_id,
+            loading_point_id,
+            unloading_point_id,
+            product_number,
+            title_name,
+            abbreviation,
+            invoicing_basis,
+            driver_instructions,
+            !!req_pcs,
             !!req_m3,
             !!req_ton,
-            !!req_h,
-            !!req_odotus,
+            !!req_hr,
+            !!req_waiting,
             !!req_km,
-            aktiivinen !== false,
+            !!req_details,
+            req_details_info,
+            is_active !== false,
             Number(id)
         ];
 
+        console.log("🔍 [BACKEND] Executing Query:", query);
+        console.log("🔍 [BACKEND] With Values:", values);
         const result = await pool.query(query, values);
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Chip title not found' });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Title not found' });
+        console.log("✅ [BACKEND] Update Success! Result:", result.rows[0]);
         res.status(200).json(result.rows[0]);
-
     } catch (error: any) {
-        console.error('ERROR in updateChipTitle:', error.message);
-        res.status(500).json({ error: 'Internal server error', details: error.message });
+        console.error("❌ [BACKEND] Update Error:", error);
+        res.status(500).json({ error: 'Database Error', details: error.message });
     }
 };
+
+

@@ -13,7 +13,6 @@ const router = Router();
 router.get(
     '/',
     protect,
-    // authorize([], permissions.view), // You can add authorization later
     controller.getAllHandler
 );
 

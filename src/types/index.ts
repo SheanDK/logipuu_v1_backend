@@ -1,6 +1,6 @@
 // backend/src/types/index.ts
 
-// Export all interfaces and types
+//1. Export all interfaces and types
 export * from './client.types';
 export * from './driver.types';
 export * from './otherInfo.types';
@@ -12,8 +12,7 @@ export * from './user.types';
 export * from './vehicle.types';
 export * from './waybill.types';
 
-// Export all DTOs as well for easy access in services
-// This will now be the single source for the conflicting names
+//2. Export all DTOs as well for easy access in services
 export * from '../dto/auth.dto';
 export * from '../dto/client.dto';
 export * from '../dto/driver.dto';

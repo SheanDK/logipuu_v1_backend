@@ -1,7 +1,7 @@
 // backend/src/services/driverViewService.ts
 import pool from '../config/db';
 
-// ... (Interfaces: MapLocation, DriverMapData - no change)
+// Interfaces
 interface MapLocation {
     id: number;
     name: string;
@@ -14,8 +14,7 @@ export interface DriverMapData {
 }
 
 
-// --- THIS IS THE MAIN CHANGE ---
-// The function now accepts vehicleId as a required parameter
+// 1. Get map data for driver
 export const getMapDataForDriver = async (driverId: number, vehicleId: number): Promise<DriverMapData> => {
     const client = await pool.connect();
     try {
@@ -93,7 +92,7 @@ export const getMapDataForDriver = async (driverId: number, vehicleId: number): 
     }
 };
 
-// --- THIS IS THE NEW FUNCTION, ADDED TO THIS FILE ---
+// 2. Get single load for edit
 export const getSingleLoadForEdit = async (id: number): Promise<any | null> => {
     const query = `
         SELECT 
@@ -113,9 +112,8 @@ export const getSingleLoadForEdit = async (id: number): Promise<any | null> => {
     }
 };
 
+// 3. Get consignments for driver
 export const getConsignmentsForDriver = async (driverId: number): Promise<any[]> => {
-    // This query selects loads where the type is '1' (Pole Transport/Consignment)
-    // for the currently logged-in driver.
     const queryText = `
         SELECT 
             k.kuorma_id,
@@ -143,11 +141,10 @@ export const getConsignmentsForDriver = async (driverId: number): Promise<any[]>
     }
 };
 
-// FIX: This function is completely rewritten to support multi-leg trips.
+// 4. Get active trip for driver
 export const getActiveTripForDriver = async (driverId: number): Promise<any | null> => {
     const client = await pool.connect();
     try {
-        // Step 1: Find the 'ajomaarays_nro' of any active trip (this part is correct).
         const activeTripQuery = `
         SELECT ajomaarays_nro 
         FROM public.kuorma 
@@ -163,19 +160,13 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
         const ajomaaraysNro = activeTripResult.rows[0].ajomaaraysNro;
         if (!ajomaaraysNro) { return null; }
 
-        // --- THE FIX IS HERE ---
-        // Step 2: Fetch all legs with robust COALESCE fallbacks for names.
         const allLegsQuery = `
             SELECT 
                 k.kuorma_id, 
                 k.status, 
                 k.puutavara_id, 
                 k.ajomaarays_nro,
-                
-                -- Use COALESCE to get the best available name for "From"
                 COALESCE(p.nimi, k.lahto) AS puulaani_name, 
-                
-                -- Use COALESCE to get the best available name for "To"
                 COALESCE(pp.purkupaikka, k.kohde) AS purkupaikka_name,
 
                 p.sijainti_lat AS puulaani_lat, p.sijainti_long AS puulaani_lng,
@@ -204,8 +195,6 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
         const allLegsResult = await client.query(allLegsQuery, [ajomaaraysNro, driverId]);
 
         if (allLegsResult.rowCount === 0) { return null; }
-
-        // Step 3: Construct the final trip object (this part is correct).
         const firstLeg = allLegsResult.rows[0];
         return {
             ajomaaraysNro: ajomaaraysNro,
@@ -222,14 +211,11 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
     }
 };
 
-// --- THIS IS THE NEW FUNCTION for the driver ---
+// 5. Update timber entry status
 export const updateTimberEntryStatus = async (puulaaniId: number, timberEntries: { puutavaraId: number, valmis: boolean }[]): Promise<any> => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-
-        // Step 1: Update the 'valmis' status for each timber entry
-        // The database trigger will automatically handle the recalculation.
         for (const entry of timberEntries) {
             const updateQuery = 'UPDATE public.puutavaralaji SET valmis = $1 WHERE puutavara_id = $2 AND puulaani_id = $3';
             await client.query(updateQuery, [entry.valmis, entry.puutavaraId, puulaaniId]);
@@ -248,19 +234,18 @@ export const updateTimberEntryStatus = async (puulaaniId: number, timberEntries:
     }
 };
 
+// 6. Get completed trips for driver
 export const getCompletedTripsForDriver = async (driverId: number): Promise<any[]> => {
     const query = `
         SELECT
             k.kuorma_id,
             k.pvm,
             a.asiakkaan_nimi,
-            -- Use a CASE statement to determine the load type as a string
             CASE 
                 WHEN k.tyyppi = 0 THEN 'Timber Load'
                 WHEN k.tyyppi = 1 THEN 'Consignment'
                 ELSE 'Unknown'
             END AS load_type,
-            -- Try to get the destination name from multiple sources
             COALESCE(pp.purkupaikka, k.kohde, 'N/A') AS kohde,
             COALESCE(p.nimi, k.lahto, 'N/A') AS lahto
         FROM public.kuorma k
@@ -284,8 +269,6 @@ export const getCompletedTripsForDriver = async (driverId: number): Promise<any[
 };
 
 export const getSingleCompletedTrip = async (id: number, driverId: number): Promise<any | null> => {
-    // FIX: The query now includes all necessary JOINs and COALESCE logic
-    // to correctly find the Origin and Destination names for both load types.
     const query = `
         SELECT
             k.kuorma_id, 
@@ -301,15 +284,12 @@ export const getSingleCompletedTrip = async (id: number, driverId: number): Prom
                 WHEN k.tyyppi = 1 THEN 'Consignment'
                 ELSE 'Unknown'
             END AS tyyppi,
-            -- Robustly find Origin name
             COALESCE(p.nimi, k.lahto) AS lahto,
-            -- Robustly find Destination name
             COALESCE(pp.purkupaikka, k.kohde) AS kohde
         FROM public.kuorma k
         LEFT JOIN public.asiakkaat a ON k.asiakas_id = a.asiakkaan_id
         LEFT JOIN public.kalusto kal ON k.kalusto_nro = kal.kalusto_nro
         LEFT JOIN public.kuljettajat kul ON k.kulj_id = kul.kulj_id
-        -- Add missing JOINs for name resolution
         LEFT JOIN public.puulaani p ON k.puulaani_id = p.puulaani_id
         LEFT JOIN public.puutavaralaji pl ON k.puutavara_id = pl.puutavara_id
         LEFT JOIN public.purkupaikka pp ON pl.purkupaikka_id = pp.purkupaikka_id
@@ -321,7 +301,6 @@ export const getSingleCompletedTrip = async (id: number, driverId: number): Prom
     try {
         const result = await pool.query(query, [id, driverId]);
         if (result.rowCount === 0) return null;
-        // The db wrapper will handle camelCasing.
         return result.rows[0];
     } catch (error) {
         console.error(`Error fetching completed trip details for ID ${id}:`, error);

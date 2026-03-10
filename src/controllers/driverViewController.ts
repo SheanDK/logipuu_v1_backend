@@ -4,6 +4,8 @@ import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import * as driverViewService from '../services/driverViewService';
 import * as loadService from '../services/loadService';
 
+// GET /api/driver-view/map-data
+// Handles fetching map data for a specific driver and vehicle.
 export const getMapDataHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const driverId = req.user?.driverNumericId;
@@ -26,6 +28,8 @@ export const getMapDataHandler = async (req: AuthenticatedRequest, res: Response
     }
 };
 
+// GET /api/driver-view/load-for-edit/:id
+// Handles fetching a single load for editing by a driver.
 export const getLoadForEditHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -45,6 +49,8 @@ export const getLoadForEditHandler = async (req: AuthenticatedRequest, res: Resp
     }
 };
 
+// GET /api/driver-view/consignments
+// Handles fetching consignments for a specific driver.
 export const getConsignmentsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const driverId = req.user?.driverNumericId;
@@ -60,6 +66,8 @@ export const getConsignmentsHandler = async (req: AuthenticatedRequest, res: Res
     }
 };
 
+// GET /api/driver-view/active-trip
+// Handles fetching the active trip for a specific driver.
 export const getActiveTripHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const driverId = req.user?.driverNumericId;
@@ -75,7 +83,8 @@ export const getActiveTripHandler = async (req: AuthenticatedRequest, res: Respo
     }
 };
 
-
+// PATCH /api/driver-view/update-timber-entry-status/:id
+// Handles updating the status of timber entries for a specific load.
 export const updateTimberEntryStatusHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const puulaaniId = parseInt(req.params.id as string, 10);
@@ -93,6 +102,8 @@ export const updateTimberEntryStatusHandler = async (req: AuthenticatedRequest, 
     }
 };
 
+// GET /api/driver-view/completed-trip/:id
+// Handles fetching the completed trip details for a specific load.
 export const getCompletedTripByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const driverId = req.user!.driverNumericId!;

@@ -1,169 +1,227 @@
-//backend/src/controllers/chipPlanningController.ts
+// backend/src/controllers/chipPlanningController.ts
 import { Request, Response } from 'express';
 import { chipPlanningService } from '../services/chipPlanningService';
-import pool from '../config/db';
 
+const getIsoWeekAndYear = (date: Date): { week: number; year: number } => {
+    const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const day = utcDate.getUTCDay() || 7;
+    utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+    const week = Math.ceil((((utcDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return { week, year: utcDate.getUTCFullYear() };
+};
+
+const getSingleQueryValue = (value: unknown): string | undefined => {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
+    return undefined;
+};
+
+// 1. get data
 export const getWeeklyPlanning = async (req: Request, res: Response) => {
     try {
-        const { week, year, shift } = req.query;
+        const { week, year } = req.query;
         if (!week || !year) return res.status(400).json({ error: 'Week and Year are required' });
 
-        const rows = await chipPlanningService.getWeeklyPlanningData(
-            Number(week), Number(year), String(shift || 'Morning')
-        );
-        if (!rows) return res.status(200).json([]);
+        const rows = await chipPlanningService.getWeeklyPlanningData(Number(week), Number(year));
 
+        // group data by vehicle
         const formatted = rows.reduce((acc: any[], row: any) => {
-            const rekNro = row.rekNro || row.reknro;
-            const programId = row.programId || row.programid;
-
-            if (!rekNro) return acc;
-
-            let vehicle = acc.find(v => v.rekNro === rekNro);
+            let vehicle = acc.find(v => v.kalustoNro === row.kalustoNro);
             if (!vehicle) {
-                vehicle = { programId, rekNro, driver: row.driverName || row.drivername, loads: [] };
+                vehicle = {
+                    kalustoNro: row.kalustoNro,
+                    rekNro: row.rekNro,
+                    loads: []
+                };
                 acc.push(vehicle);
             }
-
-            if (row.loadId || row.loadid) {
-                vehicle.loads.push({
-                    loadId: row.loadId || row.loadid,
-                    date: row.date,
-                    status: row.status,
-                    plannedM3: row.plannedM3 || row.plannedm3,
-                    titleName: row.titleName || row.titlename,
-                    lyhenne: row.lyhenne
-                });
+            if (row.loadId) {
+                vehicle.loads.push(row);
             }
             return acc;
         }, []);
 
         res.status(200).json(formatted);
     } catch (error: any) {
-        console.error("PLANNING CONTROLLER CRASHED:", error.message);
-        res.status(500).json({ error: 'Internal Server Error', details: error.message });
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 };
 
+// 2. assign title to vehicle
 export const assignTitleToVehicle = async (req: Request, res: Response) => {
     try {
-        const { program_id, title_id, order_id, pvm, shift_type } = req.body;
-
-        let finalTitleId = title_id;
-        let lahtoId = null;
-        let purkuId = null;
-
-        if (order_id && order_id !== 0) {
-            const orderInfo = await chipPlanningService.getOrderDetails(Number(order_id));
-            if (!orderInfo) return res.status(404).json({ error: 'Order link to title not found' });
-            finalTitleId = orderInfo.title_id;
-            lahtoId = orderInfo.lahto_paikka_id;
-            purkuId = orderInfo.purku_paikka_id;
-        } else if (title_id && title_id !== 0) {
-            const title = await chipPlanningService.getTitleDetails(Number(title_id));
-            if (!title) return res.status(404).json({ error: 'Title not found' });
-            lahtoId = title.lahto_paikka_id;
-            purkuId = title.purku_paikka_id;
-        } else {
-            return res.status(400).json({ error: 'Either Title ID or Order ID is required' });
-        }
-
+        const { kalusto_nro, title_id, order_id, pvm } = req.body;
         const newLoad = await chipPlanningService.createLoadRecord({
-            program_id: Number(program_id),
-            title_id: Number(finalTitleId),
-            order_id: (order_id && order_id !== 0) ? Number(order_id) : null,
-            pvm,
-            shift_type: shift_type || 'Morning',
-            lahto_id: lahtoId,
-            purku_id: purkuId
+            vehicle_number: Number(kalusto_nro),
+            title_id: Number(title_id),
+            order_id: order_id ? Number(order_id) : null,
+            scheduled_date: pvm
         });
-
         res.status(201).json(newLoad);
     } catch (error: any) {
-        console.error("Assign Error LOG:", error.message);
-        res.status(500).json({ error: 'Internal server error', details: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 
+// 3. dispatch vehicle row
 export const dispatchRow = async (req: Request, res: Response) => {
     try {
-        const { programId } = req.body;
-        await chipPlanningService.dispatchVehicleRow(Number(programId));
+        const { kalustoNro, week, year } = req.body;
+        await chipPlanningService.dispatchVehicleRow(Number(kalustoNro), Number(week), Number(year));
         res.status(200).json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
 
-export const updateProgramDriver = async (req: Request, res: Response) => {
+// 4. update assigned load
+export const updateAssignedLoad = async (req: Request, res: Response) => {
     try {
-        const { programId, driverId } = req.body;
-        await chipPlanningService.updateVehicleDriver(Number(programId), Number(driverId));
-        res.status(200).json({ success: true });
-    } catch (error) {
+        const { loadId } = req.params;
+        const result = await chipPlanningService.updateLoadRecord(Number(loadId), req.body);
+        res.status(200).json(result);
+    } catch (error: any) {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
 
+// 5. delete assigned load
+export const deleteAssignedLoad = async (req: Request, res: Response) => {
+    try {
+        const { loadId } = req.params;
+        await chipPlanningService.deleteLoadRecord(Number(loadId));
+        res.status(200).json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// 6. move assigned load
+export const moveAssignedLoad = async (req: Request, res: Response) => {
+    try {
+        const { loadId, newKalustoNro, newDate } = req.body;
+        const result = await chipPlanningService.moveLoadRecord(Number(loadId), Number(newKalustoNro), newDate);
+        res.status(200).json(result);
+    } catch (error: any) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// 7. add vehicle to plan
 export const addVehicleToPlan = async (req: Request, res: Response) => {
     try {
         const { vehicleId, week, year } = req.body;
-        const result = await chipPlanningService.addVehicleToWeeklyPlan(vehicleId, week, year);
+        const result = await chipPlanningService.addVehicleToWeeklyPlan(Number(vehicleId), Number(week), Number(year));
         res.status(201).json(result);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 };
 
-export const deleteAssignedLoad = async (req: Request, res: Response) => {
+// 8. get map data
+export const getChipMapData = async (req: Request, res: Response) => {
     try {
-        const { loadId } = req.params;
-        await chipPlanningService.deleteLoadRecord(Number(loadId));
-        res.status(200).json({ success: true, message: 'Load deleted successfully' });
+        const markers = await chipPlanningService.getChipMapMarkers();
+        res.status(200).json(markers);
     } catch (error: any) {
-        console.error("Delete Controller Error:", error.message);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
 
-
-export const updateAssignedLoad = async (req: Request, res: Response) => {
+// 9. Rename Group
+export const renameGroup = async (req: Request, res: Response) => {
     try {
-        const { loadId } = req.params;
-        const result = await chipPlanningService.updateLoadRecord(Number(loadId), req.body);
-        res.status(200).json(result);
-    } catch (error) { res.status(500).json({ error: 'Internal server error' }); }
-};
-
-export const moveAssignedLoad = async (req: Request, res: Response) => {
-    try {
-        const { loadId, newProgramId, newDate } = req.body;
-        const result = await chipPlanningService.moveLoadRecord(Number(loadId), Number(newProgramId), newDate);
-        res.status(200).json(result);
-    } catch (error) {
+        const { oldName, newName } = req.body;
+        await chipPlanningService.renameGroup(oldName, newName);
+        res.status(200).json({ success: true });
+    } catch (error: any) {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
 
-export const createQuickArea = async (req: Request, res: Response) => {
+// 10. Delete Group
+export const deleteGroup = async (req: Request, res: Response) => {
     try {
-        const { name, address, lat, lng, type, instructions } = req.body;
+        const { groupName } = req.params;
+        await chipPlanningService.deleteGroup(groupName as string);
+        res.status(200).json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
 
-        let query = "";
-        let values = [name, lat, lng];
+// 11. Update Vehicle Group
+export const updateVehicleGroup = async (req: Request, res: Response) => {
+    try {
+        const { kalustoNro, groupName } = req.body;
+        await chipPlanningService.updateVehicleGroup(Number(kalustoNro), groupName);
+        res.status(200).json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+// 9. get chip loads by week (current ISO week by default)
+export const getChipLoadsByWeek = async (req: Request, res: Response) => {
+    try {
+        const weekQuery = getSingleQueryValue(req.query.week);
+        const yearQuery = getSingleQueryValue(req.query.year);
+        const vehicleNumberQuery = getSingleQueryValue(req.query.vehicleNumber) ?? getSingleQueryValue(req.query.vehicle_number);
 
-        if (type === 'puulaani') {
-            query = `INSERT INTO public.puulaani (nimi, lisatiedot, sijainti_lat, sijainti_long, aktiivinen, pvm) 
-                     VALUES ($1, $2, $3, $4, true, CURRENT_DATE) RETURNING puulaani_id as id`;
-            values = [name, address + " " + instructions, lat, lng];
-        } else {
-            query = `INSERT INTO public.purkupaikka (purkupaikka, sijainti_lat, sijainti_long, is_active) 
-                     VALUES ($1, $2, $3, true) RETURNING purkupaikka_id as id`;
+        if ((weekQuery && !yearQuery) || (!weekQuery && yearQuery)) {
+            return res.status(400).json({ error: 'Provide both week and year, or neither.' });
         }
 
-        const result = await pool.query(query, values);
-        res.status(201).json(result.rows[0]);
-    } catch (error) {
-        res.status(500).json({ error: 'Internal server error' });
+        const now = new Date();
+        const currentIso = getIsoWeekAndYear(now);
+
+        const week = weekQuery ? Number(weekQuery) : currentIso.week;
+        const year = yearQuery ? Number(yearQuery) : currentIso.year;
+
+        if (!Number.isInteger(week) || week < 1 || week > 53) {
+            return res.status(400).json({ error: 'Week must be an integer between 1 and 53.' });
+        }
+        if (!Number.isInteger(year) || year < 1) {
+            return res.status(400).json({ error: 'Year must be a positive integer.' });
+        }
+
+        let vehicleNumber: number | undefined;
+        if (vehicleNumberQuery !== undefined) {
+            vehicleNumber = Number(vehicleNumberQuery);
+            if (!Number.isInteger(vehicleNumber) || vehicleNumber < 0) {
+                return res.status(400).json({ error: 'vehicleNumber/vehicle_number must be a non-negative integer.' });
+            }
+        }
+
+        const rows = await chipPlanningService.getChipLoadsByWeek(week, year, vehicleNumber);
+        return res.status(200).json(rows);
+    } catch (error: any) {
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// 10. set chip load (create or update)
+export const setChipLoad = async (req: Request, res: Response) => {
+    try {
+        const loadId = req.body.loadId ?? req.body.load_id;
+        const titleId = req.body.titleId ?? req.body.title_id;
+        const vehicleNumber = req.body.vehicleNumber ?? req.body.vehicle_number;
+        const scheduledDate = req.body.scheduledDate ?? req.body.scheduled_date;
+
+        if (!loadId) {
+            if (titleId === undefined || vehicleNumber === undefined || !scheduledDate) {
+                return res.status(400).json({
+                    error: 'titleId/title_id, vehicleNumber/vehicle_number and scheduledDate/scheduled_date are required when creating a load.'
+                });
+            }
+        }
+
+        const row = await chipPlanningService.setChipLoad(req.body);
+        return res.status(loadId ? 200 : 201).json(row);
+    } catch (error: any) {
+        if (error?.message === 'NOT_FOUND') {
+            return res.status(404).json({ error: 'Chip load not found.' });
+        }
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };

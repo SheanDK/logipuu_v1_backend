@@ -2,20 +2,12 @@
 import pool from '../config/db';
 import bcrypt from 'bcryptjs';
 
-// --- CORRECTION IS HERE ---
-// Import DTO classes from the dto file
 import { UpdateUserProfileDto, ChangePasswordDto } from '../dto/user.dto';
-// Import interfaces/types from the types file
 import { UserProfileResponseDto } from '../types/user.types';
-// --- END CORRECTION ---
 
 import * as userQueries from '../queries/userQueries';
 
-/**
- * Fetches the profile of the currently authenticated user.
- * @param tunnus The username (Tunnus) from the JWT token.
- * @returns A promise that resolves to the user's profile data.
- */
+// 1. Fetches the profile of the currently authenticated user.
 export const getUserProfile = async (tunnus: string): Promise<UserProfileResponseDto> => {
     console.log(`SERVICE: Fetching profile for Tunnus: ${tunnus}`);
     const result = await pool.query(userQueries.SELECT_USER_PROFILE_BY_tunnus, [tunnus]);
@@ -25,24 +17,18 @@ export const getUserProfile = async (tunnus: string): Promise<UserProfileRespons
     }
 
     const dbProfile = result.rows[0];
-    
+
     const userProfileToReturn: UserProfileResponseDto = {
         username: dbProfile.tunnus,
         fullName: dbProfile.nimi,
         roles: dbProfile.roles || [],
         driverEmail: dbProfile.driverEmail || null,
     };
-    
+
     return userProfileToReturn;
 };
 
-/**
- * Updates the profile of the currently authenticated user.
- * @param tunnus The username (Tunnus) from the JWT token.
- * @param driverNumericIdFromToken The driver ID (KuljID) from the token, if available.
- * @param profileData The data to update.
- * @returns A promise that resolves to the updated user profile data.
- */
+// 2. Updates the profile of the currently authenticated user.
 export const updateUserProfile = async (
     tunnus: string,
     driverNumericIdFromToken: number | undefined | null,
@@ -51,7 +37,7 @@ export const updateUserProfile = async (
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        
+
         if (profileData.fullName) {
             await client.query(userQueries.UPDATE_USER_OWN_FULLNAME, [profileData.fullName, tunnus]);
         }
@@ -59,7 +45,7 @@ export const updateUserProfile = async (
         if (profileData.email && driverNumericIdFromToken) {
             await client.query(userQueries.UPDATE_DRIVER_email_BY_kulj_id, [profileData.email, driverNumericIdFromToken]);
         }
-        
+
         await client.query('COMMIT');
 
         // After transaction, fetch the latest profile data to return to the client
@@ -74,12 +60,7 @@ export const updateUserProfile = async (
     }
 };
 
-/**
- * Changes the password for the currently authenticated user.
- * @param tunnus The username (Tunnus) from the JWT token.
- * @param passwordData DTO containing current and new passwords.
- * @returns A promise that resolves to a success message.
- */
+// 3. Changes the password for the currently authenticated user.
 export const changeUserPassword = async (tunnus: string, passwordData: ChangePasswordDto): Promise<{ message: string }> => {
     const { currentPassword, newPassword } = passwordData;
 

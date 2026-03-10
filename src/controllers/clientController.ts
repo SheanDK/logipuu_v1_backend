@@ -4,6 +4,7 @@ import * as clientService from '../services/clientService';
 import { CreateClientDto, UpdateClientDto } from '../dto/client.dto';
 import { IClient } from '../types/client.types';
 
+// 1. Create Client
 export const createClientHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const clientData = req.body as CreateClientDto;
@@ -17,6 +18,7 @@ export const createClientHandler = async (req: Request, res: Response, next: Nex
     }
 };
 
+// 2. Get All Clients
 export const getAllClientsHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const clients: IClient[] = await clientService.getAllClients();
@@ -26,6 +28,7 @@ export const getAllClientsHandler = async (req: Request, res: Response, next: Ne
     }
 };
 
+// 3. Get Client By ID
 export const getClientByIdHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const clientId: string = req.params.id as string;
@@ -39,6 +42,7 @@ export const getClientByIdHandler = async (req: Request, res: Response, next: Ne
     }
 };
 
+// 4. Update Client
 export const updateClientHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const clientId: string = req.params.id as string;
@@ -53,6 +57,7 @@ export const updateClientHandler = async (req: Request, res: Response, next: Nex
     }
 };
 
+// 5. Delete Client
 export const deleteClientHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const clientId: string = req.params.id as string;
@@ -66,6 +71,7 @@ export const deleteClientHandler = async (req: Request, res: Response, next: Nex
     }
 };
 
+// 6. Check Color Exists
 export const checkColorExistsHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { color, clientId } = req.query;

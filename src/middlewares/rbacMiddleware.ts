@@ -3,6 +3,7 @@ import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from './authMiddleware';
 
 
+// RBAC Middleware
 export const authorize = (arg1: string[] = [], arg2: string[] = []) => {
     return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         const user = req.user;

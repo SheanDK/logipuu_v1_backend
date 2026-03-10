@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import { CreateTimberStackDto } from '../dto/timberStack.dto'; // UpdateTimberStackDto is no longer needed here
 import { ITimberStackFilters, IUpdateTimberStackFullDto, UpdateTimberStackLocationDto, ITimberStackListFilters } from '../types';
 
+// 1. --- GET ALL TIMBER STACKS ---
 export const getAllTimberStacksHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const filters: ITimberStackFilters = {
@@ -21,6 +22,7 @@ export const getAllTimberStacksHandler = async (req: AuthenticatedRequest, res: 
     }
 };
 
+// 2. --- GET TIMBER STACK BY ID ---
 export const getTimberStackByIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -31,6 +33,7 @@ export const getTimberStackByIdHandler = async (req: AuthenticatedRequest, res: 
     } catch (error) { next(error); }
 };
 
+// 3. --- CREATE TIMBER STACK ---
 export const createTimberStackHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const dto = req.body as CreateTimberStackDto;
@@ -41,6 +44,7 @@ export const createTimberStackHandler = async (req: AuthenticatedRequest, res: R
     }
 };
 
+// 4. --- GET TIMBER STACK FULL DETAILS ---
 export const getTimberStackFullDetailsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -51,6 +55,7 @@ export const getTimberStackFullDetailsHandler = async (req: AuthenticatedRequest
     } catch (error) { next(error); }
 };
 
+// 5. --- UPDATE TIMBER STACK FULL --- 
 export const updateTimberStackFullHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -65,15 +70,12 @@ export const updateTimberStackFullHandler = async (req: AuthenticatedRequest, re
     }
 };
 
-// --- REMOVED THE UNUSED HANDLER ---
-// export const updateTimberStackHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => { ... };
-
+// 6. --- DELETE TIMBER STACK ---
 export const deleteTimberStackHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
         if (isNaN(id)) return res.status(400).json({ message: "Invalid ID format." });
 
-        // deleteTimberStack වෙනුවට deactivateTimberStack call කරන්න
         const result = await timberStackService.deactivateTimberStack(id);
 
         if (!result) return res.status(404).json({ message: 'Timber stack not found.' });
@@ -84,6 +86,7 @@ export const deleteTimberStackHandler = async (req: AuthenticatedRequest, res: R
     }
 };
 
+// 7. --- UPDATE LOCATION --- 
 export const updateLocationHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -106,7 +109,7 @@ export const updateLocationHandler = async (req: AuthenticatedRequest, res: Resp
     }
 };
 
-// --- NEW HANDLER Marker Move ---
+// 8. --- UPDATE TIMBER STACK LOCATION ---
 export const updateTimberStackLocationHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -124,10 +127,9 @@ export const updateTimberStackLocationHandler = async (req: AuthenticatedRequest
     }
 };
 
-// --- THIS IS THE HANDLER FOR THE PUULAANI LIST VIEW ---
+// 9. --- GET TIMBER STACK LIST ---
 export const getTimberStackListHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        // Extract and typecast filters from query parameters
         const filters: ITimberStackListFilters = {
             clientId: req.query.clientId as string | undefined,
             status: req.query.status as 'all' | 'active' | 'completed' | undefined,
@@ -142,7 +144,7 @@ export const getTimberStackListHandler = async (req: AuthenticatedRequest, res: 
     }
 };
 
-// --- THIS IS THE NEW HANDLER THAT WAS MISSING ---
+// 10. --- GET TIMBER TYPES FOR STACK ---
 export const getTimberTypesForStackHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -152,14 +154,13 @@ export const getTimberTypesForStackHandler = async (req: AuthenticatedRequest, r
 
         const timberTypes = await timberStackService.getTimberTypesForStack(id);
 
-        // It's good practice to return an empty array if nothing is found, 
-        // rather than a 404, unless the main stack itself doesn't exist.
         res.status(200).json(timberTypes);
     } catch (error) {
         next(error);
     }
 };
 
+// 11. --- GET ACTIVE TIMBER STACKS BY CLIENT ---
 export const getActiveTimberStacksByClientHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const clientIdString = req.params.clientId as string;
@@ -178,6 +179,7 @@ export const getActiveTimberStacksByClientHandler = async (req: AuthenticatedReq
     }
 };
 
+// 12. --- GET WOOD ENTRIES BY PUULAANI ID ---
 export const getWoodEntriesByPuulaaniIdHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);

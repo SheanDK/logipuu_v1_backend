@@ -1,15 +1,15 @@
 // backend/src/types/client.types.ts
 
-// Define the enum here so it can be used across typess and services
+//1. Define the enum here so it can be used across typess and services
 export enum ClientTypeEnum {
     PUULAANI = 0,
     RAHTIKIRJA = 1,
     BOTH = 2,
 }
 
-// This interface should match what your API sends to the frontend.
+//2. This interface should match what your API sends to the frontend.
 export interface IClient {
-    clientId: string; // Keep as string to match DTO
+    clientId: string;
     clientName: string;
     address: string | null;
     postalCode: string | null;
@@ -17,7 +17,7 @@ export interface IClient {
     phoneNo: string | null;
     vatId: string | null;
     targetColor: string | null;
-    type: ClientTypeEnum; // Use the enum
+    type: ClientTypeEnum;
     isActive: boolean;
     contactPerson: string | null;
     email: string | null;

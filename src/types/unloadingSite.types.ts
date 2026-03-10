@@ -1,16 +1,13 @@
 // backend/src/types/unloadingSite.types.ts
-
+//1. This interface is API response for /api/unloadingSite endpoint.
 export interface IUnloadingSite {
     purkupaikkaId: number;
     asiakasId: number;
     purkupaikka: string;
-    sijaintiLat: number | null; // Keep as nullable
-    sijaintiLong: number | null; // Keep as nullable
-    isVisibleOnMap: boolean; // From previous step
-    
-    // --- ADD THIS NEW PROPERTY ---
-    isActive: boolean; // For soft-deleting
-
+    sijaintiLat: number | null;
+    sijaintiLong: number | null;
+    isVisibleOnMap: boolean;
+    isActive: boolean;
     clientName?: string;
     clientColor?: string;
 }
