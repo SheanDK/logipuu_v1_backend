@@ -11,7 +11,9 @@ import {
     getChipMapData,
     renameGroup,
     deleteGroup,
-    updateVehicleGroup
+    updateVehicleGroup,
+    getChipLoadsByWeek,
+    setChipLoad
 } from '../controllers/chipPlanningController';
 
 const router = Router();
@@ -39,14 +41,7 @@ router.post('/add-vehicle', addVehicleToPlan);
 
 // 8. Get Chip Map Data
 router.get('/map-data', getChipMapData);
-
-// 9. Rename Group
-router.put('/rename-group', renameGroup);
-
-// 10. Delete Group
-router.delete('/delete-group/:groupName', deleteGroup);
-
-// 11. Update Vehicle Group
-router.put('/update-vehicle-group', updateVehicleGroup);
+router.get('/loads', getChipLoadsByWeek);
+router.post('/set-load', setChipLoad);
 
 export default router;
