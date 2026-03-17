@@ -198,8 +198,8 @@ export const getLoadsForInspectionHandler = async (req: AuthenticatedRequest, re
 // 10. --- ACCEPT LOADS ---
 export const acceptLoadsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const { loadIds } = req.body as AcceptLoadsDto;
-        const result = await loadService.acceptLoadsForInvoicing(loadIds);
+        const { loadIds, loadType } = req.body as AcceptLoadsDto;
+        const result = await loadService.acceptLoadsForInvoicing(loadIds, loadType);
         res.status(200).json({ message: `${result.count} loads successfully accepted for invoicing.`, ...result });
     } catch (error) {
         next(error);

@@ -9,11 +9,11 @@ import {
     moveAssignedLoad,
     addVehicleToPlan,
     getChipMapData,
-    renameGroup,
-    deleteGroup,
-    updateVehicleGroup,
     getChipLoadsByWeek,
-    setChipLoad
+    setChipLoad,
+    getDriverChipLoads,
+    setLoadMetrics,
+    searchChipLoadsHandler,
 } from '../controllers/chipPlanningController';
 
 const router = Router();
@@ -41,7 +41,20 @@ router.post('/add-vehicle', addVehicleToPlan);
 
 // 8. Get Chip Map Data
 router.get('/map-data', getChipMapData);
+
+// 9. get chip loads by week (current ISO week by default)
 router.get('/loads', getChipLoadsByWeek);
+
+// 10. set chip load (create or update)
 router.post('/set-load', setChipLoad);
+
+// 11. Get Driver Chip Loads
+router.get('/driver-loads', getDriverChipLoads);
+
+// 12. Set Load Metrics
+router.post('/set-metrics', setLoadMetrics);
+
+// 13. Search Chip Loads
+router.get('/search', searchChipLoadsHandler);
 
 export default router;

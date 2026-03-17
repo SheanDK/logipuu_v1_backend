@@ -34,5 +34,23 @@ export const chipQueries = {
             AND EXTRACT(YEAR FROM cl.scheduled_date) = $2
         LEFT JOIN public.chip_titles ct ON cl.title_id = ct.title_id
         LEFT JOIN public.chip_orders co ON cl.order_id = co.order_id
-        WHERE k.aktiivinen = true ORDER BY k.rek_nro, cl.scheduled_date, cl.serial_no`
+        WHERE k.aktiivinen = true ORDER BY k.rek_nro, cl.scheduled_date, cl.serial_no`,
+
+    // DRIVER LOADS
+    getDriverLoads: `
+        SELECT cl.*, 
+               ct.title_name, ct.driver_instructions, ct.invoicing_basis,
+               ct.req_pcs, ct.req_m3, ct.req_ton, ct.req_hr, ct.req_waiting, ct.req_km, ct.req_details, ct.req_details_info,
+               p_load.nimi as loading_point_name, p_load.sijainti_lat as loading_point_lat, p_load.sijainti_long as loading_point_lng,
+               p_unload.purkupaikka as unloading_point_name, p_unload.sijainti_lat as unloading_point_lat, p_unload.sijainti_long as unloading_point_lng,
+               pt.puutavara as product_name
+        FROM public.chip_loads cl
+        JOIN public.chip_titles ct ON cl.title_id = ct.title_id
+        LEFT JOIN public.puulaani p_load ON ct.loading_point_id = p_load.puulaani_id
+        LEFT JOIN public.purkupaikka p_unload ON ct.unloading_point_id = p_unload.purkupaikka_id
+        LEFT JOIN public.puutavarat pt ON ct.product_number = pt.puutavara_nro
+        WHERE cl.vehicle_number = $1 
+        AND EXTRACT(WEEK FROM cl.scheduled_date) = $2
+        AND EXTRACT(YEAR FROM cl.scheduled_date) = $3
+        ORDER BY cl.serial_no ASC`
 };

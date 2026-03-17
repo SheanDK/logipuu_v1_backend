@@ -5,36 +5,103 @@ export const chipPlanningService = {
     // 1. Get Weekly Planning Data
     getWeeklyPlanningData: async (week: number, year: number) => {
         const query = `
-        SELECT 
-            k.kalusto_nro as "kalustoNro", 
-            k.rek_nro as "rekNro", 
-            k.planning_group as "planning_group",
-            cl.load_id as "loadId", 
-            cl.order_id as "orderId",
-            TO_CHAR(cl.scheduled_date, 'YYYY-MM-DD') as "date", 
-            cl.status, 
-            cl.serial_no as "serialNo",
-            cl.actual_m3 as "actualM3",
-            cl.actual_ton as "actualTon",
-            cl.actual_details as "driverNotes",
-            COALESCE(ct.title_name, '') as "titleName", 
-            COALESCE(ct.abbreviation, '') as "abbreviation",
-            co.target_qty as "targetQty", 
-            co.weekly_dist as "weeklyDist"  
-        FROM public.kalusto k
-        LEFT JOIN public.chip_loads cl ON k.kalusto_nro = cl.vehicle_number 
-            AND EXTRACT(WEEK FROM cl.scheduled_date) = $1 
-            AND EXTRACT(YEAR FROM cl.scheduled_date) = $2
-        LEFT JOIN public.chip_titles ct ON cl.title_id = ct.title_id
-        LEFT JOIN public.chip_orders co ON cl.order_id = co.order_id
-        WHERE k.aktiivinen = true
-        ORDER BY k.rek_nro, cl.scheduled_date, cl.serial_no;
+    SELECT 
+        k.kalusto_nro as "kalustoNro", 
+        k.rek_nro as "rekNro", 
+        cl.load_id as "loadId", 
+        cl.order_id as "orderId",
+        TO_CHAR(cl.scheduled_date, 'YYYY-MM-DD') as "date", 
+        cl.status, 
+        cl.serial_no as "serialNo",
+        cl.actual_m3 as "actualM3",
+        cl.actual_ton as "actualTon",
+        cl.actual_pcs as "actualPcs",
+        cl.actual_hr as "actualHr",
+        cl.actual_km as "actualKm",
+        cl.actual_waiting as "actualWaiting",
+        cl.actual_details as "actualDetails",
+        ct.title_name as "titleName", 
+        ct.abbreviation as "abbreviation",
+        ct.req_pcs as "req_pcs",
+        ct.req_m3 as "req_m3",
+        ct.req_ton as "req_ton",
+        ct.req_hr as "req_hr",
+        ct.req_waiting as "req_waiting",
+        ct.req_km as "req_km",
+        ct.req_details as "req_details",
+        ct.req_details_info as "req_details_info"
+    FROM public.kalusto k
+    LEFT JOIN public.chip_loads cl ON k.kalusto_nro = cl.vehicle_number 
+        AND EXTRACT(WEEK FROM cl.scheduled_date) = $1 
+        AND EXTRACT(YEAR FROM cl.scheduled_date) = $2
+    LEFT JOIN public.chip_titles ct ON cl.title_id = ct.title_id
+    WHERE k.aktiivinen = true
+    ORDER BY k.rek_nro, cl.scheduled_date, cl.serial_no;
     `;
         const result = await pool.query(query, [week, year]);
         return result.rows;
     },
 
-    // 2. Create Load Record
+
+    // 2. Assign weekly loads to driver
+    getDriverLoads: async (vehicleId: number, week: number, year: number) => {
+        const query = `
+            SELECT cl.*, 
+                   ct.title_name, ct.driver_instructions, ct.invoicing_basis,
+                   ct.req_pcs, ct.req_m3, ct.req_ton, ct.req_hr, ct.req_waiting, ct.req_km, ct.req_details, ct.req_details_info,
+                   p_load.nimi as loading_point_name, p_load.sijainti_lat as loading_point_lat, p_load.sijainti_long as loading_point_lng,
+                   p_unload.purkupaikka as unloading_point_name, p_unload.sijainti_lat as unloading_point_lat, p_unload.sijainti_long as unloading_point_lng,
+                   pt.puutavara as product_name
+            FROM public.chip_loads cl
+            JOIN public.chip_titles ct ON cl.title_id = ct.title_id
+            LEFT JOIN public.puulaani p_load ON ct.loading_point_id = p_load.puulaani_id
+            LEFT JOIN public.purkupaikka p_unload ON ct.unloading_point_id = p_unload.purkupaikka_id
+            LEFT JOIN public.puutavarat pt ON ct.product_number = pt.puutavara_nro
+            WHERE cl.vehicle_number = $1 
+            AND EXTRACT(WEEK FROM cl.scheduled_date) = $2
+            AND EXTRACT(YEAR FROM cl.scheduled_date) = $3
+            ORDER BY cl.serial_no ASC;
+        `;
+        const res = await pool.query(query, [vehicleId, week, year]);
+        return res.rows;
+    },
+
+    // 3. Update load metrics
+    updateLoadMetrics: async (loadId: number, data: any) => {
+        const query = `
+        UPDATE public.chip_loads 
+        SET started_at = COALESCE($1, started_at),
+            completed_at = COALESCE($2, completed_at),
+            actual_ton = COALESCE($3, actual_ton),
+            actual_m3 = COALESCE($4, actual_m3),
+            actual_pcs = COALESCE($5, actual_pcs),
+            actual_hr = COALESCE($6, actual_hr),
+            actual_km = COALESCE($7, actual_km),
+            actual_waiting = COALESCE($8, actual_waiting),
+            actual_details = COALESCE($9, actual_details),
+            status = COALESCE($10, status),
+            is_sent_from_app = COALESCE($11, is_sent_from_app)
+        WHERE load_id = $12 RETURNING *`;
+
+        const values = [
+            data.started_at || null,
+            data.completed_at || null,
+            data.actual_ton ?? null,
+            data.actual_m3 ?? null,
+            data.actual_pcs ?? null,
+            data.actual_hr ?? null,
+            data.actual_km ?? null,
+            data.actual_waiting ?? null,
+            data.actual_details ?? null,
+            data.status || null,
+            data.is_sent_from_app ?? null,
+            loadId
+        ];
+        const res = await pool.query(query, values);
+        return res.rows[0];
+    },
+
+    // 4. Create Load Record
     createLoadRecord: async (payload: any) => {
         const { vehicle_number, title_id, order_id, scheduled_date, loading_point_id, unloading_point_id, planned_m3 } = payload;
 
@@ -61,7 +128,7 @@ export const chipPlanningService = {
         return result.rows[0];
     },
 
-    // 3. Update Load Record
+    // 5. Update Load Record
     updateLoadRecord: async (loadId: number, data: any) => {
         const query = `
             UPDATE public.chip_loads 
@@ -73,13 +140,13 @@ export const chipPlanningService = {
         return result.rows[0];
     },
 
-    // 4. Delete Load Record
+    // 6. Delete Load Record
     deleteLoadRecord: async (loadId: number) => {
         const query = `DELETE FROM public.chip_loads WHERE load_id = $1;`;
         await pool.query(query, [loadId]);
     },
 
-    // 5. Move Load Record
+    // 7. Move Load Record
     moveLoadRecord: async (loadId: number, newVehicleNumber: number, newDate: string) => {
         const seqRes = await pool.query(
             `SELECT COALESCE(MAX(serial_no), -1) + 1 as next_seq 
@@ -99,12 +166,12 @@ export const chipPlanningService = {
         return result.rows[0];
     },
 
-    // 6. Add Vehicle to Plan
+    // 8. Add Vehicle to Plan
     addVehicleToWeeklyPlan: async (kalustoNro: number, week: number, year: number) => {
         return { success: true, kalustoNro, week, year };
     },
 
-    // 7. Get Map Markers
+    // 9. Get Map Markers
     getChipMapMarkers: async () => {
         const query = `
             SELECT 
@@ -128,7 +195,7 @@ export const chipPlanningService = {
         return result.rows;
     },
 
-    // 8. Dispatch Vehicle Row
+    // 10. Dispatch Vehicle Row
     dispatchVehicleRow: async (kalustoNro: number, week: number, year: number) => {
         const query = `
             UPDATE public.chip_loads 
@@ -157,7 +224,7 @@ export const chipPlanningService = {
     updateVehicleGroup: async (kalustoNro: number, groupName: string) => {
         await pool.query(`UPDATE public.kalusto SET planning_group = $1 WHERE kalusto_nro = $2`, [groupName, kalustoNro]);
     },
-    // 9. Get chip loads for a target ISO week (defaults are handled in controller)
+    // 11. Get chip loads for a target ISO week (defaults are handled in controller)
     getChipLoadsByWeek: async (week: number, year: number, vehicleNumber?: number) => {
         const query = `
             SELECT
@@ -214,7 +281,7 @@ export const chipPlanningService = {
         return result.rows;
     },
 
-    // 10. Create or update a chip load (set load)
+    // 12. Create or update a chip load (set load)
     setChipLoad: async (payload: any) => {
         const loadId = payload.loadId ?? payload.load_id ?? null;
 
@@ -358,5 +425,39 @@ export const chipPlanningService = {
             payload.isSentFromApp ?? payload.is_sent_from_app ?? false
         ]);
         return result.rows[0];
+    },
+    searchLoads: async (filters: any) => {
+        const { status, asiakasId, kalustoNro } = filters;
+
+        let query = `
+    SELECT 
+        cl.*, 
+        ct.title_name as "titleName", 
+        ct.abbreviation,
+        k.rek_nro as "vehicleRegNo",
+        a.asiakkaan_nimi as "customerName",
+        -- දැනට ඩ්‍රයිවර් කෙනෙකු චිප් ලෝඩ් එකට සෘජුව සම්බන්ධ නැති බැවින් 'N/A' පෙන්වමු
+        'N/A' as "driverName", 
+        ct.req_pcs, ct.req_m3, ct.req_ton, ct.req_hr, ct.req_waiting, ct.req_km, ct.req_details, ct.req_details_info
+    FROM public.chip_loads cl
+    JOIN public.chip_titles ct ON cl.title_id = ct.title_id
+    JOIN public.kalusto k ON cl.vehicle_number = k.kalusto_nro
+    LEFT JOIN public.asiakkaat a ON ct.customer_id = a.asiakkaan_id -- පාරිභෝගිකයා ලබා ගැනීම
+    WHERE 1=1
+    `;
+
+        const params: any[] = [];
+        if (status === 'active') {
+            query += ` AND cl.status IN ('DISPATCHED', 'LOADED', 'UNLOADED')`;
+        } else if (status === 'pending_inspection') {
+            query += ` AND cl.status IN ('COMPLETED', 'SENT') AND cl.is_billed = false`;
+        }
+
+        if (asiakasId) { query += ` AND ct.customer_id = $${params.length + 1}`; params.push(asiakasId); }
+        if (kalustoNro) { query += ` AND cl.vehicle_number = $${params.length + 1}`; params.push(kalustoNro); }
+
+        query += ` ORDER BY cl.scheduled_date DESC, cl.serial_no ASC`;
+        const result = await pool.query(query, params);
+        return result.rows;
     }
 };

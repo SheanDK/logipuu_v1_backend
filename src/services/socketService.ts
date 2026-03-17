@@ -8,8 +8,10 @@ import pool from '../config/db';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_for_dev_change_this';
 
 class SocketService {
-    emit(arg0: string, updatedLoad: any) {
-        throw new Error('Method not implemented.');
+    public emit(event: string, data: any) {
+        if (this.io) {
+            this.io.emit(event, data);
+        }
     }
     private static instance: SocketService;
     private io: Server | null = null;
@@ -47,27 +49,32 @@ class SocketService {
             try {
                 const { token, vehicleId } = socket.handshake.auth;
 
-                if (!token) { throw new Error("No token provided"); }
-                if (!vehicleId) { throw new Error("No vehicleId provided"); }
-
-                const decoded = jwt.verify(token, JWT_SECRET) as UserPayload;
-
-                if (!decoded.driverNumericId) {
-                    throw new Error("Token is invalid for a tracking session (missing driver ID)");
+                if (!token) {
+                    console.warn(`[Socket Auth] No token provided for ${socket.id}. Disconnecting.`);
+                    socket.disconnect();
+                    return;
                 }
 
+                const decoded = jwt.verify(token, JWT_SECRET) as UserPayload;
+                
+                // Store user data on socket
                 (socket as any).user = {
                     ...decoded,
-                    kalustoNro: parseInt(vehicleId, 10)
+                    kalustoNro: vehicleId ? parseInt(vehicleId, 10) : undefined
                 };
 
                 const user = (socket as any).user;
-                console.log(`[Socket Auth] Client ${socket.id} authenticated as Driver ID: ${user.driverNumericId}, Vehicle: ${user.kalustoNro}`);
+                console.log(`[Socket Auth] Client ${socket.id} authenticated. User ID: ${user.userId}, Roles: ${user.roles?.join(', ')}`);
 
+                // Always join 'dispatchers' or a global room to receive broadcasts
                 socket.join('dispatchers');
-                socket.join(`driver_${user.driverNumericId}`);
 
-                this.handleLocationUpdates(socket);
+                // If this is a driver session, join driver-specific rooms and handle location
+                if (user.driverNumericId) {
+                    console.log(`[Socket Auth] Driver detected: ID ${user.driverNumericId}, Vehicle: ${user.kalustoNro || 'N/A'}`);
+                    socket.join(`driver_${user.driverNumericId}`);
+                    this.handleLocationUpdates(socket);
+                }
 
             } catch (error: any) {
                 console.log(`[Socket Auth] Authentication failed for ${socket.id}: ${error.message}. Disconnecting.`);
@@ -77,8 +84,8 @@ class SocketService {
 
             socket.on('disconnect', () => {
                 const user = (socket as any).user;
-                const reason = user ? `Driver ID ${user.driverNumericId}` : 'Unauthenticated user';
-                console.log(`🔌 Client disconnected: ${reason} (Socket ID: ${socket.id})`);
+                const identity = user ? (user.driverNumericId ? `Driver ID ${user.driverNumericId}` : `User ID ${user.userId}`) : 'Unauthenticated user';
+                console.log(`🔌 Client disconnected: ${identity} (Socket ID: ${socket.id})`);
             });
         });
     }

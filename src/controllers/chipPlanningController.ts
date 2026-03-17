@@ -1,6 +1,7 @@
 // backend/src/controllers/chipPlanningController.ts
 import { Request, Response } from 'express';
 import { chipPlanningService } from '../services/chipPlanningService';
+import pool from '../config/db';
 
 const getIsoWeekAndYear = (date: Date): { week: number; year: number } => {
     const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -58,6 +59,10 @@ export const assignTitleToVehicle = async (req: Request, res: Response) => {
             order_id: order_id ? Number(order_id) : null,
             scheduled_date: pvm
         });
+
+        const { socketService } = require('../services/socketService');
+        socketService.emit('chipLoadUpdated', newLoad);
+
         res.status(201).json(newLoad);
     } catch (error: any) {
         res.status(500).json({ error: 'Internal server error' });
@@ -68,8 +73,14 @@ export const assignTitleToVehicle = async (req: Request, res: Response) => {
 export const dispatchRow = async (req: Request, res: Response) => {
     try {
         const { kalustoNro, week, year } = req.body;
-        await chipPlanningService.dispatchVehicleRow(Number(kalustoNro), Number(week), Number(year));
-        res.status(200).json({ success: true });
+        const updatedRows = await chipPlanningService.dispatchVehicleRow(Number(kalustoNro), Number(week), Number(year));
+
+        const { socketService } = require('../services/socketService');
+        if (Array.isArray(updatedRows)) {
+            updatedRows.forEach(row => socketService.emit('chipLoadUpdated', row));
+        }
+
+        res.status(200).json({ success: true, count: updatedRows.length });
     } catch (error: any) {
         res.status(500).json({ error: 'Internal server error' });
     }
@@ -80,6 +91,10 @@ export const updateAssignedLoad = async (req: Request, res: Response) => {
     try {
         const { loadId } = req.params;
         const result = await chipPlanningService.updateLoadRecord(Number(loadId), req.body);
+
+        const { socketService } = require('../services/socketService');
+        socketService.emit('chipLoadUpdated', result);
+
         res.status(200).json(result);
     } catch (error: any) {
         res.status(500).json({ error: 'Internal server error' });
@@ -91,6 +106,10 @@ export const deleteAssignedLoad = async (req: Request, res: Response) => {
     try {
         const { loadId } = req.params;
         await chipPlanningService.deleteLoadRecord(Number(loadId));
+
+        const { socketService } = require('../services/socketService');
+        socketService.emit('chipLoadDeleted', { loadId: Number(loadId) });
+
         res.status(200).json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: 'Internal server error' });
@@ -102,6 +121,10 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
     try {
         const { loadId, newKalustoNro, newDate } = req.body;
         const result = await chipPlanningService.moveLoadRecord(Number(loadId), Number(newKalustoNro), newDate);
+
+        const { socketService } = require('../services/socketService');
+        socketService.emit('chipLoadUpdated', result);
+
         res.status(200).json(result);
     } catch (error: any) {
         res.status(500).json({ error: 'Internal server error' });
@@ -161,7 +184,7 @@ export const updateVehicleGroup = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
-// 9. get chip loads by week (current ISO week by default)
+// 2. get chip loads by week (current ISO week by default)
 export const getChipLoadsByWeek = async (req: Request, res: Response) => {
     try {
         const weekQuery = getSingleQueryValue(req.query.week);
@@ -200,7 +223,7 @@ export const getChipLoadsByWeek = async (req: Request, res: Response) => {
     }
 };
 
-// 10. set chip load (create or update)
+// 13. set chip load (create or update)
 export const setChipLoad = async (req: Request, res: Response) => {
     try {
         const loadId = req.body.loadId ?? req.body.load_id;
@@ -217,11 +240,46 @@ export const setChipLoad = async (req: Request, res: Response) => {
         }
 
         const row = await chipPlanningService.setChipLoad(req.body);
+
+        const { socketService } = require('../services/socketService');
+        socketService.emit('chipLoadUpdated', row);
+
         return res.status(loadId ? 200 : 201).json(row);
     } catch (error: any) {
         if (error?.message === 'NOT_FOUND') {
             return res.status(404).json({ error: 'Chip load not found.' });
         }
         return res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// 14. get driver chip loads
+export const getDriverChipLoads = async (req: Request, res: Response) => {
+    try {
+        const { vehicleNumber, week, year } = req.query;
+        const data = await chipPlanningService.getDriverLoads(Number(vehicleNumber), Number(week), Number(year));
+        res.status(200).json(data);
+    } catch (error) { res.status(500).json({ error: "Failed to fetch loads" }); }
+};
+
+// 15. set load metrics
+export const setLoadMetrics = async (req: Request, res: Response) => {
+    try {
+        const { loadId, ...metrics } = req.body;
+        const data = await chipPlanningService.updateLoadMetrics(loadId, metrics);
+        const { socketService } = require('../services/socketService');
+        socketService.emit('chipLoadUpdated', data);
+
+        res.status(200).json(data);
+    } catch (error) { res.status(500).json({ error: "Failed to update load" }); }
+};
+
+// 16. search chip loads
+export const searchChipLoadsHandler = async (req: Request, res: Response) => {
+    try {
+        const data = await chipPlanningService.searchLoads(req.query);
+        res.status(200).json(data);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
     }
 };

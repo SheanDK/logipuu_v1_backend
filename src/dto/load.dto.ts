@@ -228,6 +228,11 @@ export class AcceptLoadsDto {
     @IsInt({ each: true })
     @Type(() => Number)
     loadIds!: number[];
+
+    @IsInt()
+    @IsOptional()
+    @Type(() => Number)
+    loadType?: number;
 }
 
 // 6. --- CREATE BULK LOAD DTO ---

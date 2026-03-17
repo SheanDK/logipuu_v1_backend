@@ -821,10 +821,16 @@ export const getLoadsForInspection = async (): Promise<ILoadListItem[]> => {
 };
 
 // 18. Accept Loads for Invoicing
-export const acceptLoadsForInvoicing = async (loadIds: number[]) => {
-    const query = `UPDATE public.kuorma SET laskutukseen = 1 WHERE kuorma_id = ANY($1) RETURNING kuorma_id;`;
-    const result = await pool.query(query, [loadIds]);
-    return { count: result.rowCount, ids: result.rows.map(r => r.kuormaId) };
+export const acceptLoadsForInvoicing = async (loadIds: number[], loadType?: number) => {
+    if (loadType === 2) {
+        const query = `UPDATE public.chip_loads SET is_billed = true WHERE load_id = ANY($1) RETURNING load_id;`;
+        const result = await pool.query(query, [loadIds]);
+        return { count: result.rowCount, ids: result.rows.map(r => r.loadId) };
+    } else {
+        const query = `UPDATE public.kuorma SET laskutukseen = 1 WHERE kuorma_id = ANY($1) RETURNING kuorma_id;`;
+        const result = await pool.query(query, [loadIds]);
+        return { count: result.rowCount, ids: result.rows.map(r => r.kuormaId) };
+    }
 };
 
 // 19. Get My Completed Loads for List
