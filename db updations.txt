@@ -1,0 +1,46 @@
+-----------------------------------------------------------------------------------------------
+To temporarily keep requested driver NEW NUMBER, and check the transfer STATUS
+
+ALTER TABLE public.chip_loads 
+ADD COLUMN requested_vehicle_number SMALLINT REFERENCES public.kalusto(kalusto_nro),
+ADD COLUMN transfer_status VARCHAR(20) DEFAULT NULL; -- 'PENDING', 'ACCEPTED', 'REJECTED'
+
+
+for NOTIFICATIONS 
+
+-- Create Notifications Table
+CREATE TABLE public.notifications (
+    notification_id SERIAL PRIMARY KEY,
+    vehicle_number SMALLINT NOT NULL REFERENCES public.kalusto(kalusto_nro),
+    type VARCHAR(50), -- 'LOAD_ASSIGNED', 'LOAD_DELETED', 'REASSIGNMENT_REQUEST'
+    message TEXT NOT NULL,
+    related_id INTEGER, -- To store load_id
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+------------ Changes ----------------------------------------------------------------------------
+
+-- 1.  kayttajat -->  kulj_id make as an UNIQUE  (Foreign Key)
+ALTER TABLE public.kayttajat 
+ADD CONSTRAINT unique_user_kulj_id UNIQUE (kulj_id);
+
+
+ALTER TABLE public.chip_loads 
+ADD COLUMN requested_user_id SMALLINT REFERENCES public.kayttajat(kulj_id);
+
+-- 2. notifications Update
+-- "vehicle_number"  column ---->  "vehicle_context_id"-- ( vehicle_number)
+ALTER TABLE public.notifications 
+RENAME COLUMN vehicle_number TO vehicle_context_id;
+
+-- Fore Recipient add new column ALTER TABLE public.notifications 
+ADD COLUMN recipient_user_id SMALLINT REFERENCES public.kayttajat(kulj_id);
+
+
+==================================================================================================================================================
+
+For save the current Logging vehicle
+
+SELECT * FROM public.kayttajat
+ORDER BY tunnus ASC 
