@@ -65,3 +65,21 @@ export const changeMyPasswordHandler = async (req: AuthenticatedRequest, res: Re
         next(error);
     }
 };
+
+// 4. --- UPDATE CURRENT VEHICLE ---
+export const updateCurrentVehicleHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        const tunnus = req.user?.userId;
+        if (!tunnus) return res.status(401).json({ message: 'User not authenticated.' });
+
+        const { vehicleId } = req.body;
+        const updatedVehicleId = await userService.updateUserCurrentVehicle(tunnus, vehicleId ? Number(vehicleId) : null);
+
+        res.status(200).json({
+            message: 'Current vehicle updated successfully.',
+            currentVehicleId: updatedVehicleId
+        });
+    } catch (error) {
+        next(error);
+    }
+};

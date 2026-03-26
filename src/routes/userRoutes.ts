@@ -22,6 +22,12 @@ router.put(
     userController.updateMyProfileHandler
 );
 
+router.put(
+    '/me/current-vehicle',
+    protect,
+    userController.updateCurrentVehicleHandler
+);
+
 // 3. POST Routes
 router.post(
     '/me/change-password',

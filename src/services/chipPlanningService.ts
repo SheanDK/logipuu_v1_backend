@@ -29,7 +29,9 @@ export const chipPlanningService = {
         ct.req_waiting as "req_waiting",
         ct.req_km as "req_km",
         ct.req_details as "req_details",
-        ct.req_details_info as "req_details_info"
+        ct.req_details_info as "req_details_info",
+        cl.transfer_status as "transferStatus",
+        cl.requested_user_id as "requestedUserId"
     FROM public.kalusto k
     LEFT JOIN public.chip_loads cl ON k.kalusto_nro = cl.vehicle_number 
         AND EXTRACT(WEEK FROM cl.scheduled_date) = $1 
@@ -60,6 +62,7 @@ export const chipPlanningService = {
             WHERE cl.vehicle_number = $1 
             AND EXTRACT(WEEK FROM cl.scheduled_date) = $2
             AND EXTRACT(YEAR FROM cl.scheduled_date) = $3
+            AND cl.status IN ('DISPATCHED', 'LOADED', 'UNLOADED', 'SENT')
             ORDER BY cl.serial_no ASC;
         `;
         const res = await pool.query(query, [vehicleId, week, year]);
@@ -130,13 +133,25 @@ export const chipPlanningService = {
 
     // 5. Update Load Record
     updateLoadRecord: async (loadId: number, data: any) => {
+        // dynamic query 
         const query = `
             UPDATE public.chip_loads 
-            SET actual_details = $1 
-            WHERE load_id = $2 
+            SET 
+                vehicle_number = COALESCE($1, vehicle_number),
+                actual_details = COALESCE($2, actual_details),
+                status = COALESCE($3, status)
+            WHERE load_id = $4 
             RETURNING *;
         `;
-        const result = await pool.query(query, [data.driverNotes || '', loadId]);
+
+        const values = [
+            data.vehicle_number ?? null,
+            data.actual_details ?? data.driverNotes ?? null,
+            data.status ?? null,
+            loadId
+        ];
+
+        const result = await pool.query(query, values);
         return result.rows[0];
     },
 
@@ -436,13 +451,12 @@ export const chipPlanningService = {
         ct.abbreviation,
         k.rek_nro as "vehicleRegNo",
         a.asiakkaan_nimi as "customerName",
-        -- දැනට ඩ්‍රයිවර් කෙනෙකු චිප් ලෝඩ් එකට සෘජුව සම්බන්ධ නැති බැවින් 'N/A' පෙන්වමු
         'N/A' as "driverName", 
         ct.req_pcs, ct.req_m3, ct.req_ton, ct.req_hr, ct.req_waiting, ct.req_km, ct.req_details, ct.req_details_info
     FROM public.chip_loads cl
     JOIN public.chip_titles ct ON cl.title_id = ct.title_id
     JOIN public.kalusto k ON cl.vehicle_number = k.kalusto_nro
-    LEFT JOIN public.asiakkaat a ON ct.customer_id = a.asiakkaan_id -- පාරිභෝගිකයා ලබා ගැනීම
+    LEFT JOIN public.asiakkaat a ON ct.customer_id = a.asiakkaan_id 
     WHERE 1=1
     `;
 
@@ -459,5 +473,72 @@ export const chipPlanningService = {
         query += ` ORDER BY cl.scheduled_date DESC, cl.serial_no ASC`;
         const result = await pool.query(query, params);
         return result.rows;
+    },
+
+    getLoadById: async (loadId: number) => {
+        const query = `
+            SELECT cl.*, k.rek_nro
+            FROM public.chip_loads cl
+            JOIN public.kalusto k ON cl.vehicle_number = k.kalusto_nro
+            WHERE cl.load_id = $1`;
+        const result = await pool.query(query, [loadId]);
+        return result.rows[0];
+    },
+
+    getNotifications: async (userId: number) => {
+        const query = `
+            SELECT * FROM public.notifications 
+            WHERE (recipient_user_id = $1 OR (recipient_user_id IS NULL AND $1 = 0)) 
+            ORDER BY created_at DESC 
+            LIMIT 50;
+        `;
+        const result = await pool.query(query, [userId]);
+        return result.rows;
+    },
+
+    markNotificationAsRead: async (notificationId: number) => {
+        const query = `
+        UPDATE public.notifications
+        SET is_read = true 
+        WHERE notification_id = $1 AND (is_read = false OR is_read IS NULL)
+        RETURNING *;
+    `;
+        const result = await pool.query(query, [notificationId]);
+        return result.rows[0];
+    },
+
+    markAllNotificationsAsRead: async (userId: number) => {
+        const query = `
+        UPDATE public.notifications 
+        SET is_read = true 
+        WHERE (recipient_user_id = $1 OR (recipient_user_id IS NULL AND $1 = 0))
+          AND (is_read = false OR is_read IS NULL) 
+          AND type != 'REASSIGNMENT_REQUEST' 
+        RETURNING *;
+    `;
+        const result = await pool.query(query, [userId]);
+        return result.rows;
+    },
+
+
+    getPendingTransferRequests: async (vehicleNumber: number) => {
+        const query = `
+            SELECT cl.*, ct.title_name, ct.abbreviation,
+                   p_load.nimi as loading_point_name, p_unload.purkupaikka as unloading_point_name
+            FROM public.chip_loads cl
+            JOIN public.chip_titles ct ON cl.title_id = ct.title_id
+            LEFT JOIN public.puulaani p_load ON ct.loading_point_id = p_load.puulaani_id
+            LEFT JOIN public.purkupaikka p_unload ON ct.unloading_point_id = p_unload.purkupaikka_id
+            WHERE cl.requested_vehicle_number = $1 
+            AND cl.transfer_status = 'PENDING';
+        `;
+        const result = await pool.query(query, [vehicleNumber]);
+        return result.rows;
+    },
+
+    clearReadNotifications: async (userId: number) => {
+        const query = `DELETE FROM public.notifications WHERE (recipient_user_id = $1 OR (recipient_user_id IS NULL AND $1 = 0)) AND is_read = true`;
+        await pool.query(query, [userId]);
+        return { success: true };
     }
 };

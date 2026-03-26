@@ -14,6 +14,11 @@ import {
     getDriverChipLoads,
     setLoadMetrics,
     searchChipLoadsHandler,
+    approveLoadTransfer,
+    getNotifications,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearReadNotifications,
 } from '../controllers/chipPlanningController';
 
 const router = Router();
@@ -56,5 +61,23 @@ router.post('/set-metrics', setLoadMetrics);
 
 // 13. Search Chip Loads
 router.get('/search', searchChipLoadsHandler);
+
+// 14. Approve/Reject Load Transfer
+router.post('/approve-transfer-request', approveLoadTransfer);
+
+// 15. Health Check
+router.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+
+// 15. Get Notifications
+router.get('/notifications/:userId', getNotifications);
+
+// 16. Mark Notification as Read
+router.put('/notifications/:notificationId/read', markNotificationAsRead);
+
+// 17. Mark All Notifications as Read
+router.put('/notifications/mark-all-read/:userId', markAllNotificationsAsRead);
+
+// 18. Clear Read Notifications
+router.delete('/notifications/clear-read/:userId', clearReadNotifications);
 
 export default router;

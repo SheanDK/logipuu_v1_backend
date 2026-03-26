@@ -80,3 +80,12 @@ export const changeUserPassword = async (tunnus: string, passwordData: ChangePas
 
     return { message: 'Password changed successfully.' };
 };
+
+// 4. Updates the current_vehicle_id for the user.
+export const updateUserCurrentVehicle = async (tunnus: string, vehicleId: number | null): Promise<number | null> => {
+    const result = await pool.query(userQueries.UPDATE_USER_CURRENT_VEHICLE, [vehicleId, tunnus]);
+    if (result.rows.length === 0) {
+        throw new Error('User not found.');
+    }
+    return result.rows[0].current_vehicle_id;
+};

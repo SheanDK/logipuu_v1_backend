@@ -35,3 +35,11 @@ export const UPDATE_USER_BY_ADMIN = `
 export const DELETE_USER_ROLE_MAPPINGS_BY_tunnus = `
     DELETE FROM public.kayttaja_roolit WHERE kayttaja_tunnus = $1;
 `;
+
+// 6. UPDATE_USER_CURRENT_VEHICLE
+export const UPDATE_USER_CURRENT_VEHICLE = `
+    UPDATE public.kayttajat
+    SET current_vehicle_id = $1
+    WHERE tunnus = $2
+    RETURNING current_vehicle_id;
+`;

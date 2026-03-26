@@ -8,11 +8,6 @@ import pool from '../config/db';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_for_dev_change_this';
 
 class SocketService {
-    public emit(event: string, data: any) {
-        if (this.io) {
-            this.io.emit(event, data);
-        }
-    }
     private static instance: SocketService;
     private io: Server | null = null;
 
@@ -25,9 +20,19 @@ class SocketService {
         return SocketService.instance;
     }
 
-    // Initializes the Socket.IO server with CORS options.
-    // @param httpServer The HTTP server instance from Express.
-    // @param frontendUrl The allowed origin for CORS.
+    public emit(event: string, data: any) {
+        if (this.io) {
+            this.io.emit(event, data);
+        }
+    }
+
+    public emitToVehicle(vehicleNumber: number, event: string, data: any) {
+        if (this.io) {
+            this.io.to(`vehicle_${vehicleNumber}`).emit(event, data);
+            console.log(`🔔 Event '${event}' sent to Vehicle Room: vehicle_${vehicleNumber}`);
+        }
+    }
+
     public initialize(httpServer: HttpServer, frontendUrl: string): void {
         if (this.io) {
             console.warn("Socket.IO server is already initialized.");
@@ -56,47 +61,54 @@ class SocketService {
                 }
 
                 const decoded = jwt.verify(token, JWT_SECRET) as UserPayload;
-                
-                // Store user data on socket
+
                 (socket as any).user = {
                     ...decoded,
-                    kalustoNro: vehicleId ? parseInt(vehicleId, 10) : undefined
+
+                    kalustoNro: (vehicleId !== undefined && vehicleId !== null) ? parseInt(vehicleId, 10) : undefined
                 };
 
                 const user = (socket as any).user;
-                console.log(`[Socket Auth] Client ${socket.id} authenticated. User ID: ${user.userId}, Roles: ${user.roles?.join(', ')}`);
+                console.log(`[Socket Auth] Client ${socket.id} authenticated. User ID: ${user.userId}`);
 
-                // Always join 'dispatchers' or a global room to receive broadcasts
-                socket.join('dispatchers');
+                const isOfficeUser = user.roles?.includes('Ajojärjestelijä') || 
+                                     user.roles?.includes('Ylläpitäjä') || 
+                                     user.roles?.includes('Admin') || 
+                                     user.roles?.includes('Superuser');
 
-                // If this is a driver session, join driver-specific rooms and handle location
-                if (user.driverNumericId) {
-                    console.log(`[Socket Auth] Driver detected: ID ${user.driverNumericId}, Vehicle: ${user.kalustoNro || 'N/A'}`);
-                    socket.join(`driver_${user.driverNumericId}`);
-                    this.handleLocationUpdates(socket);
+                if (isOfficeUser) {
+                    socket.join('dispatchers');
+                    socket.join('vehicle_0');
+                    console.log(`[Socket Join] Office room joined: dispatchers & vehicle_0`);
+                }
+
+                if (user.kalustoNro !== undefined && user.kalustoNro !== null) {
+                    socket.join(`vehicle_${user.kalustoNro}`);
+                    console.log(`[Socket Join] Joined Vehicle Room: vehicle_${user.kalustoNro}`);
+                }
+
+                if (decoded.driverNumericId) {
+                    const userId = decoded.driverNumericId;
+                    socket.join(`user_${userId}`);
+                    socket.join(`driver_${userId}`);
+                    console.log(`[Socket Join] User ID Room joined: user_${userId}`);
                 }
 
             } catch (error: any) {
-                console.log(`[Socket Auth] Authentication failed for ${socket.id}: ${error.message}. Disconnecting.`);
+                console.log(`[Socket Auth] Authentication failed for ${socket.id}: ${error.message}`);
                 socket.disconnect();
                 return;
             }
 
             socket.on('disconnect', () => {
-                const user = (socket as any).user;
-                const identity = user ? (user.driverNumericId ? `Driver ID ${user.driverNumericId}` : `User ID ${user.userId}`) : 'Unauthenticated user';
-                console.log(`🔌 Client disconnected: ${identity} (Socket ID: ${socket.id})`);
+                console.log(`🔌 Client disconnected: ${socket.id}`);
             });
         });
     }
-
-    // Private helper to encapsulate event listeners for an authenticated socket.
     private handleLocationUpdates(socket: Socket): void {
         socket.on('updateLocation', (coords: { lat: number; lng: number }) => {
             const user = (socket as any).user as UserPayload;
             if (!user || !user.kalustoNro) return;
-
-            console.log(`📍 Received location from Driver ${user.driverNumericId} for Vehicle ${user.kalustoNro}:`, coords);
 
             this.updateVehicleLocationInDb(user.kalustoNro, coords.lat, coords.lng);
 
@@ -111,38 +123,40 @@ class SocketService {
         });
     }
 
-    // Updates the vehicle's last known location in the 'kalusto' table.
     private async updateVehicleLocationInDb(vehicleId: number, lat: number, lng: number): Promise<void> {
-        const query = `
-            UPDATE public.kalusto
-            SET 
-                viim_sijainti_lat = $1,
-                viim_sijainti_long = $2,
-                viim_sijainti_aika = NOW()
-            WHERE kalusto_nro = $3;
-        `;
+        const query = `UPDATE public.kalusto SET viim_sijainti_lat = $1, viim_sijainti_long = $2, viim_sijainti_aika = NOW() WHERE kalusto_nro = $3;`;
         try {
             await pool.query(query, [lat, lng, vehicleId]);
-            console.log(`[DB Update] Successfully updated location for vehicle ${vehicleId}`);
         } catch (error) {
-            console.error(`[DB Update] FAILED to update location for vehicle ${vehicleId}:`, error);
+            console.error(`[DB Update] FAILED for vehicle ${vehicleId}:`, error);
         }
     }
 
-    // Emits the location update to all connected dispatchers.
     public emitLocationUpdate(locationPayload: any) {
         if (this.io) {
             this.io.to('dispatchers').emit('newDriverLocation', locationPayload);
-            console.log(`🚀 Broadcasted location update for vehicle: ${locationPayload.vehicleId}`);
         }
     }
 
-    // Returns the Socket.IO server instance.
     public getIO(): Server {
         if (!this.io) {
-            throw new Error("Socket.IO not initialized. Call initialize() first.");
+            throw new Error("Socket.IO not initialized.");
         }
         return this.io;
+    }
+
+    public emitToDispatchers(event: string, data: any) {
+        if (this.io) {
+            this.io.to('dispatchers').emit(event, data);
+            console.log(`🚀 Real-time notification broadcasted to all Dispatchers: ${event}`);
+        }
+    }
+
+    public emitToUser(userId: number, event: string, data: any) {
+        if (this.io) {
+            this.io.to(`user_${userId}`).emit(event, data);
+            console.log(`👤 Notification sent to User Room: user_${userId}`);
+        }
     }
 }
 

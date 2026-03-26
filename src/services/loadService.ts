@@ -1,7 +1,7 @@
 // backend/src/services/loadService.ts
 
 import pool from '../config/db';
-import { ILoad, ILoadDetails, ILoadListItem, IMapTrip, ITripDetails } from '../types/load.types';
+import { ILoad, ILoadDetails, ILoadListItem } from '../types/load.types';
 import { CreateLoadDto, UpdateLoadDto, CompleteLoadDto, CreateBulkLoadDto } from '../dto/load.dto';
 import { UserPayload } from '../middlewares/authMiddleware';
 import { socketService } from './socketService';
