@@ -19,6 +19,9 @@ import {
     markNotificationAsRead,
     markAllNotificationsAsRead,
     clearReadNotifications,
+    softDeleteChipLoad,
+    bulkAcceptChipLoads,
+    claimLoads
 } from '../controllers/chipPlanningController';
 
 const router = Router();
@@ -79,5 +82,14 @@ router.put('/notifications/mark-all-read/:userId', markAllNotificationsAsRead);
 
 // 18. Clear Read Notifications
 router.delete('/notifications/clear-read/:userId', clearReadNotifications);
+
+// 19. Soft Delete Load
+router.delete('/delete-load/:loadId', softDeleteChipLoad);
+
+// 20. Bulk Accept Chip Loads
+router.post('/bulk-accept', bulkAcceptChipLoads);
+
+// 21. Claim loads for a driver
+router.post('/claim-loads', claimLoads);
 
 export default router;

@@ -1,6 +1,6 @@
 // backend/src/queries/chipQueries/chipQueries.ts
 export const chipQueries = {
-    // TITLES
+    // 1. TITLES - Master Data
     getAllTitles: `
         SELECT ct.*, a.asiakkaan_nimi as customer_name, p.nimi as loading_point_name,
                pp.purkupaikka as unloading_point_name, pt.puutavara as product_name
@@ -11,7 +11,7 @@ export const chipQueries = {
         LEFT JOIN public.puutavarat pt ON ct.product_number = pt.puutavara_nro
         ORDER BY ct.title_id DESC`,
 
-    // ORDERS
+    // 2. ORDERS - Subscriptions
     getActiveOrders: `
         SELECT co.*, a.asiakkaan_nimi as "customerName", ct.abbreviation, pt.puutavara as "productType",
                (SELECT COUNT(*) FROM public.chip_loads cl WHERE cl.order_id = co.order_id) as "scheduledCount"
@@ -21,36 +21,55 @@ export const chipQueries = {
         LEFT JOIN public.puutavarat pt ON ct.product_number = pt.puutavara_nro
         WHERE co.is_active = true ORDER BY co.order_id DESC`,
 
-    // PLANNING
+    // 3. PLANNING - Weekly Grid (Updated with Driver Info)
     getWeeklyPlan: `
         SELECT k.kalusto_nro as "kalustoNro", k.rek_nro as "rekNro", cl.load_id as "loadId", 
                cl.order_id as "orderId", TO_CHAR(cl.scheduled_date, 'YYYY-MM-DD') as "date", 
                cl.status, cl.serial_no as "serialNo", cl.actual_m3 as "actualM3",
                COALESCE(ct.title_name, '') as "titleName", COALESCE(ct.abbreviation, '') as "abbreviation",
-               co.target_qty as "targetQty", co.weekly_dist as "weeklyDist"
+               co.target_qty as "targetQty", co.weekly_dist as "weeklyDist",
+               u.nimi as "driverName", cl.driver_user_id as "driverUserId" -- 🚀 රියදුරු තොරතුරු එක් කළා
         FROM public.kalusto k
         LEFT JOIN public.chip_loads cl ON k.kalusto_nro = cl.vehicle_number 
             AND EXTRACT(WEEK FROM cl.scheduled_date) = $1 
             AND EXTRACT(YEAR FROM cl.scheduled_date) = $2
         LEFT JOIN public.chip_titles ct ON cl.title_id = ct.title_id
         LEFT JOIN public.chip_orders co ON cl.order_id = co.order_id
+        LEFT JOIN public.kayttajat u ON cl.driver_user_id = u.kulj_id -- 🚀 Join users table
         WHERE k.aktiivinen = true ORDER BY k.rek_nro, cl.scheduled_date, cl.serial_no`,
 
-    // DRIVER LOADS
+    // 4. DRIVER LOADS - PWA View (Updated with actual Driver Name)
     getDriverLoads: `
         SELECT cl.*, 
                ct.title_name, ct.driver_instructions, ct.invoicing_basis,
                ct.req_pcs, ct.req_m3, ct.req_ton, ct.req_hr, ct.req_waiting, ct.req_km, ct.req_details, ct.req_details_info,
                p_load.nimi as loading_point_name, p_load.sijainti_lat as loading_point_lat, p_load.sijainti_long as loading_point_lng,
                p_unload.purkupaikka as unloading_point_name, p_unload.sijainti_lat as unloading_point_lat, p_unload.sijainti_long as unloading_point_lng,
-               pt.puutavara as product_name
+               pt.puutavara as product_name,
+               u.nimi as "driverName" -- 🚀 සැබෑ රියදුරුගේ නම ලබා ගැනීම
         FROM public.chip_loads cl
         JOIN public.chip_titles ct ON cl.title_id = ct.title_id
         LEFT JOIN public.puulaani p_load ON ct.loading_point_id = p_load.puulaani_id
         LEFT JOIN public.purkupaikka p_unload ON ct.unloading_point_id = p_unload.purkupaikka_id
         LEFT JOIN public.puutavarat pt ON ct.product_number = pt.puutavara_nro
+        LEFT JOIN public.kayttajat u ON cl.driver_user_id = u.kulj_id -- 🚀 Join users table
         WHERE cl.vehicle_number = $1 
         AND EXTRACT(WEEK FROM cl.scheduled_date) = $2
         AND EXTRACT(YEAR FROM cl.scheduled_date) = $3
-        ORDER BY cl.serial_no ASC`
+        ORDER BY cl.serial_no ASC`,
+
+    // 5. SEARCH LOADS - Office Side Inspection (Moving hardcoded query from service here)
+    searchLoads: `
+        SELECT 
+            cl.*, ct.title_name as "titleName", ct.abbreviation,
+            k.rek_nro as "vehicleRegNo",
+            a.asiakkaan_nimi as "customerName",
+            u.nimi as "driverName", -- 🚀 'N/A' වෙනුවට සැබෑ නම
+            ct.req_pcs, ct.req_m3, ct.req_ton, ct.req_hr, ct.req_waiting, ct.req_km, ct.req_details, ct.req_details_info
+        FROM public.chip_loads cl
+        JOIN public.chip_titles ct ON cl.title_id = ct.title_id
+        JOIN public.kalusto k ON cl.vehicle_number = k.kalusto_nro
+        LEFT JOIN public.asiakkaat a ON ct.customer_id = a.asiakkaan_id 
+        LEFT JOIN public.kayttajat u ON cl.driver_user_id = u.kulj_id -- 🚀 Join users table
+        WHERE 1=1`
 };

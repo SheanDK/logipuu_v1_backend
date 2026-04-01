@@ -44,3 +44,11 @@ For save the current Logging vehicle
 
 SELECT * FROM public.kayttajat
 ORDER BY tunnus ASC 
+
+==================================================================================================================================================
+for chip loads who has driven the load
+
+-- Add requested vehicle and status columns
+
+ALTER TABLE public.chip_loads 
+ADD COLUMN driver_user_id SMALLINT REFERENCES public.kayttajat(kulj_id);
