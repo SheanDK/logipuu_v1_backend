@@ -71,35 +71,32 @@ export const chipPlanningService = {
 
     // 3. Update load metrics
     updateLoadMetrics: async (loadId: number, data: any) => {
-        const query = `
-    UPDATE public.chip_loads 
-    SET started_at = COALESCE($1, started_at),
-        completed_at = COALESCE($2, completed_at),
-        actual_ton = COALESCE($3, actual_ton),
-        actual_m3 = COALESCE($4, actual_m3),
-        actual_pcs = COALESCE($5, actual_pcs),
-        actual_hr = COALESCE($6, actual_hr),
-        actual_km = COALESCE($7, actual_km),
-        actual_waiting = COALESCE($8, actual_waiting),
-        actual_details = COALESCE($9, actual_details),
-        status = COALESCE($10, status),
-        is_sent_from_app = COALESCE($11, is_sent_from_app)
-    WHERE load_id = $12 RETURNING *`;
+        const getSafeNum = (val: any) => (val === null || val === undefined || isNaN(Number(val)) || val === '') ? null : Number(val);
+        const getSafeStr = (val: any) => (val === null || val === undefined) ? null : String(val);
 
-        const values = [
-            data.started_at || null,
-            data.completed_at || null,
-            data.actual_ton ?? null,
-            data.actual_m3 ?? null,
-            data.actual_pcs ?? null,
-            data.actual_hr ?? null,
-            data.actual_km ?? null,
-            data.actual_waiting ?? null,
-            data.actual_details ?? null,
-            data.status || null,
-            data.is_sent_from_app ?? null,
-            loadId
-        ];
+        const updates: string[] = [];
+        const values: any[] = [];
+        let index = 1;
+
+        if (data.started_at !== undefined) { updates.push(`started_at = $${index++}`); values.push(data.started_at || null); }
+        if (data.completed_at !== undefined) { updates.push(`completed_at = $${index++}`); values.push(data.completed_at || null); }
+        if (data.actual_ton !== undefined) { updates.push(`actual_ton = $${index++}`); values.push(getSafeNum(data.actual_ton)); }
+        if (data.actual_m3 !== undefined) { updates.push(`actual_m3 = $${index++}`); values.push(getSafeNum(data.actual_m3)); }
+        if (data.actual_pcs !== undefined) { updates.push(`actual_pcs = $${index++}`); values.push(getSafeNum(data.actual_pcs)); }
+        if (data.actual_hr !== undefined) { updates.push(`actual_hr = $${index++}`); values.push(getSafeNum(data.actual_hr)); }
+        if (data.actual_km !== undefined) { updates.push(`actual_km = $${index++}`); values.push(getSafeNum(data.actual_km)); }
+        if (data.actual_waiting !== undefined) { updates.push(`actual_waiting = $${index++}`); values.push(getSafeNum(data.actual_waiting)); }
+        if (data.actual_details !== undefined) { updates.push(`actual_details = $${index++}`); values.push(getSafeStr(data.actual_details)); }
+        if (data.status !== undefined) { updates.push(`status = $${index++}`); values.push(data.status || null); }
+        if (data.is_sent_from_app !== undefined) { updates.push(`is_sent_from_app = $${index++}`); values.push(data.is_sent_from_app ?? null); }
+
+        if (updates.length === 0) {
+            const res = await pool.query(`SELECT * FROM public.chip_loads WHERE load_id = $1`, [loadId]);
+            return res.rows[0];
+        }
+
+        values.push(loadId);
+        const query = `UPDATE public.chip_loads SET ${updates.join(', ')} WHERE load_id = $${index} RETURNING *`;
         const res = await pool.query(query, values);
         return res.rows[0];
     },
@@ -296,23 +293,55 @@ export const chipPlanningService = {
         return result.rows;
     },
 
-    // 12. Create or update a chip load (set load)
+    // 12. Create or update a chip load - FULL CORRECTED IMPLEMENTATION
+    // 12. Create or update a chip load - FULL COMPLETED PRO LOGIC
     setChipLoad: async (payload: any) => {
         const loadId = payload.loadId ?? payload.load_id ?? null;
-        const driverUserId = payload.driver_user_id || payload.driverUserId || null;
+
+        // Helper function: NaN හෝ undefined අගයන් null බවට පත් කරයි (500 Error වැළැක්වීමට)
+        const getSafeNum = (val: any) => (val === null || val === undefined || isNaN(Number(val)) || val === '') ? null : Number(val);
+        const getSafeStr = (val: any) => (val === null || val === undefined) ? null : String(val);
+        const getSafeBool = (val: any) => (val === 'true' || val === true);
+
+        // රියදුරු ID එක ලබා ගැනීම
+        const driverUserId = getSafeNum(payload.driver_user_id || payload.driverUserId);
 
         if (loadId) {
+            // ==========================================
+            // 🔄 UPDATE LOGIC (Status/Metrics Update)
+            // ==========================================
             const currentRes = await pool.query(`SELECT * FROM public.chip_loads WHERE load_id = $1`, [Number(loadId)]);
-            if (currentRes.rowCount === 0) throw new Error('NOT_FOUND'); // 🚀 Fix: Properly structured
 
+            if (currentRes.rowCount === 0) throw new Error('NOT_FOUND');
             const current = currentRes.rows[0];
 
-            const nextData = {
-                titleId: payload.titleId ?? payload.title_id ?? current.title_id,
-                vehicleNumber: payload.vehicleNumber ?? payload.vehicle_number ?? current.vehicle_number,
-                status: payload.status ?? current.status,
-                // 🚀 සහතික කිරීම: රියදුරු ID එක තිබේ නම් එය ගනී, නැත්නම් පරණ එකම තබයි
-                driverUserId: driverUserId ?? current.driver_user_id
+            // Helper to respect explicit nulls but fallback on undefined
+            const getField = (key1: any, key2: any, current: any) => {
+                if (key1 !== undefined) return key1;
+                if (key2 !== undefined) return key2;
+                return current;
+            };
+
+            // 🚀 CRITICAL FIX: Database එකෙන් එන snake_case fields නිවැරදිව කියවීම
+            const dataToUpdate = {
+                title_id: getSafeNum(getField(payload.titleId, payload.title_id, current.titleId ?? current.title_id)),
+                vehicle_number: getSafeNum(getField(payload.vehicleNumber, payload.vehicle_number, current.vehicleNumber ?? current.vehicle_number)),
+                order_id: getSafeNum(getField(payload.orderId, payload.order_id, current.orderId ?? current.order_id)),
+                scheduled_date: getField(payload.scheduledDate, payload.scheduled_date, current.scheduledDate ?? current.scheduled_date),
+                serial_no: getSafeNum(getField(payload.serialNo, payload.serial_no, current.serialNo ?? current.serial_no)),
+                status: getField(payload.status, undefined, current.status),
+                started_at: getField(payload.startedAt, payload.started_at, current.startedAt ?? current.started_at),
+                completed_at: getField(payload.completedAt, payload.completed_at, current.completedAt ?? current.completed_at),
+                actual_ton: getSafeNum(getField(payload.actualTon, payload.actual_ton, current.actualTon ?? current.actual_ton)),
+                actual_m3: getSafeNum(getField(payload.actualM3, payload.actual_m3, current.actualM3 ?? current.actual_m3)),
+                actual_pcs: getSafeNum(getField(payload.actualPcs, payload.actual_pcs, current.actualPcs ?? current.actual_pcs)),
+                actual_hr: getSafeNum(getField(payload.actualHr, payload.actual_hr, current.actualHr ?? current.actual_hr)),
+                actual_km: getSafeNum(getField(payload.actualKm, payload.actual_km, current.actualKm ?? current.actual_km)),
+                actual_waiting: getSafeNum(getField(payload.actualWaiting, payload.actual_waiting, current.actualWaiting ?? current.actual_waiting)),
+                actual_details: getSafeStr(getField(payload.actualDetails, payload.actual_details, current.actualDetails ?? current.actual_details)),
+                load_notes: getSafeStr(getField(payload.loadNotes, payload.load_notes, current.loadNotes ?? current.load_notes)),
+                is_sent_from_app: getSafeBool(getField(payload.isSentFromApp, payload.is_sent_from_app, current.isSentFromApp ?? current.is_sent_from_app)),
+                driver_user_id: driverUserId !== null ? driverUserId : (current.driverUserId ?? current.driver_user_id)
             };
 
             const updateQuery = `
@@ -321,137 +350,101 @@ export const chipPlanningService = {
                     serial_no = $5, status = $6, started_at = $7, completed_at = $8,
                     actual_ton = $9, actual_m3 = $10, actual_pcs = $11, actual_hr = $12,
                     actual_km = $13, actual_waiting = $14, actual_details = $15,
-                    load_notes = $16, is_sent_from_app = $17, 
-                    driver_user_id = $18 -- 🚀 සැබෑ රියදුරු ID එක මෙහිදී සටහන් වේ
+                    load_notes = $16, is_sent_from_app = $17, driver_user_id = $18
                 WHERE load_id = $19 RETURNING *;
             `;
 
             const result = await pool.query(updateQuery, [
-                Number(nextData.titleId), Number(nextData.vehicleNumber),
-                payload.order_id || current.order_id, payload.scheduled_date || current.scheduled_date,
-                payload.serial_no ?? current.serial_no, nextData.status,
-                payload.started_at || current.started_at, payload.completed_at || current.completed_at,
-                payload.actual_ton ?? current.actual_ton, payload.actual_m3 ?? current.actual_m3,
-                payload.actual_pcs ?? current.actual_pcs, payload.actual_hr ?? current.actual_hr,
-                payload.actual_km ?? current.actual_km, payload.actual_waiting ?? current.actual_waiting,
-                payload.actual_details ?? current.actual_details, payload.load_notes ?? current.load_notes,
-                payload.is_sent_from_app ?? current.is_sent_from_app,
-                nextData.driverUserId ? Number(nextData.driverUserId) : null,
-                Number(loadId)
+                dataToUpdate.title_id, dataToUpdate.vehicle_number, dataToUpdate.order_id, dataToUpdate.scheduled_date,
+                dataToUpdate.serial_no, dataToUpdate.status, dataToUpdate.started_at, dataToUpdate.completed_at,
+                dataToUpdate.actual_ton, dataToUpdate.actual_m3, dataToUpdate.actual_pcs, dataToUpdate.actual_hr,
+                dataToUpdate.actual_km, dataToUpdate.actual_waiting, dataToUpdate.actual_details, dataToUpdate.load_notes,
+                dataToUpdate.is_sent_from_app, dataToUpdate.driver_user_id, Number(loadId)
+            ]);
+            return result.rows[0];
+
+        } else {
+            // ==========================================
+            // 🆕 CREATE LOGIC (New Load Record)
+            // ==========================================
+            const vehicleNumber = getSafeNum(payload.vehicleNumber ?? payload.vehicle_number);
+            const scheduledDate = payload.scheduledDate ?? payload.scheduled_date;
+
+            // Generate Serial No
+            const seqRes = await pool.query(
+                `SELECT COALESCE(MAX(serial_no), -1) + 1 as next_seq FROM public.chip_loads WHERE vehicle_number = $1 AND scheduled_date = $2`,
+                [vehicleNumber, scheduledDate]
+            );
+            const serialNo = getSafeNum(payload.serialNo ?? payload.serial_no ?? seqRes.rows[0].next_seq);
+
+            const insertQuery = `
+                INSERT INTO public.chip_loads (
+                    title_id, vehicle_number, order_id, scheduled_date, serial_no, status,
+                    started_at, completed_at, actual_ton, actual_m3, actual_pcs,
+                    actual_hr, actual_km, actual_waiting, actual_details, load_notes,
+                    is_sent_from_app, driver_user_id
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+                RETURNING *;
+            `;
+
+            const result = await pool.query(insertQuery, [
+                getSafeNum(payload.titleId ?? payload.title_id),
+                vehicleNumber,
+                getSafeNum(payload.orderId ?? payload.order_id),
+                scheduledDate,
+                serialNo,
+                payload.status ?? 'NOT_SENT',
+                payload.startedAt ?? payload.started_at ?? null,
+                payload.completedAt ?? payload.completed_at ?? null,
+                getSafeNum(payload.actualTon ?? payload.actual_ton),
+                getSafeNum(payload.actualM3 ?? payload.actual_m3),
+                getSafeNum(payload.actualPcs ?? payload.actual_pcs),
+                getSafeNum(payload.actualHr ?? payload.actual_hr),
+                getSafeNum(payload.actualKm ?? payload.actual_km),
+                getSafeNum(payload.actualWaiting ?? payload.actual_waiting),
+                getSafeStr(payload.actualDetails ?? payload.actual_details),
+                getSafeStr(payload.loadNotes ?? payload.load_notes),
+                getSafeBool(payload.isSentFromApp ?? payload.is_sent_from_app ?? false),
+                driverUserId
             ]);
             return result.rows[0];
         }
-
-        const titleId = payload.titleId ?? payload.title_id;
-        const vehicleNumber = payload.vehicleNumber ?? payload.vehicle_number;
-        const scheduledDate = payload.scheduledDate ?? payload.scheduled_date;
-        const orderId = payload.orderId ?? payload.order_id ?? null;
-        const providedSerial = payload.serialNo ?? payload.serial_no;
-
-        let serialNo = 0;
-        if (providedSerial !== undefined && providedSerial !== null) {
-            serialNo = Number(providedSerial);
-        } else {
-            const seqRes = await pool.query(
-                `SELECT COALESCE(MAX(serial_no), -1) + 1 as next_seq
-             FROM public.chip_loads
-             WHERE vehicle_number = $1 AND scheduled_date = $2`,
-                [Number(vehicleNumber), scheduledDate]
-            );
-            serialNo = Number(seqRes.rows[0].nextSeq);
-        }
-
-        const insertQuery = `
-        INSERT INTO public.chip_loads (
-            title_id,
-            vehicle_number,
-            order_id,
-            scheduled_date,
-            serial_no,
-            status,
-            started_at,
-            completed_at,
-            actual_ton,
-            actual_m3,
-            actual_pcs,
-            actual_hr,
-            actual_km,
-            actual_waiting,
-            actual_details,
-            load_notes,
-            is_sent_from_app
-        )
-        VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
-        )
-        RETURNING *;
-    `;
-
-        const result = await pool.query(insertQuery, [
-            Number(titleId),
-            Number(vehicleNumber),
-            orderId !== null ? Number(orderId) : null,
-            scheduledDate,
-            serialNo,
-            String(payload.status ?? 'NOT_SENT'),
-            payload.startedAt ?? payload.started_at ?? null,
-            payload.completedAt ?? payload.completed_at ?? null,
-            payload.actualTon ?? payload.actual_ton ?? null,
-            payload.actualM3 ?? payload.actual_m3 ?? null,
-            payload.actualPcs ?? payload.actual_pcs ?? null,
-            payload.actualHr ?? payload.actual_hr ?? null,
-            payload.actualKm ?? payload.actual_km ?? null,
-            payload.actualWaiting ?? payload.actual_waiting ?? null,
-            payload.actualDetails ?? payload.actual_details ?? null,
-            payload.loadNotes ?? payload.load_notes ?? null,
-            payload.isSentFromApp ?? payload.is_sent_from_app ?? false
-        ]);
-        return result.rows[0];
     },
-    // 13. Search Loads
+    // 13. Search Loads - FIXED (Removed non-existent column u3.current_vehicle_id)
     searchLoads: async (filters: any) => {
-        const { status, asiakasId, kalustoNro } = filters;
+        const { status, asiakasId, kalustoNro, startDate, endDate } = filters;
         let query = `
             SELECT 
-            cl.*, 
-            ct.title_name as "titleName", 
-            ct.abbreviation,
-            k.rek_nro as "vehicleRegNo",
-            a.asiakkaan_nimi as "customerName",
-            COALESCE(u1.nimi, u2.nimi, 'N/A') as "driverName", 
-            ct.req_pcs, ct.req_m3, ct.req_ton, ct.req_hr, ct.req_waiting, ct.req_km, ct.req_details, ct.req_details_info
-        FROM public.chip_loads cl
-        JOIN public.chip_titles ct ON cl.title_id = ct.title_id
-        JOIN public.kalusto k ON cl.vehicle_number = k.kalusto_nro
-        LEFT JOIN public.asiakkaat a ON ct.customer_id = a.asiakkaan_id 
-        LEFT JOIN public.kayttajat u1 ON cl.driver_user_id = u1.kulj_id
-        LEFT JOIN public.kayttajat u2 ON cl.requested_user_id = u2.kulj_id
-        WHERE 1=1
-    `;
+                cl.*, ct.title_name as "titleName", ct.abbreviation, k.rek_nro as "vehicleRegNo",
+                a.asiakkaan_nimi as "customerName", COALESCE(u1.nimi, u2.nimi, 'N/A') as "driverName", 
+                ct.req_pcs, ct.req_m3, ct.req_ton, ct.req_hr, ct.req_waiting, ct.req_km, ct.req_details, ct.req_details_info
+            FROM public.chip_loads cl
+            JOIN public.chip_titles ct ON cl.title_id = ct.title_id
+            JOIN public.kalusto k ON cl.vehicle_number = k.kalusto_nro
+            LEFT JOIN public.asiakkaat a ON ct.customer_id = a.asiakkaan_id 
+            LEFT JOIN public.kayttajat u1 ON cl.driver_user_id = u1.kulj_id
+            LEFT JOIN public.kayttajat u2 ON cl.requested_user_id = u2.kulj_id
+            WHERE 1=1
+        `;
         const params: any[] = [];
-        if (status === 'active') {
-            query += ` AND cl.status IN ('DISPATCHED', 'LOADED', 'UNLOADED')`;
-        } else if (status === 'pending_inspection' || status === 'completed' || status === 'sent') {
-            query += ` AND cl.status IN ('COMPLETED', 'SENT') AND COALESCE(cl.is_billed, false) = false`;
-        } else if (status === 'all') {
-            query += ` AND cl.status IN ('COMPLETED', 'SENT') AND cl.is_billed = true`;
-        }
+        if (status === 'active') { query += ` AND cl.status IN ('DISPATCHED', 'LOADED', 'UNLOADED')`; }
+        else if (status === 'pending_inspection') { query += ` AND cl.status IN ('COMPLETED', 'SENT') AND COALESCE(cl.is_billed, false) = false`; }
+        else if (status === 'all') { query += ` AND cl.status IN ('COMPLETED', 'SENT') AND cl.is_billed = true`; }
 
+        if (startDate && endDate) { query += ` AND cl.scheduled_date BETWEEN $${params.length + 1} AND $${params.length + 2}`; params.push(startDate, endDate); }
         if (asiakasId) { query += ` AND ct.customer_id = $${params.length + 1}`; params.push(asiakasId); }
-        if (kalustoNro && kalustoNro !== '') { query += ` AND cl.vehicle_number = $${params.length + 1}`; params.push(kalustoNro); }
+        if (kalustoNro) { query += ` AND cl.vehicle_number = $${params.length + 1}`; params.push(kalustoNro); }
 
         query += ` ORDER BY cl.scheduled_date DESC, cl.serial_no ASC`;
         const result = await pool.query(query, params);
         return result.rows;
     },
-    // 14. Get load by ID
+
+    // 14. Get load by ID - FIXED
     getLoadById: async (load_id: number) => {
         const query = `
             SELECT 
-                cl.*, 
-                k.rek_nro as "vehicleRegNo",
-                ct.title_name as "titleName",
-                a.asiakkaan_nimi as "customerName",
+                cl.*, k.rek_nro as "vehicleRegNo", ct.title_name as "titleName", a.asiakkaan_nimi as "customerName",
                 COALESCE(u1.nimi, u2.nimi, 'N/A') as "driverName"
             FROM public.chip_loads cl
             JOIN public.kalusto k ON cl.vehicle_number = k.kalusto_nro
@@ -462,6 +455,19 @@ export const chipPlanningService = {
             WHERE cl.load_id = $1`;
         const result = await pool.query(query, [load_id]);
         return result.rows[0];
+    },
+
+    // 🚀 CLAIM LOADS - UPDATED (Added SENT status for history)
+    claimVehicleLoads: async (vehicleNumber: number, userId: number) => {
+        const query = `
+            UPDATE public.chip_loads 
+            SET driver_user_id = $1 
+            WHERE vehicle_number = $2 
+              AND (driver_user_id IS NULL OR driver_user_id = 0)
+            RETURNING *;
+        `;
+        const result = await pool.query(query, [userId, vehicleNumber]);
+        return result.rows;
     },
 
     // 15. Get notifications
@@ -542,17 +548,5 @@ export const chipPlanningService = {
         const result = await pool.query(query, [loadIds]);
         return result.rows;
     },
-    // 22. Claim loads for a driver when they select a vehicle
-    claimVehicleLoads: async (vehicleNumber: number, userId: number) => {
-        const query = `
-        UPDATE public.chip_loads 
-        SET driver_user_id = $1 
-        WHERE vehicle_number = $2 
-          AND (driver_user_id IS NULL OR driver_user_id = 0)
-        RETURNING *;
-    `;
-        const result = await pool.query(query, [userId, vehicleNumber]);
-        console.log(`[DB] Claimed ${result.rowCount} loads for User: ${userId} on Vehicle: ${vehicleNumber}`);
-        return result.rows;
-    }
+
 };

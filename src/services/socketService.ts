@@ -4,13 +4,10 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { UserPayload } from '../middlewares/authMiddleware';
 import pool from '../config/db';
-
 const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_for_dev_change_this';
-
 class SocketService {
     private static instance: SocketService;
     private io: Server | null = null;
-
     private constructor() { }
 
     public static getInstance(): SocketService {
@@ -71,10 +68,10 @@ class SocketService {
                 const user = (socket as any).user;
                 console.log(`[Socket Auth] Client ${socket.id} authenticated. User ID: ${user.userId}`);
 
-                const isOfficeUser = user.roles?.includes('Ajojärjestelijä') || 
-                                     user.roles?.includes('Ylläpitäjä') || 
-                                     user.roles?.includes('Admin') || 
-                                     user.roles?.includes('Superuser');
+                const isOfficeUser = user.roles?.includes('Ajojärjestelijä') ||
+                    user.roles?.includes('Ylläpitäjä') ||
+                    user.roles?.includes('Admin') ||
+                    user.roles?.includes('Superuser');
 
                 if (isOfficeUser) {
                     socket.join('dispatchers');
@@ -159,5 +156,4 @@ class SocketService {
         }
     }
 }
-
 export const socketService = SocketService.getInstance();

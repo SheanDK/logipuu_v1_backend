@@ -1,0 +1,10 @@
+
+
+[2026-04-02T07:47:14.524Z] setChipLoad 500 ERROR:
+error: null value in column "title_id" of relation "chip_loads" violates not-null constraint
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:357:28)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:383:21)
+Payload: {"loadId":280,"started_at":"2026-04-02T07:47:14.233Z","status":"LOADED"}

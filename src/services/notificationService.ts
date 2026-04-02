@@ -1,5 +1,7 @@
 // backend/src/services/notificationService.ts
+
 import pool from "../config/db";
+import { socketService } from "./socketService";
 
 export const notificationService = {
     async sendNotification(recipientUserId: number, type: string, message: string, relatedId?: number, vehicleContextId?: number) {
@@ -16,31 +18,26 @@ export const notificationService = {
                 vehicleContextId || null
             ]);
 
+            // Database එකෙන් ලැබෙන raw data එක
             const dbNotif = result.rows[0];
 
-            // 🚀 🚀 🚀 FIX: Frontend එකට අවශ්‍ය CamelCase Payload එක සහතික කිරීම 🚀 🚀 🚀
+            // 🚀 Frontend එකට ගැළපෙන සේ දත්ත සකස් කිරීම (Mapping)
             const notificationPayload = {
+                ...dbNotif,
                 notificationId: dbNotif.notification_id,
                 recipientUserId: dbNotif.recipient_user_id,
-                type: dbNotif.type,
-                message: dbNotif.message,
                 relatedId: dbNotif.related_id,
                 vehicleContextId: dbNotif.vehicle_context_id,
-                createdAt: dbNotif.created_at,
-                isRead: false
+                createdAt: dbNotif.created_at
             };
 
-            const { socketService } = require('./socketService');
-
             if (recipientUserId === 0) {
-                // කාර්යාලයට යැවීම
                 socketService.emitToDispatchers('newNotification', notificationPayload);
             } else {
-                // 🚀 රියදුරුගේ පුද්ගලික User Room එකට පණිවිඩය යැවීම
-                console.log(`📡 Sending Socket Notification to user_${recipientUserId}`);
-                socketService.emitToUser(recipientUserId, 'newNotification', notificationPayload);
-
-                // Backup සඳහා වාහනයටත් යවමු
+                if (recipientUserId) {
+                    socketService.emitToUser(recipientUserId, 'newNotification', notificationPayload);
+                }
+                // Backup: වාහනයටත් පණිවිඩය යවමු
                 if (vehicleContextId) {
                     socketService.emitToVehicle(vehicleContextId, 'newNotification', notificationPayload);
                 }

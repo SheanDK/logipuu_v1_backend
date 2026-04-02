@@ -71,25 +71,25 @@ router.post('/approve-transfer-request', approveLoadTransfer);
 // 15. Health Check
 router.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
-// 15. Get Notifications
+// 16. Get Notifications
 router.get('/notifications/:userId', getNotifications);
 
-// 16. Mark Notification as Read
+// 17. Mark Notification as Read
 router.put('/notifications/:notificationId/read', markNotificationAsRead);
 
-// 17. Mark All Notifications as Read
+// 18. Mark All Notifications as Read
 router.put('/notifications/mark-all-read/:userId', markAllNotificationsAsRead);
 
-// 18. Clear Read Notifications
+// 19. Clear Read Notifications
 router.delete('/notifications/clear-read/:userId', clearReadNotifications);
-
-// 19. Soft Delete Load
-router.delete('/delete-load/:loadId', softDeleteChipLoad);
 
 // 20. Bulk Accept Chip Loads
 router.post('/bulk-accept', bulkAcceptChipLoads);
 
 // 21. Claim loads for a driver
 router.post('/claim-loads', claimLoads);
+
+// 22. Soft Delete Chip Load
+router.patch('/archive-load/:loadId', softDeleteChipLoad);
 
 export default router;

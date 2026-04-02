@@ -21,11 +21,15 @@ const getSingleQueryValue = (value: unknown): string | undefined => {
 
 // Helper to get driver ID for a vehicle
 const getDriverOfVehicle = async (vehicleNumber: number): Promise<number | null> => {
-    const res = await pool.query(
-        `SELECT kulj_id FROM public.kayttajat WHERE current_vehicle_id = $1 AND aktiivinen = true LIMIT 1`,
-        [vehicleNumber]
-    );
-    return res.rows[0]?.kulj_id || null;
+    try {
+        const res = await pool.query(
+            `SELECT kulj_id FROM public.kayttajat WHERE (current_vehicle_id = $1 OR kalusto_nro = $1) AND aktiivinen = true LIMIT 1`,
+            [vehicleNumber]
+        );
+        return res.rows[0]?.kulj_id || null;
+    } catch {
+        return null;
+    }
 };
 
 // 1. get data
@@ -147,7 +151,7 @@ export const deleteAssignedLoad = async (req: Request, res: Response) => {
         }
 
         const currentVehicleId = load.vehicle_number || load.vehicleNumber;
-        const currentDriverId = await getDriverOfVehicle(Number(currentVehicleId));
+        const currentDriverId = load.driver_user_id || load.driverUserId || await getDriverOfVehicle(Number(currentVehicleId));
 
         await chipPlanningService.deleteLoadRecord(Number(loadId));
 
@@ -181,7 +185,8 @@ export const deleteAssignedLoad = async (req: Request, res: Response) => {
     }
 };
 
-// 6. move assigned load (සෘජුවම මාරු කර රියදුරන්ට දැනුම් දීම)
+// 6. move assigned load
+// 6. move assigned load (UPDATED: Only notify if DISPATCHED)
 export const moveAssignedLoad = async (req: Request, res: Response) => {
     try {
         const { loadId, newKalustoNro, newDate } = req.body;
@@ -192,20 +197,18 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
         const previousStatus = load.status;
         const oldVehicleId = load.vehicle_number || load.vehicleNumber;
 
-        // 🚀 අනුමැතියකින් තොරව සෘජුවම DB එකේ වාහනය මාරු කරයි
-        const result = await chipPlanningService.moveLoadRecord(
-            Number(loadId),
-            Number(newKalustoNro),
-            newDate || load.scheduled_date || load.scheduledDate
-        );
+        // Execute the move in DB
+        const result = await chipPlanningService.moveLoadRecord(Number(loadId), Number(newKalustoNro), newDate || load.scheduled_date || load.scheduledDate);
 
-        const { socketService, notificationService } = require('../services');
+        const { socketService } = require('../services/socketService');
+        const { notificationService } = require('../services/notificationService');
 
-        if (previousStatus === 'DISPATCHED') {
-            const originalDriverId = await getDriverOfVehicle(Number(oldVehicleId));
+        // --- FIX: Trigger Notifications/Popups ---
+        if (['DISPATCHED', 'NOT_SENT'].includes(previousStatus)) {
+            const originalDriverId = load.driver_user_id || load.driverUserId || await getDriverOfVehicle(Number(oldVehicleId));
             const targetDriverId = await getDriverOfVehicle(Number(newKalustoNro));
 
-            // පැරණි රියදුරාට: පණිවිඩය (Removal)
+            // Old driver gets a "Removed" popup
             if (originalDriverId) {
                 await notificationService.sendNotification(
                     originalDriverId,
@@ -216,7 +219,7 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
                 );
             }
 
-            // අලුත් රියදුරාට: පණිවිඩය (New Assignment)
+            // New driver gets an "Assigned" popup
             if (targetDriverId) {
                 await notificationService.sendNotification(
                     targetDriverId,
@@ -228,8 +231,7 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
             }
         }
 
-        const { socketService: socket } = require('../services/socketService');
-        socket.emit('chipLoadUpdated', result);
+        socketService.emit('chipLoadUpdated', result);
         return res.status(200).json(result);
 
     } catch (error: any) {
@@ -351,21 +353,22 @@ const DRIVER_METRIC_KEYS = new Set([
 export const setChipLoad = async (req: Request, res: Response) => {
     try {
         const loadId = req.body.loadId ?? req.body.load_id;
-        const actingUserId = (req as any).user?.driverNumericId;
+        const actingUserId = (req as any).user?.driverNumericId || (req as any).user?.userId;
         let isStatusChangingToSent = false;
 
+        // --- FETCH existing load BEFORE mutating DB to check proper status transitions ---
         if (loadId) {
-            const currentLoad = await chipPlanningService.getLoadById(Number(loadId));
+            const existingLoad = await chipPlanningService.getLoadById(Number(loadId));
 
-            if (currentLoad) {
+            if (existingLoad) {
                 // 1. check if status is changing to 'SENT' (Notification Trigger)
                 const newStatus = req.body.status;
-                if (currentLoad.status !== 'SENT' && newStatus === 'SENT') {
+                if (existingLoad.status !== 'SENT' && newStatus === 'SENT') {
                     isStatusChangingToSent = true;
                 }
 
                 // 2. check structural changes (Metric keys validation)
-                if (['LOADED', 'UNLOADED', 'SENT'].includes(currentLoad.status)) {
+                if (['LOADED', 'UNLOADED', 'SENT'].includes(existingLoad.status)) {
                     const bodyKeys = Object.keys(req.body);
                     const isMetricsOnlyUpdate = bodyKeys.every(k => DRIVER_METRIC_KEYS.has(k));
                     if (!isMetricsOnlyUpdate) {
@@ -374,6 +377,13 @@ export const setChipLoad = async (req: Request, res: Response) => {
                 }
             }
         }
+
+        const payload = {
+            ...req.body,
+            driver_user_id: actingUserId
+        };
+
+        const row = await chipPlanningService.setChipLoad(payload);
 
         const titleId = req.body.titleId ?? req.body.title_id;
         const vehicleNumber = req.body.vehicleNumber ?? req.body.vehicle_number;
@@ -386,13 +396,6 @@ export const setChipLoad = async (req: Request, res: Response) => {
                 });
             }
         }
-        const payload = {
-            ...req.body,
-            driver_user_id: actingUserId
-        };
-
-        // database එක update කිරීම (දැන් driver_user_id සමඟ)
-        const row = await chipPlanningService.setChipLoad(payload);
 
         // update the table via socket
         const { socketService } = require('../services/socketService');
@@ -416,10 +419,26 @@ export const setChipLoad = async (req: Request, res: Response) => {
 
         return res.status(loadId ? 200 : 201).json(row);
     } catch (error: any) {
+        console.error("setChipLoad ERROR:", error);
+        
+        // --- ADDED CRITICAL DEBUG LOGGING ---
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const logPath = path.join(__dirname, '../../error_debug_log.txt');
+            fs.appendFileSync(logPath, `\n\n[${new Date().toISOString()}] setChipLoad 500 ERROR:\n${error.stack}\nPayload: ${JSON.stringify(req.body)}\n`);
+        } catch (fileErr) {
+            console.error("Failed to write to debug log", fileErr);
+        }
+
         if (error?.message === 'NOT_FOUND') {
             return res.status(404).json({ error: 'Chip load not found.' });
         }
-        return res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ 
+            error: 'Internal server error', 
+            details: String(error.message),
+            stack: String(error.stack)
+        });
     }
 };
 
@@ -459,22 +478,31 @@ export const approveLoadTransfer = async (req: Request, res: Response) => {
     try {
         const { loadId, approve, notificationId } = req.body;
 
-        if (!loadId || !notificationId) return res.status(400).json({ error: "Missing IDs" });
+        console.log(`[Approval Request] Load: ${loadId}, Notif: ${notificationId}, Approve: ${approve}`);
+
+        if (!loadId || !notificationId) {
+            return res.status(400).json({ error: "loadId and notificationId are required." });
+        }
 
         const notifRes = await pool.query('SELECT * FROM public.notifications WHERE notification_id = $1', [Number(notificationId)]);
         const notif = notifRes.rows[0];
 
-        if (!notif) return res.status(400).json({ error: "Notification not found" });
+        if (!notif) {
+            return res.status(400).json({ error: "Notification record not found." });
+        }
 
-        // 🚀 FIX: Database එකෙන් එන්නේ snake_case පමණි
-        const targetVehicle = notif.vehicle_context_id;
+        const targetVehicle = notif.vehicleContextId;
 
         const loadResult = await pool.query('SELECT * FROM public.chip_loads WHERE load_id = $1', [Number(loadId)]);
         if (loadResult.rows.length === 0) return res.status(404).json({ error: "Load not found" });
+
         const load = loadResult.rows[0];
 
         if (approve) {
-            if (!targetVehicle) return res.status(400).json({ error: "Target vehicle missing" });
+            if (!targetVehicle) {
+                console.error("❌ ERROR: Target vehicle is missing in notification context!");
+                return res.status(400).json({ error: "Target vehicle info missing. Please contact Admin." });
+            }
 
             const updatedLoad = await chipPlanningService.updateLoadRecord(Number(loadId), {
                 vehicle_number: targetVehicle,
@@ -485,14 +513,37 @@ export const approveLoadTransfer = async (req: Request, res: Response) => {
 
             await chipPlanningService.markNotificationAsRead(Number(notificationId));
 
-            // ... (Notifications යැවීමේ කොටස පෙර පරිදිම)
+            try {
+                const newDriverId = await getDriverOfVehicle(targetVehicle);
+                if (newDriverId) {
+                    await notificationService.sendNotification(newDriverId, 'LOAD_ASSIGNED', `New load assigned: Load ${loadId} was transferred to you.`, loadId, targetVehicle);
+                }
+
+                await notificationService.sendNotification(0, 'TRANSFER_ACCEPTED', `Transfer Approved: Load ${loadId} moved to Vehicle ${targetVehicle}.`, loadId);
+            } catch (err) { console.error('Notification logic error:', err); }
+
             const { socketService } = require('../services/socketService');
             socketService.emit('chipLoadUpdated', updatedLoad);
-            res.status(200).json({ message: "Transfer accepted", data: updatedLoad });
-        } else {
-            // ... (Reject logic)
+
+            res.status(200).json({ message: "Transfer completed", data: updatedLoad });
         }
-    } catch (error) {
+        else {
+            await chipPlanningService.updateLoadRecord(Number(loadId), {
+                requested_user_id: null,
+                transfer_status: 'REJECTED'
+            });
+
+            await chipPlanningService.markNotificationAsRead(Number(notificationId));
+
+            await notificationService.sendNotification(0, 'TRANSFER_REJECTED', `Owner rejected transfer for Load ${loadId}`, loadId);
+
+            const { socketService } = require('../services/socketService');
+            socketService.emit('chipLoadUpdated', { loadId });
+
+            res.status(200).json({ message: "Transfer rejected by owner" });
+        }
+    } catch (error: any) {
+        console.error("❌ approveLoadTransfer CRITICAL ERROR:", error.message);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -507,35 +558,49 @@ export const getNotifications = async (req: Request, res: Response) => {
         res.status(500).json({ error: "Failed to fetch notifications" });
     }
 };
-// 19. mark notification as read (රියදුරු "OK" කළ විට කාර්යාලයට පණිවිඩයක් යැවීම)
+// 19. mark notification as read
 export const markNotificationAsRead = async (req: Request, res: Response) => {
     try {
         const { notificationId } = req.params;
         const updatedNotif = await chipPlanningService.markNotificationAsRead(Number(notificationId));
 
         if (updatedNotif) {
-            const { type, recipient_user_id, related_id, vehicle_context_id } = updatedNotif;
+            // --- Send Acknowledgment Notification back to Planner ---
+            if (updatedNotif.type === 'LOAD_ASSIGNED' || updatedNotif.type === 'LOAD_DELETED') {
+                try {
+                    const { notificationService } = require('../services/notificationService');
+                    const recipientId = updatedNotif.recipient_user_id || updatedNotif.recipientUserId;
+                    const relatedId = updatedNotif.related_id || updatedNotif.relatedId;
+                    const vehicleCtx = updatedNotif.vehicle_context_id || updatedNotif.vehicleContextId;
 
-            // 🚀 රියදුරු LOAD_ASSIGNED හෝ LOAD_DELETED පණිවිඩයක් කියවූ විට කාර්යාලයට දැනුම් දෙයි
-            if (type === 'LOAD_ASSIGNED' || type === 'LOAD_DELETED') {
-                const { notificationService } = require('../services/notificationService');
+                    let driverName = `Driver #${recipientId}`;
+                    try {
+                        const driverRes = await pool.query('SELECT nimi, tunnus FROM public.kayttajat WHERE kulj_id = $1', [Number(recipientId)]);
+                        driverName = driverRes.rows[0]?.nimi || driverRes.rows[0]?.tunnus || driverName;
+                    } catch (e) {
+                        console.error('Error fetching driver name', e);
+                    }
 
-                // රියදුරුගේ නම ලබා ගැනීම
-                const driverRes = await pool.query('SELECT nimi FROM public.kayttajat WHERE kulj_id = $1', [recipient_user_id]);
-                const driverName = driverRes.rows[0]?.nimi || `Driver #${recipient_user_id}`;
+                    const actionTxt = updatedNotif.type === 'LOAD_ASSIGNED' ? 'new assignment' : 'removal';
+                    const loadTxt = relatedId ? ` for Load ${relatedId}` : '';
 
-                await notificationService.sendNotification(
-                    0, // Office/Dispatcher side
-                    'DRIVER_ACKNOWLEDGED',
-                    `${driverName} has acknowledged the update for Load ${related_id}.`,
-                    related_id,
-                    vehicle_context_id
-                );
+                    await notificationService.sendNotification(
+                        0,
+                        'DRIVER_ACKNOWLEDGED',
+                        `${driverName} acknowledged the ${actionTxt}${loadTxt}.`,
+                        relatedId ? Number(relatedId) : undefined,
+                        vehicleCtx ? Number(vehicleCtx) : undefined
+                    );
+                } catch (notifErr) {
+                    console.error("Ack Notification error", notifErr);
+                }
             }
             return res.status(200).json(updatedNotif);
+        } else {
+            return res.status(200).json({ message: "Already acknowledged" });
         }
-        res.status(404).json({ error: "Notification not found" });
     } catch (error) {
+        console.error("markNotificationAsRead ERROR:", error);
         res.status(500).json({ error: "Failed to update notification" });
     }
 };
@@ -624,28 +689,21 @@ export const claimLoads = async (req: Request, res: Response) => {
     try {
         const { vehicleNumber, userId } = req.body;
 
-        console.log(`[ClaimRequest] Vehicle: ${vehicleNumber}, UserID: ${userId}`);
-
         if (!vehicleNumber || !userId) {
-            return res.status(400).json({ error: "Missing required IDs" });
+            return res.status(400).json({ error: "Vehicle and User IDs are required." });
         }
 
-        // 🚀 දත්ත update කිරීම
         const updatedLoads = await chipPlanningService.claimVehicleLoads(Number(vehicleNumber), Number(userId));
 
+        // Socket හරහා කාර්යාලයට දැනුම් දීම (එවිට N/A වෙනුවට නම දිස්වේ)
         const { socketService } = require('../services/socketService');
         if (updatedLoads.length > 0) {
-            // කාර්යාලයට update එක යැවීම
             socketService.emit('chipLoadUpdated', { vehicleNumber, claimedBy: userId });
         }
 
         res.status(200).json({ success: true, count: updatedLoads.length });
-    } catch (error: any) {
-        console.error("claimLoads ERROR:", error.message);
+    } catch (error) {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
 
-function dayjs(arg0: any) {
-    throw new Error('Function not implemented.');
-}
