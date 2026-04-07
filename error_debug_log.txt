@@ -8,3 +8,183 @@ error: null value in column "title_id" of relation "chip_loads" violates not-nul
     at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:357:28)
     at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:383:21)
 Payload: {"loadId":280,"started_at":"2026-04-02T07:47:14.233Z","status":"LOADED"}
+
+
+[2026-04-07T06:42:44.069Z] setChipLoad 500 ERROR:
+error: column u3.kalusto_nro does not exist
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.getLoadById (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:469:24)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:342:34)
+Payload: {"loadId":303,"actual_ton":null}
+
+
+[2026-04-07T06:42:45.993Z] setChipLoad 500 ERROR:
+error: column u3.kalusto_nro does not exist
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.getLoadById (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:469:24)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:342:34)
+Payload: {"loadId":303,"actual_hr":null}
+
+
+[2026-04-07T06:42:48.951Z] setChipLoad 500 ERROR:
+error: column u3.kalusto_nro does not exist
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.getLoadById (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:469:24)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:342:34)
+Payload: {"loadId":303,"actual_hr":null}
+
+
+[2026-04-07T06:43:07.911Z] setChipLoad 500 ERROR:
+error: column u3.kalusto_nro does not exist
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.getLoadById (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:469:24)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:342:34)
+Payload: {"loadId":303,"actual_ton":20}
+
+
+[2026-04-07T06:43:08.050Z] setChipLoad 500 ERROR:
+error: column u3.kalusto_nro does not exist
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.getLoadById (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:469:24)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:342:34)
+Payload: {"loadId":303,"completed_at":"2026-04-07T06:43:07.989Z","status":"UNLOADED"}
+
+
+[2026-04-07T06:43:21.990Z] setChipLoad 500 ERROR:
+error: column u3.kalusto_nro does not exist
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.getLoadById (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:469:24)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:342:34)
+Payload: {"loadId":303,"actual_ton":20,"actual_m3":200,"actual_pcs":4000,"actual_hr":5,"actual_km":null,"actual_waiting":null,"actual_details":""}
+
+
+[2026-04-07T06:43:22.056Z] setChipLoad 500 ERROR:
+error: column u3.kalusto_nro does not exist
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.getLoadById (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:469:24)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:342:34)
+Payload: {"loadId":303,"status":"SENT","is_sent_from_app":true}
+
+
+[2026-04-07T07:37:47.697Z] setChipLoad 500 ERROR:
+error: null value in column "title_id" of relation "chip_loads" violates not-null constraint
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:344:28)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:345:21)
+Payload: {"loadId":303,"actual_pcs":4000}
+
+
+[2026-04-07T07:37:50.203Z] setChipLoad 500 ERROR:
+error: null value in column "title_id" of relation "chip_loads" violates not-null constraint
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:344:28)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:345:21)
+Payload: {"loadId":303,"actual_pcs":4000}
+
+
+[2026-04-07T07:41:33.076Z] setChipLoad 500 ERROR:
+error: null value in column "title_id" of relation "chip_loads" violates not-null constraint
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:346:28)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:345:21)
+Payload: {"loadId":303,"actual_m3":200}
+
+
+[2026-04-07T07:41:38.697Z] setChipLoad 500 ERROR:
+error: null value in column "title_id" of relation "chip_loads" violates not-null constraint
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:346:28)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:345:21)
+Payload: {"loadId":303,"actual_pcs":null}
+
+
+[2026-04-07T07:41:50.454Z] setChipLoad 500 ERROR:
+error: null value in column "title_id" of relation "chip_loads" violates not-null constraint
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:346:28)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:345:21)
+Payload: {"loadId":303,"actual_m3":200}
+
+
+[2026-04-07T07:41:52.098Z] setChipLoad 500 ERROR:
+error: null value in column "title_id" of relation "chip_loads" violates not-null constraint
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:346:28)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:345:21)
+Payload: {"loadId":303,"actual_pcs":null}
+
+
+[2026-04-07T07:43:41.095Z] setChipLoad 500 ERROR:
+error: null value in column "title_id" of relation "chip_loads" violates not-null constraint
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:349:28)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:345:21)
+Payload: {"loadId":303,"actual_m3":100}
+
+
+[2026-04-07T07:43:47.859Z] setChipLoad 500 ERROR:
+error: null value in column "title_id" of relation "chip_loads" violates not-null constraint
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:349:28)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:345:21)
+Payload: {"loadId":303,"actual_pcs":null}
+
+
+[2026-04-07T07:44:11.819Z] setChipLoad 500 ERROR:
+error: null value in column "title_id" of relation "chip_loads" violates not-null constraint
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:349:28)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:345:21)
+Payload: {"loadId":303,"actual_pcs":null}
+
+
+[2026-04-07T07:46:12.215Z] setChipLoad 500 ERROR:
+error: null value in column "title_id" of relation "chip_loads" violates not-null constraint
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:347:28)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:345:21)
+Payload: {"loadId":303,"actual_m3":200}
+
+
+[2026-04-07T07:46:19.071Z] setChipLoad 500 ERROR:
+error: null value in column "title_id" of relation "chip_loads" violates not-null constraint
+    at C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\node_modules\pg-pool\index.js:45:11
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Object.query (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\config\db.ts:17:24)
+    at async Object.setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\services\chipPlanningService.ts:347:28)
+    at async setChipLoad (C:\Users\Nayanjith Rathnayake\Documents\Hkk2026-MergedBranch\backend\src\controllers\chipPlanningController.ts:345:21)
+Payload: {"loadId":303,"actual_pcs":null}

@@ -50,6 +50,7 @@ class SocketService {
 
             try {
                 const { token, vehicleId } = socket.handshake.auth;
+                const decoded = jwt.verify(token, JWT_SECRET) as UserPayload;
 
                 if (!token) {
                     console.warn(`[Socket Auth] No token provided for ${socket.id}. Disconnecting.`);
@@ -57,7 +58,7 @@ class SocketService {
                     return;
                 }
 
-                const decoded = jwt.verify(token, JWT_SECRET) as UserPayload;
+
 
                 (socket as any).user = {
                     ...decoded,
@@ -68,15 +69,15 @@ class SocketService {
                 const user = (socket as any).user;
                 console.log(`[Socket Auth] Client ${socket.id} authenticated. User ID: ${user.userId}`);
 
-                const isOfficeUser = user.roles?.includes('Ajojärjestelijä') ||
-                    user.roles?.includes('Ylläpitäjä') ||
-                    user.roles?.includes('Admin') ||
-                    user.roles?.includes('Superuser');
+                const isOfficeUser = decoded.roles?.some(r => ['Ajojärjestelijä', 'Ylläpitäjä', 'Admin', 'Superuser'].includes(r));
+                const userId = decoded.driverNumericId || decoded.userId;
 
                 if (isOfficeUser) {
                     socket.join('dispatchers');
-                    socket.join('vehicle_0');
-                    console.log(`[Socket Join] Office room joined: dispatchers & vehicle_0`);
+                    console.log(`[SOCKET] Office User ${userId} joined room: dispatchers`);
+                } else {
+                    socket.join(`user_${userId}`);
+                    console.log(`[SOCKET] Driver ${userId} joined room: user_${userId}`);
                 }
 
                 if (user.kalustoNro !== undefined && user.kalustoNro !== null) {

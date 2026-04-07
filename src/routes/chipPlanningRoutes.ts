@@ -21,7 +21,8 @@ import {
     clearReadNotifications,
     softDeleteChipLoad,
     bulkAcceptChipLoads,
-    claimLoads
+    claimLoads,
+    requestTransfer
 } from '../controllers/chipPlanningController';
 
 const router = Router();
@@ -88,6 +89,9 @@ router.post('/bulk-accept', bulkAcceptChipLoads);
 
 // 21. Claim loads for a driver
 router.post('/claim-loads', claimLoads);
+
+// 23. Request Load Transfer
+router.post('/request-transfer', requestTransfer);
 
 // 22. Soft Delete Chip Load
 router.patch('/archive-load/:loadId', softDeleteChipLoad);

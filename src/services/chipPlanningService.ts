@@ -130,24 +130,21 @@ export const chipPlanningService = {
 
     // 5. Update Load Record
     updateLoadRecord: async (loadId: number, data: any) => {
-        // dynamic query 
-        const query = `
-        UPDATE public.chip_loads 
-        SET 
-            vehicle_number = COALESCE($1, vehicle_number),
-            actual_details = COALESCE($2, actual_details),
-            status = COALESCE($3, status)
-        WHERE load_id = $4 
-        RETURNING *;
-    `;
+        const updates: string[] = [];
+        const values: any[] = [];
+        let index = 1;
 
-        const values = [
-            data.vehicle_number ?? null,
-            data.actual_details ?? data.driverNotes ?? null,
-            data.status ?? null,
-            loadId
-        ];
+        Object.keys(data).forEach(key => {
+            if (data[key] !== undefined) {
+                updates.push(`${key} = $${index++}`);
+                values.push(data[key]);
+            }
+        });
 
+        if (updates.length === 0) return null;
+
+        values.push(loadId);
+        const query = `UPDATE public.chip_loads SET ${updates.join(', ')} WHERE load_id = $${index} RETURNING *;`;
         const result = await pool.query(query, values);
         return result.rows[0];
     },
@@ -410,13 +407,14 @@ export const chipPlanningService = {
             return result.rows[0];
         }
     },
-    // 13. Search Loads - FIXED (Removed non-existent column u3.current_vehicle_id)
+    // 13. Search Loads 
     searchLoads: async (filters: any) => {
         const { status, asiakasId, kalustoNro, startDate, endDate } = filters;
         let query = `
             SELECT 
                 cl.*, ct.title_name as "titleName", ct.abbreviation, k.rek_nro as "vehicleRegNo",
-                a.asiakkaan_nimi as "customerName", COALESCE(u1.nimi, u2.nimi, 'N/A') as "driverName", 
+                a.asiakkaan_nimi as "customerName", 
+                COALESCE(u1.nimi, u2.nimi, 'N/A') as "driverName", 
                 ct.req_pcs, ct.req_m3, ct.req_ton, ct.req_hr, ct.req_waiting, ct.req_km, ct.req_details, ct.req_details_info
             FROM public.chip_loads cl
             JOIN public.chip_titles ct ON cl.title_id = ct.title_id
@@ -443,9 +441,8 @@ export const chipPlanningService = {
     // 14. Get load by ID - FIXED
     getLoadById: async (load_id: number) => {
         const query = `
-            SELECT 
-                cl.*, k.rek_nro as "vehicleRegNo", ct.title_name as "titleName", a.asiakkaan_nimi as "customerName",
-                COALESCE(u1.nimi, u2.nimi, 'N/A') as "driverName"
+            SELECT cl.*, k.rek_nro as "vehicleRegNo", ct.title_name as "titleName", a.asiakkaan_nimi as "customerName",
+            COALESCE(u1.nimi, u2.nimi, 'N/A') as "driverName"
             FROM public.chip_loads cl
             JOIN public.kalusto k ON cl.vehicle_number = k.kalusto_nro
             JOIN public.chip_titles ct ON cl.title_id = ct.title_id
@@ -499,7 +496,6 @@ export const chipPlanningService = {
     SET is_read = true 
     WHERE (recipient_user_id = $1 OR (recipient_user_id IS NULL AND $1 = 0))
       AND (is_read = false OR is_read IS NULL) 
-      AND type != 'REASSIGNMENT_REQUEST' 
     RETURNING *;
 `;
         const result = await pool.query(query, [userId]);
