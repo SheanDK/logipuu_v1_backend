@@ -16,7 +16,6 @@ export const notificationService = {
                 vehicleContextId ? Number(vehicleContextId) : null
             ]);
 
-            // 🚀 FIX: Pool එක camelCase කරන නිසා 'notificationId' ලෙස භාවිතා කරන්න
             const dbNotif = result.rows[0];
             const actualId = dbNotif.notificationId || dbNotif.notification_id;
 
@@ -36,7 +35,7 @@ export const notificationService = {
             const { socketService } = require('./socketService');
             if (recipientUserId === 0) {
                 socketService.emitToDispatchers('newNotification', payload);
-            } else {
+            } else if (recipientUserId !== -1) {
                 socketService.emitToUser(recipientUserId, 'newNotification', payload);
             }
 

@@ -167,7 +167,7 @@ export const chipPlanningService = {
 
         const query = `
         UPDATE public.chip_loads 
-        SET vehicle_number = $1, scheduled_date = $2, serial_no = $3 
+        SET vehicle_number = $1, scheduled_date = $2, serial_no = $3, driver_user_id = NULL
         WHERE load_id = $4 
         RETURNING *;
     `;
@@ -464,6 +464,20 @@ export const chipPlanningService = {
             RETURNING *;
         `;
         const result = await pool.query(query, [userId, vehicleNumber]);
+        return result.rows;
+    },
+
+    // 🚀 යම් වාහනයකට රියදුරෙකු නොමැතිව ලැබී ඇති දැනුම්දීම්, රියදුරා වාහනය තෝරාගැනීමේදී ඔහුට පවරයි
+    claimVehicleNotifications: async (vehicleNumber: number, userId: number) => {
+        const query = `
+            UPDATE public.notifications 
+            SET recipient_user_id = $2 
+            WHERE vehicle_context_id = $1 
+              AND recipient_user_id = -1 
+              AND is_read = false
+            RETURNING *;
+        `;
+        const result = await pool.query(query, [vehicleNumber, userId]);
         return result.rows;
     },
 

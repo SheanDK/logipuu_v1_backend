@@ -94,13 +94,20 @@ export const dispatchRow = async (req: Request, res: Response) => {
             const { socketService } = require('../services/socketService');
             updatedRows.forEach(row => socketService.emit('chipLoadUpdated', row));
 
-            // 🚀 රියදුරු හඳුනාගෙන Notification එක යැවීම
             const targetDriverId = await getDriverOfVehicle(Number(kalustoNro));
             if (targetDriverId) {
                 await notificationService.sendNotification(
                     targetDriverId,
                     'LOAD_ASSIGNED',
                     `New loads have been assigned to your schedule for Week ${week}.`,
+                    undefined,
+                    Number(kalustoNro)
+                );
+            } else {
+                await notificationService.sendNotification(
+                    -1,
+                    'LOAD_ASSIGNED',
+                    `New loads were assigned to Vehicle ${kalustoNro} for Week ${week}.`,
                     undefined,
                     Number(kalustoNro)
                 );
@@ -185,7 +192,6 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
     try {
         const { loadId, newKalustoNro, newDate } = req.body;
 
-        // 🚀 FIX 2: පටන් ගැන්මේදීම දත්තවල නිරවද්‍යතාවය පරීක්ෂා කිරීම
         if (isNaN(Number(loadId)) || isNaN(Number(newKalustoNro))) {
             console.error("❌ Invalid IDs in moveAssignedLoad:", { loadId, newKalustoNro });
             return res.status(400).json({ error: "Invalid Load ID or Vehicle Number provided." });
@@ -195,12 +201,10 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
         if (!load) return res.status(404).json({ error: 'Load not found' });
 
         const previousStatus = load.status;
-        // Database එකෙන් එන snake_case සහ camelCase දෙකම පරීක්ෂා කරයි
         const oldVehicleId = Number(load.vehicle_number || load.vehicleNumber);
         const targetVehicleId = Number(newKalustoNro);
 
-        // 1. Database එකේ load එක මාරු කිරීම
-        const result = await chipPlanningService.moveLoadRecord(
+        let result = await chipPlanningService.moveLoadRecord(
             Number(loadId),
             targetVehicleId,
             newDate || load.scheduled_date || load.scheduledDate
@@ -209,12 +213,14 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
         const { socketService } = require('../services/socketService');
         const { notificationService } = require('../services/notificationService');
 
-        // 2. දැනට පවරන ලද (DISPATCHED) එකක් නම් පමණක් රියදුරන්ට පණිවිඩ යවයි
-        if (previousStatus === 'DISPATCHED') {
-            const originalDriverId = await getDriverOfVehicle(oldVehicleId);
-            const targetDriverId = await getDriverOfVehicle(targetVehicleId);
+        const originalDriverId = await getDriverOfVehicle(oldVehicleId);
+        const targetDriverId = await getDriverOfVehicle(targetVehicleId);
 
-            // පැරණි රියදුරාට දැනුම් දීම
+        if (targetDriverId && !isNaN(targetDriverId)) {
+            result = await chipPlanningService.updateLoadRecord(Number(loadId), { driver_user_id: targetDriverId });
+        }
+
+        if (previousStatus === 'DISPATCHED') {
             if (originalDriverId && !isNaN(originalDriverId)) {
                 await notificationService.sendNotification(
                     originalDriverId,
@@ -225,12 +231,19 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
                 );
             }
 
-            // අලුත් රියදුරාට දැනුම් දීම
             if (targetDriverId && !isNaN(targetDriverId)) {
                 await notificationService.sendNotification(
                     targetDriverId,
                     'LOAD_ASSIGNED',
                     `New Load ${loadId} has been transferred to your vehicle.`,
+                    Number(loadId),
+                    targetVehicleId
+                );
+            } else {
+                await notificationService.sendNotification(
+                    -1,
+                    'LOAD_ASSIGNED',
+                    `New Load ${loadId} has been transferred to Vehicle ${targetVehicleId}.`,
                     Number(loadId),
                     targetVehicleId
                 );
@@ -578,7 +591,6 @@ export const markNotificationAsRead = async (req: Request, res: Response) => {
                     const driverName = driverRes.rows[0]?.nimi || `Driver #${recipientId}`;
 
                     const actionTxt = updatedNotif.type === 'LOAD_ASSIGNED' ? 'new assignment' : 'removal';
-                    // Load ID එක පවතී නම් පමණක් පෙන්වයි
                     const loadTxt = (relatedId && String(relatedId) !== 'undefined') ? ` for Load #${relatedId}` : '';
 
                     await notificationService.sendNotification(
@@ -687,14 +699,27 @@ export const claimLoads = async (req: Request, res: Response) => {
         }
 
         const updatedLoads = await chipPlanningService.claimVehicleLoads(Number(vehicleNumber), Number(userId));
+        
+        // 🚀 වාහනය තෝරාගැනීමේදී, එම වාහනයට ලැබී තිබූ පණිවිඩ (Unassigned) රියදුරාට පවරයි
+        const claimedNotifs = await chipPlanningService.claimVehicleNotifications(Number(vehicleNumber), Number(userId));
 
         const { socketService } = require('../services/socketService');
-        if (updatedLoads.length > 0) {
-            socketService.emit('chipLoadUpdated', { vehicleNumber, claimedBy: userId });
+        // පණිවිඩ හෝ ලෝඩ්ස් යාවත්කාලීන වූයේ නම් පමණක් Socket මගින් දැනුම් දීමක් සිදු කරයි
+        if (updatedLoads.length > 0 || (claimedNotifs && claimedNotifs.length > 0)) {
+            socketService.emit('chipLoadUpdated', { 
+                vehicleNumber, 
+                claimedBy: userId,
+                claimedNotificationsCount: claimedNotifs.length 
+            });
         }
 
-        res.status(200).json({ success: true, count: updatedLoads.length });
+        res.status(200).json({ 
+            success: true, 
+            count: updatedLoads.length, 
+            claimedNotificationsCount: claimedNotifs ? claimedNotifs.length : 0 
+        });
     } catch (error) {
+        console.error("claimLoads Error:", error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
