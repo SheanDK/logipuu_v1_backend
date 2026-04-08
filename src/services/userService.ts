@@ -83,9 +83,36 @@ export const changeUserPassword = async (tunnus: string, passwordData: ChangePas
 
 // 4. Updates the current_vehicle_id for the user.
 export const updateUserCurrentVehicle = async (tunnus: string, vehicleId: number | null): Promise<number | null> => {
-    const result = await pool.query(userQueries.UPDATE_USER_CURRENT_VEHICLE, [vehicleId, tunnus]);
-    if (result.rows.length === 0) {
-        throw new Error('User not found.');
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 🚀 වාහනය දැනටමත් වෙනත් රියදුරෙකු භාවිතා කරන්නේ දැයි පරීක්ෂා කිරීම (Atomic check)
+        if (vehicleId !== null) {
+            const checkQuery = `
+                SELECT tunnus, nimi 
+                FROM public.kayttajat 
+                WHERE current_vehicle_id = $1 AND aktiivinen = true AND tunnus != $2 
+                LIMIT 1
+            `;
+            const checkRes = await client.query(checkQuery, [vehicleId, tunnus]);
+            if (checkRes.rows.length > 0) {
+                throw new Error(`This vehicle is already in use by ${checkRes.rows[0].nimi}.`);
+            }
+        }
+
+        const result = await client.query(userQueries.UPDATE_USER_CURRENT_VEHICLE, [vehicleId, tunnus]);
+        
+        await client.query('COMMIT');
+
+        if (result.rows.length === 0) {
+            throw new Error('User not found.');
+        }
+        return result.rows[0].current_vehicle_id;
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
     }
-    return result.rows[0].current_vehicle_id;
 };

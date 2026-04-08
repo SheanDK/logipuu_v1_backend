@@ -290,36 +290,27 @@ export const chipPlanningService = {
         return result.rows;
     },
 
-    // 12. Create or update a chip load - FULL CORRECTED IMPLEMENTATION
-    // 12. Create or update a chip load - FULL COMPLETED PRO LOGIC
+    // 12. Create or update a chip load
     setChipLoad: async (payload: any) => {
         const loadId = payload.loadId ?? payload.load_id ?? null;
 
-        // Helper function: NaN හෝ undefined අගයන් null බවට පත් කරයි (500 Error වැළැක්වීමට)
         const getSafeNum = (val: any) => (val === null || val === undefined || isNaN(Number(val)) || val === '') ? null : Number(val);
         const getSafeStr = (val: any) => (val === null || val === undefined) ? null : String(val);
         const getSafeBool = (val: any) => (val === 'true' || val === true);
 
-        // රියදුරු ID එක ලබා ගැනීම
         const driverUserId = getSafeNum(payload.driver_user_id || payload.driverUserId);
 
         if (loadId) {
-            // ==========================================
-            // 🔄 UPDATE LOGIC (Status/Metrics Update)
-            // ==========================================
             const currentRes = await pool.query(`SELECT * FROM public.chip_loads WHERE load_id = $1`, [Number(loadId)]);
 
             if (currentRes.rowCount === 0) throw new Error('NOT_FOUND');
             const current = currentRes.rows[0];
-
-            // Helper to respect explicit nulls but fallback on undefined
             const getField = (key1: any, key2: any, current: any) => {
                 if (key1 !== undefined) return key1;
                 if (key2 !== undefined) return key2;
                 return current;
             };
 
-            // 🚀 CRITICAL FIX: Database එකෙන් එන snake_case fields නිවැරදිව කියවීම
             const dataToUpdate = {
                 title_id: getSafeNum(getField(payload.titleId, payload.title_id, current.titleId ?? current.title_id)),
                 vehicle_number: getSafeNum(getField(payload.vehicleNumber, payload.vehicle_number, current.vehicleNumber ?? current.vehicle_number)),
@@ -361,13 +352,8 @@ export const chipPlanningService = {
             return result.rows[0];
 
         } else {
-            // ==========================================
-            // 🆕 CREATE LOGIC (New Load Record)
-            // ==========================================
             const vehicleNumber = getSafeNum(payload.vehicleNumber ?? payload.vehicle_number);
             const scheduledDate = payload.scheduledDate ?? payload.scheduled_date;
-
-            // Generate Serial No
             const seqRes = await pool.query(
                 `SELECT COALESCE(MAX(serial_no), -1) + 1 as next_seq FROM public.chip_loads WHERE vehicle_number = $1 AND scheduled_date = $2`,
                 [vehicleNumber, scheduledDate]
@@ -467,7 +453,6 @@ export const chipPlanningService = {
         return result.rows;
     },
 
-    // 🚀 යම් වාහනයකට රියදුරෙකු නොමැතිව ලැබී ඇති දැනුම්දීම්, රියදුරා වාහනය තෝරාගැනීමේදී ඔහුට පවරයි
     claimVehicleNotifications: async (vehicleNumber: number, userId: number) => {
         const query = `
             UPDATE public.notifications 

@@ -79,7 +79,11 @@ export const updateCurrentVehicleHandler = async (req: AuthenticatedRequest, res
             message: 'Current vehicle updated successfully.',
             currentVehicleId: updatedVehicleId
         });
-    } catch (error) {
+    } catch (error: any) {
+        // 🚀 වාහනය දැනටමත් කාර්යබහුල නම් හමුවන Error එක පාලනය කිරීම
+        if (error.message.includes('already in use')) {
+            return res.status(400).json({ message: error.message });
+        }
         next(error);
     }
 };
