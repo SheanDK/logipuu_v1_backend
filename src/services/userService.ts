@@ -23,6 +23,8 @@ export const getUserProfile = async (tunnus: string): Promise<UserProfileRespons
         fullName: dbProfile.nimi,
         roles: dbProfile.roles || [],
         driverEmail: dbProfile.driverEmail || null,
+        currentVehicleId: dbProfile.current_vehicle_id || null,
+        currentVehicleRegNo: dbProfile.current_vehicle_reg_no || null,
     };
 
     return userProfileToReturn;
@@ -87,22 +89,38 @@ export const updateUserCurrentVehicle = async (tunnus: string, vehicleId: number
     try {
         await client.query('BEGIN');
 
-        // 🚀 වාහනය දැනටමත් වෙනත් රියදුරෙකු භාවිතා කරන්නේ දැයි පරීක්ෂා කිරීම (Atomic check)
+        // 🚀 Check and update at the same time (Prevent race conditions)
         if (vehicleId !== null) {
-            const checkQuery = `
+            // 1. Check if another driver is using this vehicle
+            const conflictQuery = `
                 SELECT tunnus, nimi 
                 FROM public.kayttajat 
                 WHERE current_vehicle_id = $1 AND aktiivinen = true AND tunnus != $2 
                 LIMIT 1
             `;
-            const checkRes = await client.query(checkQuery, [vehicleId, tunnus]);
-            if (checkRes.rows.length > 0) {
-                throw new Error(`This vehicle is already in use by ${checkRes.rows[0].nimi}.`);
+            const conflictRes = await client.query(conflictQuery, [vehicleId, tunnus]);
+
+            if (conflictRes.rows.length > 0) {
+                const occupant = conflictRes.rows[0];
+                throw new Error(`This vehicle is already in use by ${occupant.nimi} (${occupant.tunnus}).`);
+            }
+
+            // 2. Strict One-Driver-One-Vehicle
+            const driverCheckQuery = `
+                SELECT k.current_vehicle_id, v.rek_nro
+                FROM public.kayttajat k
+                LEFT JOIN public.kalusto v ON k.current_vehicle_id = v.kalusto_nro
+                WHERE k.tunnus = $1 AND k.current_vehicle_id IS NOT NULL AND k.current_vehicle_id != $2
+            `;
+            const driverCheckRes = await client.query(driverCheckQuery, [tunnus, vehicleId]);
+            if (driverCheckRes.rows.length > 0) {
+                const currentReg = driverCheckRes.rows[0].rek_nro;
+                throw new Error(`You are already assigned to vehicle ${currentReg}. Please unselect it before choosing a new one.`);
             }
         }
 
         const result = await client.query(userQueries.UPDATE_USER_CURRENT_VEHICLE, [vehicleId, tunnus]);
-        
+
         await client.query('COMMIT');
 
         if (result.rows.length === 0) {

@@ -17,6 +17,8 @@ export interface UserProfileResponseDto {
     fullName: string;
     roles: string[];
     driverEmail: string | null;
+    currentVehicleId?: number | null;
+    currentVehicleRegNo?: string | null;
 }
 
 

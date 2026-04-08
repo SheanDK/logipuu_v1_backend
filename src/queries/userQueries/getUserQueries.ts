@@ -5,15 +5,18 @@ export const SELECT_USER_PROFILE_BY_tunnus = `
     SELECT
         k.tunnus,
         k.nimi,
-        k.kulj_id, -- Corrected from kuljid and alias removed
+        k.kulj_id,
+        k.current_vehicle_id,
+        v.rek_nro AS current_vehicle_reg_no,
         COALESCE(array_agg(r.roolin_nimi) FILTER (WHERE r.roolin_nimi IS NOT NULL), '{}') as roles,
-        kj.email AS driver_email -- We can give it a clear snake_case name
+        kj.email AS driver_email
     FROM public.kayttajat k
     LEFT JOIN public.kayttaja_roolit kr ON k.tunnus = kr.kayttaja_tunnus
     LEFT JOIN public.roolit r ON kr.rooli_id = r.rooli_id
     LEFT JOIN public.kuljettajat kj ON k.kulj_id = kj.kulj_id 
+    LEFT JOIN public.kalusto v ON k.current_vehicle_id = v.kalusto_nro
     WHERE k.tunnus = $1 AND k.aktiivinen = TRUE
-    GROUP BY k.tunnus, k.nimi, k.kulj_id, kj.email;
+    GROUP BY k.tunnus, k.nimi, k.kulj_id, k.current_vehicle_id, v.rek_nro, kj.email;
 `;
 
 // 2. SELECT_KAYTTAJAT_PASSWORD_BY_tunnus
