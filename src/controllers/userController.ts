@@ -3,6 +3,8 @@ import { Response, NextFunction } from 'express';
 import * as userService from '../services/userService';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import { UpdateUserProfileDto, ChangePasswordDto } from '../dto/user.dto';
+import { sessionService } from '../services/sessionService';
+import pool from '../config/db';
 
 // 1. --- GET MY PROFILE ---
 export const getMyProfileHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -66,24 +68,31 @@ export const changeMyPasswordHandler = async (req: AuthenticatedRequest, res: Re
     }
 };
 
-// 4. --- UPDATE CURRENT VEHICLE ---
+// 4. --- UPDATE CURRENT VEHICLE (with session handling) ---
 export const updateCurrentVehicleHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const tunnus = req.user?.userId;
-        if (!tunnus) return res.status(401).json({ message: 'User not authenticated.' });
+        const userId = req.user?.driverNumericId;
+        const tokenIdentifier = req.headers.authorization;
 
-        const { vehicleId } = req.body;
-        const updatedVehicleId = await userService.updateUserCurrentVehicle(tunnus, vehicleId ? Number(vehicleId) : null);
+        const { vehicleId, deviceInfo } = req.body;
+
+        if (!tunnus || !userId) return res.status(401).json({ message: 'User not authenticated.' });
+
+        const updatedVehicleId = await userService.updateUserCurrentVehicle(
+            tunnus,
+            vehicleId ? Number(vehicleId) : null,
+            userId,
+            deviceInfo || 'Unknown Device',
+            tokenIdentifier || '',
+            req.ip || 'Unknown IP'
+        );
 
         res.status(200).json({
-            message: 'Current vehicle updated successfully.',
+            message: 'Vehicle session updated successfully.',
             currentVehicleId: updatedVehicleId
         });
     } catch (error: any) {
-        // 🚀 වාහනය දැනටමත් කාර්යබහුල නම් හමුවන Error එක පාලනය කිරීම
-        if (error.message.includes('already in use')) {
-            return res.status(400).json({ message: error.message });
-        }
-        next(error);
+        res.status(400).json({ message: error.message });
     }
 };

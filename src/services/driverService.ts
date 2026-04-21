@@ -84,3 +84,26 @@ export const getDriversWithoutAccount = async () => {
     const result = await pool.query(query);
     return result.rows;
 };
+
+// 7. Get all drivers with online status
+export const fetchAllDrivers = async () => {
+    const result = await pool.query(`SELECT * FROM public.kayttajat WHERE taso = 5`);
+    const drivers = result.rows;
+
+    const { socketService } = require('./socketService');
+    const onlineTokens = socketService.getOnlineIdentifiers();
+
+    const sessionRes = await pool.query(`SELECT user_id, token_identifier FROM public.driver_active_sessions`);
+
+    return drivers.map(d => {
+        // 🚀 FIX: ටෝකනය තුළ "Bearer " තිබුණත් නැතත් හඳුනාගැනීමට String comparison එක වැඩි දියුණු කළා
+        const activeSessionsForDriver = sessionRes.rows.filter(s => Number(s.user_id) === Number(d.kulj_id));
+
+        const isOnline = activeSessionsForDriver.some(s => {
+            const cleanId = s.token_identifier.startsWith('Bearer ') ? s.token_identifier.slice(7) : s.token_identifier;
+            return onlineTokens.has(cleanId);
+        });
+
+        return { ...d, isOnline };
+    });
+};

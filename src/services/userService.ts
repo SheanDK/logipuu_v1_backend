@@ -49,10 +49,7 @@ export const updateUserProfile = async (
         }
 
         await client.query('COMMIT');
-
-        // After transaction, fetch the latest profile data to return to the client
         return getUserProfile(tunnus);
-
     } catch (error) {
         await client.query('ROLLBACK');
         console.error(`SERVICE ERROR: Failed to update profile for Tunnus ${tunnus}:`, error);
@@ -83,50 +80,104 @@ export const changeUserPassword = async (tunnus: string, passwordData: ChangePas
     return { message: 'Password changed successfully.' };
 };
 
-// 4. Updates the current_vehicle_id for the user.
-export const updateUserCurrentVehicle = async (tunnus: string, vehicleId: number | null): Promise<number | null> => {
+// 4. Updates the current_vehicle_id and manages active sessions for the user.
+export const updateUserCurrentVehicle = async (
+    tunnus: string,
+    vehicleId: number | null,
+    userId: number,
+    deviceInfo: string,
+    tokenIdentifier: string,
+    ipAddress: string,
+): Promise<number | null> => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
-        // 🚀 Check and update at the same time (Prevent race conditions)
         if (vehicleId !== null) {
-            // 1. Check if another driver is using this vehicle
-            const conflictQuery = `
-                SELECT tunnus, nimi 
-                FROM public.kayttajat 
-                WHERE current_vehicle_id = $1 AND aktiivinen = true AND tunnus != $2 
+            // 1. check if the vehicle is used by another driver
+            const vehicleBusyQuery = `
+                SELECT u.nimi, u.tunnus 
+                FROM public.driver_active_sessions s
+                JOIN public.kayttajat u ON s.user_id = u.kulj_id
+                WHERE s.vehicle_id = $1 AND s.user_id != $2
                 LIMIT 1
             `;
-            const conflictRes = await client.query(conflictQuery, [vehicleId, tunnus]);
 
-            if (conflictRes.rows.length > 0) {
-                const occupant = conflictRes.rows[0];
-                throw new Error(`This vehicle is already in use by ${occupant.nimi} (${occupant.tunnus}).`);
+            const occupantRes = await client.query(vehicleBusyQuery, [vehicleId, userId]);
+            if (occupantRes.rows.length > 0) {
+                const occupant = occupantRes.rows[0];
+                throw new Error(`This vehicle is currently in use by ${occupant.nimi} on another device.`);
             }
 
-            // 2. Strict One-Driver-One-Vehicle
-            const driverCheckQuery = `
-                SELECT k.current_vehicle_id, v.rek_nro
-                FROM public.kayttajat k
-                LEFT JOIN public.kalusto v ON k.current_vehicle_id = v.kalusto_nro
-                WHERE k.tunnus = $1 AND k.current_vehicle_id IS NOT NULL AND k.current_vehicle_id != $2
+            // 2. check if the driver is already logged in to another vehicle
+            const driverBusyQuery = `
+                SELECT k.rek_nro 
+                FROM public.driver_active_sessions s
+                JOIN public.kalusto k ON s.vehicle_id = k.kalusto_nro
+                WHERE s.user_id = $1 AND s.vehicle_id != $2
+                LIMIT 1
             `;
-            const driverCheckRes = await client.query(driverCheckQuery, [tunnus, vehicleId]);
-            if (driverCheckRes.rows.length > 0) {
-                const currentReg = driverCheckRes.rows[0].rek_nro;
-                throw new Error(`You are already assigned to vehicle ${currentReg}. Please unselect it before choosing a new one.`);
+
+            const driverRes = await client.query(driverBusyQuery, [userId, vehicleId]);
+            if (driverRes.rows.length > 0) {
+                const row = driverRes.rows[0];
+                const currentRegNo = row.rek_nro || row.rekNro || "Unknown";
+                throw new Error(`You are already using vehicle ${currentRegNo}. Please release it first before switching.`);
+            }
+
+            // 3. insert or update the session for this specific token
+            await client.query(
+                `INSERT INTO public.driver_active_sessions 
+                    (user_id, vehicle_id, device_info, token_identifier, ip_address) 
+                 VALUES ($1, $2, $3, $4, $5) 
+                 ON CONFLICT (token_identifier) 
+                 DO UPDATE SET 
+                    created_at = NOW(), 
+                    ip_address = EXCLUDED.ip_address,
+                    device_info = EXCLUDED.device_info`,
+                [userId, vehicleId, deviceInfo, tokenIdentifier, ipAddress]
+            );
+
+            // update the vehicle number as a cache
+            await client.query(
+                `UPDATE public.kayttajat SET current_vehicle_id = $1 WHERE kulj_id = $2`,
+                [vehicleId, userId]
+            );
+
+        } else {
+            // when the driver logs out from one browser
+
+            // 1. delete the session for this specific token
+            await client.query(
+                `DELETE FROM public.driver_active_sessions WHERE token_identifier = $1`,
+                [tokenIdentifier]
+            );
+
+            // 2. check if the driver has any other active sessions
+            const remainingSessionsRes = await client.query(
+                `SELECT count(*) FROM public.driver_active_sessions WHERE user_id = $1`,
+                [userId]
+            );
+
+            const activeCount = parseInt(remainingSessionsRes.rows[0].count);
+
+            // 3. all sessions are ended
+            if (activeCount === 0) {
+                await client.query(
+                    `UPDATE public.kayttajat SET current_vehicle_id = NULL WHERE kulj_id = $1`,
+                    [userId]
+                );
+                console.log(`[SESSION] Vehicle released for Driver ${userId} - No more active sessions.`);
+            } else {
+                console.log(`[SESSION] Session closed for Driver ${userId}, but vehicle remains locked due to ${activeCount} other session(s).`);
             }
         }
-
-        const result = await client.query(userQueries.UPDATE_USER_CURRENT_VEHICLE, [vehicleId, tunnus]);
 
         await client.query('COMMIT');
 
-        if (result.rows.length === 0) {
-            throw new Error('User not found.');
-        }
-        return result.rows[0].current_vehicle_id;
+        const freshRes = await client.query(`SELECT current_vehicle_id FROM public.kayttajat WHERE kulj_id = $1`, [userId]);
+        return freshRes.rows[0]?.current_vehicle_id || null;
+
     } catch (error) {
         await client.query('ROLLBACK');
         throw error;

@@ -4,10 +4,15 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { UserPayload } from '../middlewares/authMiddleware';
 import pool from '../config/db';
+
 const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_for_dev_change_this';
+
 class SocketService {
     private static instance: SocketService;
     private io: Server | null = null;
+
+    private onlineTokens: Set<string> = new Set();
+
     private constructor() { }
 
     public static getInstance(): SocketService {
@@ -15,6 +20,10 @@ class SocketService {
             SocketService.instance = new SocketService();
         }
         return SocketService.instance;
+    }
+
+    public getOnlineIdentifiers(): Set<string> {
+        return this.onlineTokens;
     }
 
     public emit(event: string, data: any) {
@@ -46,63 +55,92 @@ class SocketService {
         console.log("✅ Socket.IO server initialized and listening for connections.");
 
         this.io.on('connection', (socket: Socket) => {
-            console.log(`🔌 New client connected: ${socket.id}`);
+            const { token, vehicleId } = socket.handshake.auth;
+
+            if (!token) {
+                console.warn(`[Socket Auth] No token provided for ${socket.id}. Disconnecting.`);
+                socket.disconnect();
+                return;
+            }
 
             try {
-                const { token, vehicleId } = socket.handshake.auth;
                 const decoded = jwt.verify(token, JWT_SECRET) as UserPayload;
 
-                if (!token) {
-                    console.warn(`[Socket Auth] No token provided for ${socket.id}. Disconnecting.`);
-                    socket.disconnect();
-                    return;
-                }
-
-
+                // 🚀 Add token to online set
+                this.onlineTokens.add(token);
+                console.log(`🔌 New client connected: ${socket.id}. Total Online Devices: ${this.onlineTokens.size}`);
+                this.emitToDispatchers('driverStatusChanged', { userId: decoded.driverNumericId, status: 'online' });
 
                 (socket as any).user = {
                     ...decoded,
-
                     kalustoNro: (vehicleId !== undefined && vehicleId !== null) ? parseInt(vehicleId, 10) : undefined
                 };
 
                 const user = (socket as any).user;
-                console.log(`[Socket Auth] Client ${socket.id} authenticated. User ID: ${user.userId}`);
-
-                const isOfficeUser = decoded.roles?.some(r => ['Ajojärjestelijä', 'Ylläpitäjä', 'Admin', 'Superuser'].includes(r));
                 const userId = decoded.driverNumericId || decoded.userId;
+                const isOfficeUser = decoded.roles?.some(r => ['Ajojärjestelijä', 'Ylläpitäjä', 'Admin', 'Superuser'].includes(r));
 
                 if (isOfficeUser) {
                     socket.join('dispatchers');
-                    console.log(`[SOCKET] Office User ${userId} joined room: dispatchers`);
                 } else {
-                    socket.join(`user_${userId}`);
-                    console.log(`[SOCKET] Driver ${userId} joined room: user_${userId}`);
+                    if (decoded.driverNumericId) {
+                        socket.join(`user_${decoded.driverNumericId}`);
+                        socket.join(`driver_${decoded.driverNumericId}`);
+                    }
                 }
 
                 if (user.kalustoNro !== undefined && user.kalustoNro !== null) {
                     socket.join(`vehicle_${user.kalustoNro}`);
-                    console.log(`[Socket Join] Joined Vehicle Room: vehicle_${user.kalustoNro}`);
                 }
 
-                if (decoded.driverNumericId) {
-                    const userId = decoded.driverNumericId;
-                    socket.join(`user_${userId}`);
-                    socket.join(`driver_${userId}`);
-                    console.log(`[Socket Join] User ID Room joined: user_${userId}`);
+                socket.on('disconnect', async () => {
+                    this.onlineTokens.delete(token);
+                    console.log(`🔌 Client disconnected: ${socket.id}. Remaining Online: ${this.onlineTokens.size}`);
+                    this.emitToDispatchers('driverStatusChanged', { userId: decoded.driverNumericId, status: 'offline' });
+                    if (isOfficeUser) return;
+
+                    try {
+                        const deleteRes = await pool.query(
+                            `DELETE FROM public.driver_active_sessions WHERE token_identifier = $1 RETURNING user_id`,
+                            [token]
+                        );
+
+                        if (deleteRes.rowCount && deleteRes.rowCount > 0) {
+                            const dbUserId = deleteRes.rows[0].user_id;
+
+                            const checkRemainingRes = await pool.query(
+                                `SELECT count(*) FROM public.driver_active_sessions WHERE user_id = $1`,
+                                [dbUserId]
+                            );
+
+                            const activeCount = parseInt(checkRemainingRes.rows[0].count);
+
+                            if (activeCount === 0) {
+                                await pool.query(
+                                    `UPDATE public.kayttajat SET current_vehicle_id = NULL WHERE kulj_id = $1`,
+                                    [dbUserId]
+                                );
+                                console.log(`✅ [AUTO-RELEASE] Vehicle freed for Driver ${dbUserId} (All tabs closed).`);
+                            }
+
+                            this.emitToDispatchers('chipLoadUpdated', { action: 'SESSION_CLEANUP' });
+                        }
+                    } catch (dbErr) {
+                        console.error("❌ Cleanup failed on disconnect:", dbErr);
+                    }
+                });
+
+                if (!isOfficeUser) {
+                    this.handleLocationUpdates(socket);
                 }
 
             } catch (error: any) {
                 console.log(`[Socket Auth] Authentication failed for ${socket.id}: ${error.message}`);
                 socket.disconnect();
-                return;
             }
-
-            socket.on('disconnect', () => {
-                console.log(`🔌 Client disconnected: ${socket.id}`);
-            });
         });
     }
+
     private handleLocationUpdates(socket: Socket): void {
         socket.on('updateLocation', (coords: { lat: number; lng: number }) => {
             const user = (socket as any).user as UserPayload;
@@ -157,4 +195,5 @@ class SocketService {
         }
     }
 }
+
 export const socketService = SocketService.getInstance();

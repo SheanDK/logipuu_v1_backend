@@ -22,7 +22,9 @@ import {
     softDeleteChipLoad,
     bulkAcceptChipLoads,
     claimLoads,
-    requestTransfer
+    requestTransfer,
+    searchChipInvoicingHandler,
+    markChipLoadsAsBilled
 } from '../controllers/chipPlanningController';
 
 const router = Router();
@@ -95,5 +97,11 @@ router.post('/request-transfer', requestTransfer);
 
 // 22. Soft Delete Chip Load
 router.patch('/archive-load/:loadId', softDeleteChipLoad);
+
+// 24. Search Loads for Invoicing
+router.get('/invoicing/search', searchChipInvoicingHandler);
+
+// 25. Confirm Invoicing (Mark as Billed)
+router.post('/invoicing/confirm', markChipLoadsAsBilled);
 
 export default router;

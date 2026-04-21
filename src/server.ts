@@ -32,6 +32,7 @@ import chipTitleRoutes from './routes/chipTitleRoutes';
 import chipPlanningRoutes from './routes/chipPlanningRoutes';
 import { globalErrorHandler } from './middlewares/errorHandler';
 import chipInvoicingRoutes from './routes/chipInvoicingRoutes';
+import sessionRoutes from './routes/sessionRoutes';
 
 dotenv.config();
 
@@ -87,6 +88,7 @@ apiRouter.use('/chip-orders', chipOrderRoutes);
 apiRouter.use('/chip-titles', chipTitleRoutes);
 apiRouter.use('/chip-planning', chipPlanningRoutes);
 apiRouter.use('/chip-invoicing', chipInvoicingRoutes);
+apiRouter.use('/sessions', sessionRoutes);
 
 app.use('/api', apiRouter);
 

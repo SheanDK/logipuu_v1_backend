@@ -689,7 +689,7 @@ export const bulkAcceptChipLoads = async (req: Request, res: Response) => {
     }
 };
 
-// Controller to handle driver claiming the vehicle's loads
+// 25. Controller to handle driver claiming the vehicle's loads
 export const claimLoads = async (req: Request, res: Response) => {
     try {
         const { vehicleNumber, userId } = req.body;
@@ -699,27 +699,79 @@ export const claimLoads = async (req: Request, res: Response) => {
         }
 
         const updatedLoads = await chipPlanningService.claimVehicleLoads(Number(vehicleNumber), Number(userId));
-        
-        // 🚀 වාහනය තෝරාගැනීමේදී, එම වාහනයට ලැබී තිබූ පණිවිඩ (Unassigned) රියදුරාට පවරයි
+
         const claimedNotifs = await chipPlanningService.claimVehicleNotifications(Number(vehicleNumber), Number(userId));
 
         const { socketService } = require('../services/socketService');
-        // පණිවිඩ හෝ ලෝඩ්ස් යාවත්කාලීන වූයේ නම් පමණක් Socket මගින් දැනුම් දීමක් සිදු කරයි
         if (updatedLoads.length > 0 || (claimedNotifs && claimedNotifs.length > 0)) {
-            socketService.emit('chipLoadUpdated', { 
-                vehicleNumber, 
+            socketService.emit('chipLoadUpdated', {
+                vehicleNumber,
                 claimedBy: userId,
-                claimedNotificationsCount: claimedNotifs.length 
+                claimedNotificationsCount: claimedNotifs.length
             });
         }
 
-        res.status(200).json({ 
-            success: true, 
-            count: updatedLoads.length, 
-            claimedNotificationsCount: claimedNotifs ? claimedNotifs.length : 0 
+        res.status(200).json({
+            success: true,
+            count: updatedLoads.length,
+            claimedNotificationsCount: claimedNotifs ? claimedNotifs.length : 0
         });
     } catch (error) {
         console.error("claimLoads Error:", error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// 26. Search Loads for Invoicing
+export const searchChipInvoicingHandler = async (req: Request, res: Response) => {
+    try {
+        const { dateFrom, dateTo, customerId, billed } = req.query;
+
+        const filters = {
+            status: billed === 'true' ? 'all' : 'pending_inspection',
+            asiakasId: customerId,
+            startDate: dateFrom,
+            endDate: dateTo
+        };
+
+        const data = await chipPlanningService.searchLoads(filters);
+
+        const payload = data.map((r: any) => ({
+            // 🚀 FIX: snake_case සහ camelCase යන දෙවර්ගයම පරීක්ෂා කරයි
+            loadId: r.loadId || r.load_id,
+            scheduledDate: r.scheduledDate || r.scheduled_date,
+            vehicleRegNo: r.vehicleRegNo || r.rekNro,
+            customerName: r.customerName || r.asiakkaan_nimi,
+            titleName: r.titleName || r.title_name,
+            actualM3: Number(r.actualM3 || r.actual_m3 || 0),
+            actualTon: Number(r.actualTon || r.actual_ton || 0),
+            isBilled: r.isBilled || r.is_billed
+        }));
+
+        res.status(200).json(payload);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 27. Confirm Invoicing (Mark as Billed)
+export const markChipLoadsAsBilled = async (req: Request, res: Response) => {
+    try {
+        const { loadIds } = req.body;
+
+        if (!loadIds || !Array.isArray(loadIds) || loadIds.length === 0) {
+            return res.status(400).json({ error: "Please select at least one load." });
+        }
+
+        const numericIds = loadIds.map(id => Number(id));
+        const result = await chipPlanningService.bulkAcceptChipLoads(numericIds);
+
+        const { socketService } = require('../services/socketService');
+        socketService.emit('chipLoadUpdated', { action: 'INVOICED' });
+
+        res.status(200).json({ success: true, count: result.length });
+    } catch (error) {
+        console.error("Bulk Invoicing Error:", error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };

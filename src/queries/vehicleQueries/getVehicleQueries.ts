@@ -3,12 +3,18 @@
 // 1. SELECT_ALL_VEHICLES
 export const SELECT_ALL_VEHICLES = `
     SELECT 
-        v.*, 
-        k.tunnus AS current_driver_tunnus,
-        k.nimi AS current_driver_name
-    FROM public.kalusto v
-    LEFT JOIN public.kayttajat k ON v.kalusto_nro = k.current_vehicle_id AND k.aktiivinen = true
-    ORDER BY v.kalusto_nro ASC;
+    v.kalusto_nro AS "kalustoNro", 
+    v.rek_nro AS "rekNro", 
+    v.aktiivinen,
+    (SELECT u.nimi FROM public.driver_active_sessions s 
+     JOIN public.kayttajat u ON s.user_id = u.kulj_id 
+     WHERE s.vehicle_id = v.kalusto_nro LIMIT 1) AS current_driver_name,
+    (SELECT u.tunnus FROM public.driver_active_sessions s 
+     JOIN public.kayttajat u ON s.user_id = u.kulj_id 
+     WHERE s.vehicle_id = v.kalusto_nro LIMIT 1) AS current_driver_tunnus
+FROM public.kalusto v
+WHERE v.aktiivinen = true
+ORDER BY v.rek_nro ASC;
 `;
 
 // 2. SELECT_VEHICLE_BY_ID
