@@ -6,6 +6,8 @@ export const SELECT_ALL_VEHICLES = `
     v.kalusto_nro AS "kalustoNro", 
     v.rek_nro AS "rekNro", 
     v.aktiivinen,
+    v.katsastus_aik AS "nextInspectionDate",
+    v.ed_katsastus AS "previousInspectionDate",
     (SELECT u.nimi FROM public.driver_active_sessions s 
      JOIN public.kayttajat u ON s.user_id = u.kulj_id 
      WHERE s.vehicle_id = v.kalusto_nro LIMIT 1) AS current_driver_name,
