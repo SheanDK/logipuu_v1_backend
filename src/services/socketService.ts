@@ -63,21 +63,23 @@ class SocketService {
                 return;
             }
 
-            try {
-                const decoded = jwt.verify(token, JWT_SECRET) as UserPayload;
+            const sanitizedToken = token.startsWith('Bearer ') ? token.slice(7) : token;
+            (socket as any).sanitizedToken = sanitizedToken;
 
-                // 🚀 Add token to online set
-                this.onlineTokens.add(token);
+            console.log(`[Socket Init] Socket ${socket.id} attached with token: ${sanitizedToken.substring(0, 20)}...`);
+
+            try {
+                const decoded = jwt.verify(sanitizedToken, JWT_SECRET) as UserPayload;
+                this.onlineTokens.add(sanitizedToken);
+
                 console.log(`🔌 New client connected: ${socket.id}. Total Online Devices: ${this.onlineTokens.size}`);
                 this.emitToDispatchers('driverStatusChanged', { userId: decoded.driverNumericId, status: 'online' });
-
                 (socket as any).user = {
                     ...decoded,
                     kalustoNro: (vehicleId !== undefined && vehicleId !== null) ? parseInt(vehicleId, 10) : undefined
                 };
 
                 const user = (socket as any).user;
-                const userId = decoded.driverNumericId || decoded.userId;
                 const isOfficeUser = decoded.roles?.some(r => ['Ajojärjestelijä', 'Ylläpitäjä', 'Admin', 'Superuser'].includes(r));
 
                 if (isOfficeUser) {
@@ -94,48 +96,45 @@ class SocketService {
                 }
 
                 socket.on('disconnect', async () => {
-                    this.onlineTokens.delete(token);
-                    console.log(`🔌 Client disconnected: ${socket.id}. Remaining Online: ${this.onlineTokens.size}`);
-                    this.emitToDispatchers('driverStatusChanged', { userId: decoded.driverNumericId, status: 'offline' });
-                    if (isOfficeUser) return;
+                    const currentToken = (socket as any).sanitizedToken;
+                    this.onlineTokens.delete(currentToken);
 
-                    try {
-                        const deleteRes = await pool.query(
-                            `DELETE FROM public.driver_active_sessions WHERE token_identifier = $1 RETURNING user_id`,
-                            [token]
-                        );
+                    // 🚀 FIX: Decoded token එකෙන් සෘජුවම driver ID එක ලබා ගනී
+                    const driverId = (socket as any).user?.driverNumericId;
 
-                        if (deleteRes.rowCount && deleteRes.rowCount > 0) {
-                            const dbUserId = deleteRes.rows[0].user_id;
-
-                            const checkRemainingRes = await pool.query(
-                                `SELECT count(*) FROM public.driver_active_sessions WHERE user_id = $1`,
-                                [dbUserId]
+                    if (driverId) {
+                        this.emitToDispatchers('driverStatusChanged', {
+                            userId: Number(driverId),
+                            status: 'offline'
+                        });
+                        console.log(`📡 Driver ${driverId} status set to offline.`);
+                    }
+                    if (!isOfficeUser && currentToken) {
+                        try {
+                            const deleteRes = await pool.query(
+                                `DELETE FROM public.driver_active_sessions WHERE 
+                                 (token_identifier = $1 OR token_identifier = $2) RETURNING user_id`,
+                                [currentToken, `Bearer ${currentToken}`]
                             );
 
-                            const activeCount = parseInt(checkRemainingRes.rows[0].count);
+                            if (deleteRes.rowCount && deleteRes.rowCount > 0) {
+                                const dbUserId = deleteRes.rows[0].user_id;
+                                const checkRes = await pool.query(`SELECT count(*) FROM public.driver_active_sessions WHERE user_id = $1`, [dbUserId]);
 
-                            if (activeCount === 0) {
-                                await pool.query(
-                                    `UPDATE public.kayttajat SET current_vehicle_id = NULL WHERE kulj_id = $1`,
-                                    [dbUserId]
-                                );
-                                console.log(`✅ [AUTO-RELEASE] Vehicle freed for Driver ${dbUserId} (All tabs closed).`);
+                                if (parseInt(checkRes.rows[0].count) === 0) {
+                                    await pool.query(`UPDATE public.kayttajat SET current_vehicle_id = NULL WHERE kulj_id = $1`, [dbUserId]);
+                                    console.log(`✅ [AUTO-RELEASE] Driver ${dbUserId} released.`);
+                                }
+                                this.emitToDispatchers('driverStatusChanged', { userId: dbUserId, status: 'offline' });
+                                this.emitToDispatchers('chipLoadUpdated', { action: 'SESSION_CLEANUP' });
                             }
-
-                            this.emitToDispatchers('chipLoadUpdated', { action: 'SESSION_CLEANUP' });
-                        }
-                    } catch (dbErr) {
-                        console.error("❌ Cleanup failed on disconnect:", dbErr);
+                        } catch (err) { console.error("Cleanup Error:", err); }
                     }
                 });
 
-                if (!isOfficeUser) {
-                    this.handleLocationUpdates(socket);
-                }
+                if (!isOfficeUser) this.handleLocationUpdates(socket);
 
             } catch (error: any) {
-                console.log(`[Socket Auth] Authentication failed for ${socket.id}: ${error.message}`);
                 socket.disconnect();
             }
         });

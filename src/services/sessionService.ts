@@ -77,8 +77,8 @@ export const sessionService = {
         return {
             success: true,
             userId: user_id,
-            isLastSession,
-            tokenIdentifier: token_identifier
+            tokenIdentifier: token_identifier,
+            isLastSession: isLastSession
         };
     }
 };

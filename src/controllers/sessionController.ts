@@ -24,19 +24,13 @@ export const forceReleaseSession = async (req: Request, res: Response) => {
 
         if (result.success) {
             const { socketService } = require('../services/socketService');
-
-            socketService.emitToUser(result.userId, 'sessionTerminated', {
-                isLastSession: result.isLastSession,
-                terminatedToken: result.tokenIdentifier
+            socketService.emitToUser(result.userId, 'emergencyLogout', {
+                tokenIdentifier: result.tokenIdentifier,
+                message: "Your session has been terminated by the office management. You are being logged out."
             });
 
-            socketService.emit('chipLoadUpdated', { action: 'SESSION_RELEASED' });
-
-            res.status(200).json({ message: 'Device disconnected successfully' });
-        } else {
-            res.status(404).json({ error: 'Session not found' });
+            socketService.emitToDispatchers('driverStatusChanged', { userId: result.userId, status: 'offline' });
+            res.status(200).json({ success: true });
         }
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to release session' });
-    }
+    } catch (error) { res.status(500).json({ error: 'Failed' }); }
 };

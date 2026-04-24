@@ -85,23 +85,26 @@ export const getDriversWithoutAccount = async () => {
     return result.rows;
 };
 
-// 7. Get all drivers with online status
 export const fetchAllDrivers = async () => {
-    const result = await pool.query(`SELECT * FROM public.kayttajat WHERE taso = 5`);
-    const drivers = result.rows;
+    // 1. Get all active drivers
+    const result = await pool.query(`SELECT * FROM public.kayttajat WHERE taso = 5 AND aktiivinen = true`);
+    const drivers = result.rows; // [{ kuljId, nimi, ... }]
 
     const { socketService } = require('./socketService');
-    const onlineTokens = socketService.getOnlineIdentifiers();
+    const onlineTokens = socketService.getOnlineIdentifiers(); // Set of tokens
 
+    // 2. Get active sessions (Pool automatically transforms to camelCase)
     const sessionRes = await pool.query(`SELECT user_id, token_identifier FROM public.driver_active_sessions`);
+    const dbSessions = sessionRes.rows; // [{ userId, tokenIdentifier }]
 
     return drivers.map(d => {
-        // 🚀 FIX: ටෝකනය තුළ "Bearer " තිබුණත් නැතත් හඳුනාගැනීමට String comparison එක වැඩි දියුණු කළා
-        const activeSessionsForDriver = sessionRes.rows.filter(s => Number(s.user_id) === Number(d.kulj_id));
+        // 🚀 FIX: Database එකෙන් ලැබෙන camelCase names භාවිතා කරන්න
+        const activeSessionsForThisDriver = dbSessions.filter(s => Number(s.userId) === Number(d.kuljId));
 
-        const isOnline = activeSessionsForDriver.some(s => {
-            const cleanId = s.token_identifier.startsWith('Bearer ') ? s.token_identifier.slice(7) : s.token_identifier;
-            return onlineTokens.has(cleanId);
+        const isOnline = activeSessionsForThisDriver.some(s => {
+            const token = s.tokenIdentifier || "";
+            const cleanToken = token.startsWith('Bearer ') ? token.slice(7).trim() : token.trim();
+            return onlineTokens.has(cleanToken);
         });
 
         return { ...d, isOnline };
