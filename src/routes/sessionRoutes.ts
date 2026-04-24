@@ -8,6 +8,6 @@ const router = Router();
 
 // office users only (Admin/Dispatcher)
 router.get('/active', protect, authorize(['dashboard_dispatch_view']), sessionController.getActiveSessions);
-router.delete('/:id', protect, authorize(['load management_edit']), sessionController.forceReleaseSession);
+router.delete('/:id', protect, authorize(['load management_edit', 'load management_view']), sessionController.forceReleaseSession);
 
 export default router;

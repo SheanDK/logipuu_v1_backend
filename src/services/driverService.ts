@@ -88,17 +88,15 @@ export const getDriversWithoutAccount = async () => {
 export const fetchAllDrivers = async () => {
     // 1. Get all active drivers
     const result = await pool.query(`SELECT * FROM public.kayttajat WHERE taso = 5 AND aktiivinen = true`);
-    const drivers = result.rows; // [{ kuljId, nimi, ... }]
+    const drivers = result.rows;
 
     const { socketService } = require('./socketService');
-    const onlineTokens = socketService.getOnlineIdentifiers(); // Set of tokens
+    const onlineTokens = socketService.getOnlineIdentifiers();
 
-    // 2. Get active sessions (Pool automatically transforms to camelCase)
     const sessionRes = await pool.query(`SELECT user_id, token_identifier FROM public.driver_active_sessions`);
-    const dbSessions = sessionRes.rows; // [{ userId, tokenIdentifier }]
+    const dbSessions = sessionRes.rows;
 
     return drivers.map(d => {
-        // 🚀 FIX: Database එකෙන් ලැබෙන camelCase names භාවිතා කරන්න
         const activeSessionsForThisDriver = dbSessions.filter(s => Number(s.userId) === Number(d.kuljId));
 
         const isOnline = activeSessionsForThisDriver.some(s => {

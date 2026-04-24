@@ -99,7 +99,6 @@ class SocketService {
                     const currentToken = (socket as any).sanitizedToken;
                     this.onlineTokens.delete(currentToken);
 
-                    // 🚀 FIX: Decoded token එකෙන් සෘජුවම driver ID එක ලබා ගනී
                     const driverId = (socket as any).user?.driverNumericId;
 
                     if (driverId) {
