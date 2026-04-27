@@ -8,7 +8,7 @@ import { CreateDriverDto, UpdateDriverDto } from '../dto/driver.dto';
 export const getAllDriversHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         console.log(`User ${req.user?.userId} fetching all drivers.`);
-        const drivers = await driverService.getAllDrivers();
+        const drivers = await driverService.fetchAllDrivers();
         res.status(200).json(drivers);
     } catch (error) {
         next(error);

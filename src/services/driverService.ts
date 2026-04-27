@@ -86,22 +86,30 @@ export const getDriversWithoutAccount = async () => {
 };
 
 export const fetchAllDrivers = async () => {
-    const result = await pool.query(`SELECT * FROM public.kayttajat WHERE taso = 5 AND aktiivinen = true`);
+    const result = await pool.query(getQueries.SELECT_ALL_DRIVERS);
     const drivers = result.rows;
 
     const { socketService } = require('./socketService');
     const onlineTokens = socketService.getOnlineIdentifiers();
-
-    const sessionRes = await pool.query(`SELECT user_id as "userId", token_identifier as "tokenIdentifier" FROM public.driver_active_sessions`);
+    const sessionRes = await pool.query(
+        `SELECT user_id AS "userId", token_identifier AS "tokenIdentifier" 
+         FROM public.driver_active_sessions`
+    );
     const dbSessions = sessionRes.rows;
 
     return drivers.map(d => {
-        const activeSessions = dbSessions.filter(s => Number(s.userId) === Number(d.kuljId));
+        const driverId = d.kuljId || d.kulj_id;
 
-        const isOnline = activeSessions.some(s => {
+        const mySessions = dbSessions.filter(s => Number(s.userId) === Number(driverId));
+
+        const isOnline = mySessions.some(s => {
             const token = s.tokenIdentifier || "";
+
             const cleanToken = token.startsWith('Bearer ') ? token.slice(7).trim() : token.trim();
-            return onlineTokens.has(cleanToken);
+
+            const match = onlineTokens.has(cleanToken);
+
+            return match;
         });
 
         return { ...d, isOnline };

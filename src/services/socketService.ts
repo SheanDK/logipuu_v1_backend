@@ -71,9 +71,15 @@ class SocketService {
             try {
                 const decoded = jwt.verify(sanitizedToken, JWT_SECRET) as UserPayload;
                 this.onlineTokens.add(sanitizedToken);
+                const driverId = (socket as any).user?.driverNumericId;
 
-                console.log(`🔌 New client connected: ${socket.id}. Total Online Devices: ${this.onlineTokens.size}`);
-                this.emitToDispatchers('driverStatusChanged', { userId: decoded.driverNumericId, status: 'online' });
+                const userIdForLog = decoded.driverNumericId || decoded.userId;
+                console.log(`[DEBUG-SOCKET] Token stored. User: ${userIdForLog}. Total Online: ${this.onlineTokens.size}`);
+
+                this.emitToDispatchers('driverStatusChanged', {
+                    userId: decoded.driverNumericId,
+                    status: 'online'
+                });
                 (socket as any).user = {
                     ...decoded,
                     kalustoNro: (vehicleId !== undefined && vehicleId !== null) ? parseInt(vehicleId, 10) : undefined
@@ -101,11 +107,18 @@ class SocketService {
 
                     const driverId = (socket as any).user?.driverNumericId;
 
-                    if (driverId) {
-                        this.emitToDispatchers('driverStatusChanged', {
-                            userId: Number(driverId),
-                            status: 'offline'
-                        });
+                    if (driverId && this.io) {
+                        const remainingSockets = await this.io.in(`driver_${driverId}`).fetchSockets();
+
+                        if (remainingSockets.length === 0) {
+                            this.emitToDispatchers('driverStatusChanged', {
+                                userId: Number(driverId),
+                                status: 'offline'
+                            });
+                            console.log(`📡 [SOCKET] Driver ${driverId} is now fully OFFLINE (No remaining sessions)`);
+                        } else {
+                            console.log(`📡 [SOCKET] Driver ${driverId} disconnected one session, but still has ${remainingSockets.length} active session(s)`);
+                        }
                     }
 
                     if (!isOfficeUser && currentToken) {
