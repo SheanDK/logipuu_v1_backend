@@ -6,6 +6,7 @@ export const SELECT_ALL_VEHICLES = `
     v.kalusto_nro AS "kalustoNro", 
     v.rek_nro AS "rekNro", 
     v.aktiivinen,
+    v.planning_group AS "planningGroup",
     v.katsastus_aik AS "nextInspectionDate",
     v.ed_katsastus AS "previousInspectionDate",
     (SELECT u.nimi FROM public.driver_active_sessions s 
