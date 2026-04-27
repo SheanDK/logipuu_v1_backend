@@ -45,40 +45,37 @@ export const sessionService = {
 
     // 3. Force Release (office)
     async forceRelease(sessionId: number) {
-        // 1. get user id and token identifier of the session to be released
         const sessionRes = await pool.query(
-            `SELECT user_id, token_identifier FROM public.driver_active_sessions WHERE session_id = $1`,
+            `SELECT user_id as "userId", token_identifier as "tokenIdentifier" FROM public.driver_active_sessions WHERE session_id = $1`,
             [sessionId]
         );
 
         if (sessionRes.rows.length === 0) return { success: false };
 
-        const { user_id, token_identifier } = sessionRes.rows[0];
+        // 🚀 FIX: Pool එක camelCase කරන නිසා userId සහ tokenIdentifier ලෙස ලබා ගත යුතුය
+        const { userId, tokenIdentifier } = sessionRes.rows[0];
 
-        // 2. delete that specific session
         await pool.query(`DELETE FROM public.driver_active_sessions WHERE session_id = $1`, [sessionId]);
 
-        // 3. check if the driver has any other active sessions
         const remainingRes = await pool.query(
             `SELECT count(*) FROM public.driver_active_sessions WHERE user_id = $1`,
-            [user_id]
+            [userId]
         );
 
         const isLastSession = parseInt(remainingRes.rows[0].count) === 0;
 
-        // 4. release vehicle only if all sessions are ended
         if (isLastSession) {
             await pool.query(
                 `UPDATE public.kayttajat SET current_vehicle_id = NULL WHERE kulj_id = $1`,
-                [user_id]
+                [userId]
             );
         }
 
         return {
             success: true,
-            userId: user_id,
-            tokenIdentifier: token_identifier,
-            isLastSession: isLastSession
+            userId: userId, // දැන් මෙය නිවැරදිව ලැබෙනු ඇත
+            isLastSession,
+            tokenIdentifier: tokenIdentifier
         };
     }
 };

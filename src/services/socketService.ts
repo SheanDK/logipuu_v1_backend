@@ -106,25 +106,25 @@ class SocketService {
                             userId: Number(driverId),
                             status: 'offline'
                         });
-                        console.log(`📡 Driver ${driverId} status set to offline.`);
                     }
+
                     if (!isOfficeUser && currentToken) {
                         try {
                             const deleteRes = await pool.query(
                                 `DELETE FROM public.driver_active_sessions WHERE 
-                                 (token_identifier = $1 OR token_identifier = $2) RETURNING user_id`,
+                 (token_identifier = $1 OR token_identifier = $2) RETURNING user_id as "userId"`,
                                 [currentToken, `Bearer ${currentToken}`]
                             );
 
                             if (deleteRes.rowCount && deleteRes.rowCount > 0) {
-                                const dbUserId = deleteRes.rows[0].user_id;
+                                const dbUserId = deleteRes.rows[0].userId;
+
                                 const checkRes = await pool.query(`SELECT count(*) FROM public.driver_active_sessions WHERE user_id = $1`, [dbUserId]);
 
                                 if (parseInt(checkRes.rows[0].count) === 0) {
                                     await pool.query(`UPDATE public.kayttajat SET current_vehicle_id = NULL WHERE kulj_id = $1`, [dbUserId]);
-                                    console.log(`✅ [AUTO-RELEASE] Driver ${dbUserId} released.`);
+                                    console.log(`✅ [AUTO-RELEASE] Vehicle freed for Driver ${dbUserId}.`);
                                 }
-                                this.emitToDispatchers('driverStatusChanged', { userId: dbUserId, status: 'offline' });
                                 this.emitToDispatchers('chipLoadUpdated', { action: 'SESSION_CLEANUP' });
                             }
                         } catch (err) { console.error("Cleanup Error:", err); }
