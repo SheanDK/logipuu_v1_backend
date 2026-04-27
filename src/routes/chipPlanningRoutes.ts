@@ -24,7 +24,10 @@ import {
     claimLoads,
     requestTransfer,
     searchChipInvoicingHandler,
-    markChipLoadsAsBilled
+    markChipLoadsAsBilled,
+    renameGroup,
+    deleteGroup,
+    updateVehicleGroup
 } from '../controllers/chipPlanningController';
 
 const router = Router();
@@ -103,5 +106,12 @@ router.get('/invoicing/search', searchChipInvoicingHandler);
 
 // 25. Confirm Invoicing (Mark as Billed)
 router.post('/invoicing/confirm', markChipLoadsAsBilled);
+
+// 26. Rename Group
+router.put('/rename-group', renameGroup);
+// 27. Delete Group
+router.delete('/delete-group/:groupName', deleteGroup);
+// 28. Update Vehicle Group
+router.put('/update-vehicle-group', updateVehicleGroup);
 
 export default router;

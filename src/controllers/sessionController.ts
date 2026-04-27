@@ -26,7 +26,7 @@ export const forceReleaseSession = async (req: Request, res: Response) => {
             const { socketService } = require('../services/socketService');
             socketService.emitToUser(result.userId, 'emergencyLogout', {
                 tokenIdentifier: result.tokenIdentifier,
-                message: "Your session has been terminated by the office management. You are being logged out."
+                reason: "login:session-terminated-reason"
             });
 
             socketService.emitToDispatchers('driverStatusChanged', { userId: result.userId, status: 'offline' });
