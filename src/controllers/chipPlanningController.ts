@@ -93,14 +93,17 @@ export const dispatchRow = async (req: Request, res: Response) => {
         if (Array.isArray(updatedRows) && updatedRows.length > 0) {
             const { socketService } = require('../services/socketService');
             updatedRows.forEach(row => socketService.emit('chipLoadUpdated', row));
+            const firstLoadId = updatedRows[0].load_id || updatedRows[0].loadId;
 
             const targetDriverId = await getDriverOfVehicle(Number(kalustoNro));
             if (targetDriverId) {
+
+
                 await notificationService.sendNotification(
                     targetDriverId,
                     'LOAD_ASSIGNED',
                     `New loads have been assigned to your schedule for Week ${week}.`,
-                    undefined,
+                    Number(firstLoadId),
                     Number(kalustoNro)
                 );
             } else {
@@ -108,7 +111,7 @@ export const dispatchRow = async (req: Request, res: Response) => {
                     -1,
                     'LOAD_ASSIGNED',
                     `New loads were assigned to Vehicle ${kalustoNro} for Week ${week}.`,
-                    undefined,
+                    Number(firstLoadId),
                     Number(kalustoNro)
                 );
             }
@@ -192,8 +195,8 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
     try {
         const { loadId, newKalustoNro, newDate } = req.body;
 
-        if (isNaN(Number(loadId)) || isNaN(Number(newKalustoNro))) {
-            console.error("❌ Invalid IDs in moveAssignedLoad:", { loadId, newKalustoNro });
+        // 1. මූලික පරාමිති පරීක්ෂා කිරීම (NaN දෝෂ වැළැක්වීමට)
+        if (!loadId || !newKalustoNro || isNaN(Number(loadId)) || isNaN(Number(newKalustoNro))) {
             return res.status(400).json({ error: "Invalid Load ID or Vehicle Number provided." });
         }
 
@@ -204,57 +207,60 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
         const oldVehicleId = Number(load.vehicle_number || load.vehicleNumber);
         const targetVehicleId = Number(newKalustoNro);
 
-        let result = await chipPlanningService.moveLoadRecord(
+        // 2. Database එකේ වාහනය සහ දිනය මාරු කිරීම
+        const result = await chipPlanningService.moveLoadRecord(
             Number(loadId),
             targetVehicleId,
             newDate || load.scheduled_date || load.scheduledDate
         );
 
-        const { socketService } = require('../services/socketService');
-        const { notificationService } = require('../services/notificationService');
+        // 🚀 FIX: දැනටමත් ඉහළින් import කර ඇති notificationService සහ socketService සෘජුවම භාවිතා කරන්න
+        // (require('../services') යන පේළිය ඉවත් කළා)
 
+        // 3. රියදුරන් සොයා ගැනීම
         const originalDriverId = await getDriverOfVehicle(oldVehicleId);
         const targetDriverId = await getDriverOfVehicle(targetVehicleId);
 
-        if (targetDriverId && !isNaN(targetDriverId)) {
-            result = await chipPlanningService.updateLoadRecord(Number(loadId), { driver_user_id: targetDriverId });
-        }
-
+        // 4. Load එක දැනටමත් රියදුරුට යවා තිබුණේ නම් (DISPATCHED) පණිවිඩ යැවීම
         if (previousStatus === 'DISPATCHED') {
-            if (originalDriverId && !isNaN(originalDriverId)) {
-                await notificationService.sendNotification(
-                    originalDriverId,
-                    'LOAD_DELETED',
-                    `Load ${loadId} was transferred from your schedule to another vehicle.`,
-                    Number(loadId),
-                    oldVehicleId
-                );
+
+            // පැරණි රියදුරාට (Old Driver) දැනුම් දීම - වැඩේ ඉවත් වූ බව
+            if (originalDriverId) {
+                try {
+                    await notificationService.sendNotification(
+                        originalDriverId,
+                        'LOAD_DELETED',
+                        `Load ${loadId} was moved from your schedule to vehicle ${targetVehicleId}.`,
+                        Number(loadId),
+                        oldVehicleId
+                    );
+                } catch (e) { console.error("Old driver notification failed:", e); }
             }
 
-            if (targetDriverId && !isNaN(targetDriverId)) {
-                await notificationService.sendNotification(
-                    targetDriverId,
-                    'LOAD_ASSIGNED',
-                    `New Load ${loadId} has been transferred to your vehicle.`,
-                    Number(loadId),
-                    targetVehicleId
-                );
+            // අලුත් රියදුරාට (New Driver) දැනුම් දීම - අලුත් වැඩක් ලැබුණු බව
+            if (targetDriverId) {
+                try {
+                    await notificationService.sendNotification(
+                        targetDriverId,
+                        'LOAD_ASSIGNED',
+                        `New Load ${loadId} has been transferred to your vehicle from vehicle ${oldVehicleId}.`,
+                        Number(loadId),
+                        targetVehicleId
+                    );
+                } catch (e) { console.error("New driver notification failed:", e); }
             } else {
-                await notificationService.sendNotification(
-                    -1,
-                    'LOAD_ASSIGNED',
-                    `New Load ${loadId} has been transferred to Vehicle ${targetVehicleId}.`,
-                    Number(loadId),
-                    targetVehicleId
-                );
+                // රියදුරෙකු නැත්නම් වාහනයට (General notification)
+                await notificationService.sendNotification(0, 'LOAD_ASSIGNED', `Load ${loadId} assigned to Vehicle ${targetVehicleId}.`, Number(loadId), targetVehicleId);
             }
         }
 
+        // Socket හරහා කාර්යාලයේ Grid එක update කිරීම
         socketService.emit('chipLoadUpdated', result);
+
         return res.status(200).json(result);
 
     } catch (error: any) {
-        console.error("moveAssignedLoad CRITICAL ERROR:", error.message);
+        console.error("❌ moveAssignedLoad CRITICAL ERROR:", error.message);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -591,13 +597,14 @@ export const markNotificationAsRead = async (req: Request, res: Response) => {
                     const driverName = driverRes.rows[0]?.nimi || `Driver #${recipientId}`;
 
                     const actionTxt = updatedNotif.type === 'LOAD_ASSIGNED' ? 'new assignment' : 'removal';
+                    const loadIdValue = (relatedId && !isNaN(Number(relatedId))) ? relatedId : '';
                     const loadTxt = (relatedId && String(relatedId) !== 'undefined') ? ` for Load #${relatedId}` : '';
 
                     await notificationService.sendNotification(
                         0, // Office
                         'DRIVER_ACKNOWLEDGED',
                         `${driverName} acknowledged the ${actionTxt}${loadTxt}.`,
-                        relatedId,
+                        relatedId ? Number(relatedId) : null,
                         vehicleCtx
                     );
                 }

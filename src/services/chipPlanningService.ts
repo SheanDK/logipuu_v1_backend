@@ -167,7 +167,11 @@ export const chipPlanningService = {
 
         const query = `
         UPDATE public.chip_loads 
-        SET vehicle_number = $1, scheduled_date = $2, serial_no = $3, driver_user_id = NULL
+        SET 
+            vehicle_number = $1, 
+            scheduled_date = $2, 
+            serial_no = $3, 
+            driver_user_id = NULL
         WHERE load_id = $4 
         RETURNING *;
     `;
