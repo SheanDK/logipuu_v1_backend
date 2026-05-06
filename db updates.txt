@@ -52,3 +52,21 @@ for chip loads who has driven the load
 
 ALTER TABLE public.chip_loads 
 ADD COLUMN driver_user_id SMALLINT REFERENCES public.kayttajat(kulj_id);
+
+===============================================================2026-05-06===================================================================================
+Database Schema Update Note: public.chip_loads Table
+Date of Update: 2026-05-06
+Affected Table: public.chip_loads
+Purpose of Update: To support detailed unit pricing and calculated total amounts for the Chip Transport Invoicing module, enabling professional billing and accurate data representation.
+
+Action Required (if not already done):
+Ensure these ALTER TABLE commands have been successfully executed on your PostgreSQL database instance for the public.chip_loads table.
+code
+SQL
+ALTER TABLE public.chip_loads 
+ADD COLUMN unit_price_m3 NUMERIC(10,2) DEFAULT 0,
+ADD COLUMN unit_price_ton NUMERIC(10,2) DEFAULT 0,
+ADD COLUMN unit_price_pcs NUMERIC(10,2) DEFAULT 0,
+ADD COLUMN unit_price_hr NUMERIC(10,2) DEFAULT 0,
+ADD COLUMN unit_price_km NUMERIC(10,2) DEFAULT 0,
+ADD COLUMN total_amount NUMERIC(10,2) DEFAULT 0;
