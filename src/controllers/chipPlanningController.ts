@@ -744,7 +744,6 @@ export const searchChipInvoicingHandler = async (req: Request, res: Response) =>
         const data = await chipPlanningService.searchLoads(filters);
 
         const payload = data.map((r: any) => ({
-            // 🚀 FIX: snake_case සහ camelCase යන දෙවර්ගයම පරීක්ෂා කරයි
             loadId: r.loadId || r.load_id,
             scheduledDate: r.scheduledDate || r.scheduled_date,
             vehicleRegNo: r.vehicleRegNo || r.rekNro,
