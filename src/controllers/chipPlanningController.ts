@@ -27,7 +27,8 @@ const getDriverOfVehicle = async (vehicleNumber: number): Promise<number | null>
     }
 
     const res = await pool.query(
-        `SELECT kulj_id FROM public.kayttajat WHERE current_vehicle_id = $1 AND aktiivinen = true LIMIT 1`,
+        `SELECT kulj_id, nimi FROM public.kayttajat 
+     WHERE current_vehicle_id = $1 AND aktiivinen = true LIMIT 1`,
         [vehicleNumber]
     );
     return res.rows[0]?.kulj_id || res.rows[0]?.kuljId || null;

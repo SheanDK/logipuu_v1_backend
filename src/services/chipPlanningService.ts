@@ -400,31 +400,68 @@ export const chipPlanningService = {
     // 13. Search Loads 
     searchLoads: async (filters: any) => {
         const { status, asiakasId, kalustoNro, startDate, endDate } = filters;
-        let query = `
-            SELECT 
-                cl.*, ct.title_name as "titleName", ct.abbreviation, k.rek_nro as "vehicleRegNo",
-                a.asiakkaan_nimi as "customerName", 
-                COALESCE(u1.nimi, u2.nimi, 'N/A') as "driverName", 
-                ct.req_pcs, ct.req_m3, ct.req_ton, ct.req_hr, ct.req_waiting, ct.req_km, ct.req_details, ct.req_details_info
-            FROM public.chip_loads cl
-            JOIN public.chip_titles ct ON cl.title_id = ct.title_id
-            JOIN public.kalusto k ON cl.vehicle_number = k.kalusto_nro
-            LEFT JOIN public.asiakkaat a ON ct.customer_id = a.asiakkaan_id 
-            LEFT JOIN public.kayttajat u1 ON cl.driver_user_id = u1.kulj_id
-            LEFT JOIN public.kayttajat u2 ON cl.requested_user_id = u2.kulj_id
-            WHERE 1=1
-        `;
-        const params: any[] = [];
-        if (status === 'active') { query += ` AND cl.status IN ('DISPATCHED', 'LOADED', 'UNLOADED')`; }
-        else if (status === 'pending_inspection') { query += ` AND cl.status IN ('COMPLETED', 'SENT') AND COALESCE(cl.is_billed, false) = false`; }
-        else if (status === 'all') { query += ` AND cl.status IN ('COMPLETED', 'SENT') AND cl.is_billed = true`; }
 
-        if (startDate && endDate) { query += ` AND cl.scheduled_date BETWEEN $${params.length + 1} AND $${params.length + 2}`; params.push(startDate, endDate); }
-        if (asiakasId) { query += ` AND ct.customer_id = $${params.length + 1}`; params.push(asiakasId); }
-        if (kalustoNro) { query += ` AND cl.vehicle_number = $${params.length + 1}`; params.push(kalustoNro); }
+        let query = `
+        SELECT 
+            cl.*, 
+            ct.title_name as "titleName", 
+            ct.abbreviation, 
+            k.rek_nro as "vehicleRegNo",
+            a.asiakkaan_nimi as "customerName", 
+            COALESCE(
+                u1.nimi,
+                (
+                    SELECT kj.nimi 
+                    FROM public.kayttajat kj 
+                    WHERE kj.current_vehicle_id = cl.vehicle_number 
+                    AND kj.aktiivinen = true 
+                    LIMIT 1
+                ),
+                u2.nimi,
+                'Unassigned'
+            ) as "driverName", 
+            ct.req_pcs, ct.req_m3, ct.req_ton, 
+            ct.req_hr, ct.req_waiting, ct.req_km, 
+            ct.req_details, ct.req_details_info
+        FROM public.chip_loads cl
+        JOIN public.chip_titles ct ON cl.title_id = ct.title_id
+        JOIN public.kalusto k ON cl.vehicle_number = k.kalusto_nro
+        LEFT JOIN public.asiakkaat a ON ct.customer_id = a.asiakkaan_id 
+        LEFT JOIN public.kayttajat u1 ON cl.driver_user_id = u1.kulj_id
+        LEFT JOIN public.kayttajat u2 ON cl.requested_user_id = u2.kulj_id
+        WHERE 1=1
+    `;
+
+        const params: any[] = [];
+
+        if (status === 'active') {
+            query += ` AND cl.status IN ('DISPATCHED', 'LOADED', 'UNLOADED')`;
+        } else if (status === 'pending_inspection') {
+            query += ` AND cl.status IN ('COMPLETED', 'SENT') AND COALESCE(cl.is_billed, false) = false`;
+        } else if (status === 'all') {
+            query += ` AND cl.status IN ('COMPLETED', 'SENT') AND cl.is_billed = true`;
+        }
+
+        if (startDate && endDate) {
+            query += ` AND cl.scheduled_date BETWEEN $${params.length + 1} AND $${params.length + 2}`;
+            params.push(startDate, endDate);
+        }
+        if (asiakasId) {
+            query += ` AND ct.customer_id = $${params.length + 1}`;
+            params.push(asiakasId);
+        }
+        if (kalustoNro) {
+            query += ` AND cl.vehicle_number = $${params.length + 1}`;
+            params.push(kalustoNro);
+        }
 
         query += ` ORDER BY cl.scheduled_date DESC, cl.serial_no ASC`;
+
         const result = await pool.query(query, params);
+
+        // 🔍 Debug log
+        console.log('searchLoads sample:', result.rows[0]);
+
         return result.rows;
     },
 
