@@ -238,7 +238,7 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
                 } catch (e) { console.error("Old driver notification failed:", e); }
             }
 
-            // අලුත් රියදුරාට (New Driver) දැනුම් දීම - අලුත් වැඩක් ලැබුණු බව
+            //new notification to the driver of the new vehicle
             if (targetDriverId) {
                 try {
                     await notificationService.sendNotification(
@@ -250,12 +250,12 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
                     );
                 } catch (e) { console.error("New driver notification failed:", e); }
             } else {
-                // රියදුරෙකු නැත්නම් වාහනයට (General notification)
+                // for the vehicle general notification
                 await notificationService.sendNotification(0, 'LOAD_ASSIGNED', `Load ${loadId} assigned to Vehicle ${targetVehicleId}.`, Number(loadId), targetVehicleId);
             }
         }
 
-        // Socket හරහා කාර්යාලයේ Grid එක update කිරීම
+        // update grid in the office
         socketService.emit('chipLoadUpdated', result);
 
         return res.status(200).json(result);
@@ -393,6 +393,11 @@ export const setChipLoad = async (req: Request, res: Response) => {
 
         const row = await chipPlanningService.setChipLoad({ ...req.body, driver_user_id: actingUserId });
 
+        const finalLoadId = row?.load_id ?? row?.loadId ?? loadId;
+        const finalVehicleNum = row?.vehicle_number ?? row?.vehicleNumber ?? req.body.vehicle_number ?? req.body.vehicleNumber;
+
+        console.log('✅ setChipLoad row:', { finalLoadId, finalVehicleNum, row });
+
         const { socketService } = require('../services/socketService');
         socketService.emit('chipLoadUpdated', row);
 
@@ -402,9 +407,9 @@ export const setChipLoad = async (req: Request, res: Response) => {
                 await notificationService.sendNotification(
                     0,
                     'LOAD_COMPLETED',
-                    `Vehicle ${row.vehicle_number} has completed and sent Load ID: ${row.load_id}.`,
-                    row.load_id,
-                    row.vehicle_number
+                    `Vehicle ${finalVehicleNum} has completed and sent Load ID: ${finalLoadId}. Ready for invoicing.`,
+                    Number(finalLoadId),      // ✅ relatedId
+                    Number(finalVehicleNum)   // ✅ vehicleContextId
                 );
             } catch (notifErr) {
                 console.error('Failed to send notification to office:', notifErr);
