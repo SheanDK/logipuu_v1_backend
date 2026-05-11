@@ -242,12 +242,26 @@ export const updateConsignment = async (id: number, dto: UpdateConsignmentDto) =
 
 //5. Check Consignment Status
 export const checkConsignmentStatus = async (id: number): Promise<'billed' | 'notfound' | 'ok'> => {
-    const result = await pool.query('SELECT pvm_laskutus FROM public.rahtikirja WHERE rahti_id = $1', [id]);
-    if (result.rowCount === 0) return 'notfound';
-    if (result.rows[0].pvmLaskutus) return 'billed';
-    return 'ok';
-};
+    const query = `
+        SELECT kk.pvm_laskutus 
+        FROM public.rahtikirja rk
+        JOIN public.kuorma kk ON rk.kuorma_id = kk.kuorma_id
+        WHERE rk.rahti_id = $1
+    `;
 
+    try {
+        const result = await pool.query(query, [id]);
+
+        if (result.rowCount === 0) return 'notfound';
+
+        if (result.rows[0].pvm_laskutus) return 'billed';
+
+        return 'ok';
+    } catch (error: any) {
+        console.error("Status Check SQL Error:", error.message);
+        throw error;
+    }
+};
 //6. Delete Consignment
 export const deleteConsignment = async (id: number) => {
     const result = await pool.query('DELETE FROM public.rahtikirja WHERE rahti_id = $1', [id]);

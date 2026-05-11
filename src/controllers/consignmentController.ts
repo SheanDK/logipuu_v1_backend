@@ -3,8 +3,7 @@ import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import * as consignmentService from '../services/consignmentService';
 
-// GET /api/consignments/search
-// Handles searching via query parameters.
+
 export const searchConsignmentsHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
 
@@ -59,14 +58,29 @@ export const createConsignmentHandler = async (req: AuthenticatedRequest, res: R
     }
 };
 
-// PATCH /api/consignments/:id
-// Handles updating an existing consignment.
 export const updateConsignmentHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
         if (isNaN(id)) return res.status(400).json({ message: "Invalid ID format." });
 
-        const success = await consignmentService.updateConsignment(id, req.body);
+        const updateDto = {
+            pvm: req.body.pvm,
+            rahtikirjanNro: req.body.rahtikirjanNro,
+            reitti: req.body.ajoreitti,
+            lisatiedot: req.body.lisatiedot,
+            m3: req.body.maaraM3,
+            m3_hinta: req.body.hintaM3,
+            km: req.body.km,
+            km_hinta: req.body.hintaKm,
+            kpl: req.body.kpl,
+            kpl_hinta: req.body.hintaKpl,
+            jako_hinta: req.body.hintaJakoTunti,
+            jako: req.body.jakoTunnit,
+            tievero: req.body.tievero,
+            koko_hinta: req.body.total
+        };
+
+        const success = await consignmentService.updateConsignment(id, updateDto);
         if (!success) return res.status(404).json({ message: 'Update failed or not found.' });
 
         const updatedData = await consignmentService.getConsignmentById(id);
@@ -76,8 +90,6 @@ export const updateConsignmentHandler = async (req: AuthenticatedRequest, res: R
     }
 };
 
-// DELETE /api/consignments/:id
-// Handles deleting an existing consignment.
 export const deleteConsignmentHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const id = parseInt(req.params.id as string, 10);
@@ -98,8 +110,7 @@ export const deleteConsignmentHandler = async (req: AuthenticatedRequest, res: R
     }
 };
 
-// POST /api/consignments/invoice
-// Handles invoicing multiple consignments.
+
 export const invoiceManyHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const { kuormaIds } = req.body;
