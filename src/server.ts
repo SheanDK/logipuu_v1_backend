@@ -1,3 +1,4 @@
+// backend/src/app.ts
 import 'reflect-metadata';
 import express, { Application, Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
@@ -5,7 +6,8 @@ import cors from 'cors';
 import http from 'http';
 import db from './config/db';
 import { socketService } from './services/socketService';
-//1. Import All Routes Here
+
+// Import Routes
 import authRoutes from './routes/authRoutes';
 import clientRoutes from './routes/clientRoutes';
 import vehicleRoutes from './routes/vehicleRoutes';
@@ -30,38 +32,43 @@ import woodCategoryRoutes from './routes/woodCategoryRoutes';
 import chipOrderRoutes from './routes/chipOrderRoutes';
 import chipTitleRoutes from './routes/chipTitleRoutes';
 import chipPlanningRoutes from './routes/chipPlanningRoutes';
-import { globalErrorHandler } from './middlewares/errorHandler';
 import chipInvoicingRoutes from './routes/chipInvoicingRoutes';
 import sessionRoutes from './routes/sessionRoutes';
+import { globalErrorHandler } from './middlewares/errorHandler';
 
 dotenv.config();
 
 const app: Application = express();
 const PORT: number = parseInt(process.env.PORT || '5000', 10);
-const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
-const httpServer = http.createServer(app);
-
-socketService.initialize(httpServer, frontendUrl);
+// 🚀 CORS Configuration: Multiple origins support
+const frontendUrls = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ["http://localhost:3000"];
 
 const corsOptions = {
-    origin: frontendUrl,
+    origin: frontendUrls.map(url => url.trim()),
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     credentials: true,
     allowedHeaders: "Origin, X-Requested-With, Content-Type, Accept, Authorization"
 };
 
-app.use(cors(corsOptions));
+const httpServer = http.createServer(app);
 
+// Initialize Socket.io
+socketService.initialize(httpServer, frontendUrls[0]);
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Trust proxy for Render/Heroku/Vercel
+app.set('trust proxy', 1);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
     next();
 });
 
-//2. API Routes
+// API Routes
 const apiRouter = express.Router();
 apiRouter.use('/auth', authRoutes);
 apiRouter.use('/users', userRoutes);
