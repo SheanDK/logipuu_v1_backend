@@ -45,8 +45,16 @@ const PORT: number = parseInt(process.env.PORT || '5000', 10);
 const frontendUrls = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ["http://localhost:3000"];
 
 const corsOptions = {
-    origin: frontendUrls.map(url => url.trim()),
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    origin: (origin: any, callback: any) => {
+        // origin එක undefined නම් (server to server calls) ඉඩ දෙන්න, නැතහොත් ලැයිස්තුවේ ඇත්දැයි බලන්න
+        if (!origin || frontendUrls.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    // origin: frontendUrls.map(url => url.trim()),
+    // methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     credentials: true,
     allowedHeaders: "Origin, X-Requested-With, Content-Type, Accept, Authorization"
 };
