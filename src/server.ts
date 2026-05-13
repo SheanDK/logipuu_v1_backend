@@ -41,28 +41,33 @@ dotenv.config();
 const app: Application = express();
 const PORT: number = parseInt(process.env.PORT || '5000', 10);
 
-// 🚀 CORS Configuration: Multiple origins support
-const frontendUrls = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ["http://localhost:3000"];
+const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
 const corsOptions = {
-    origin: (origin: any, callback: any) => {
-        // origin එක undefined නම් (server to server calls) ඉඩ දෙන්න, නැතහොත් ලැයිස්තුවේ ඇත්දැයි බලන්න
-        if (!origin || frontendUrls.includes(origin)) {
+    // 🚀 මෙහිදී allowed origins කිහිපයක් පරීක්ෂා කිරීමට ඉඩ දෙන්න
+    origin: function (origin: any, callback: any) {
+        const allowedOrigins = [
+            frontendUrl,
+            "http://localhost:3000",
+            "https://logipuu-v1-frontend.vercel.app" // ඔබගේ සැබෑ Vercel URL එක මෙතනටත් දමන්න
+        ];
+
+        // origin එක allowed ලැයිස්තුවේ තිබේ නම් හෝ එය null (same-origin) නම් ඉඩ දෙන්න
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
+            console.log("Blocked by CORS from origin:", origin); // Debugging සඳහා
             callback(new Error('Not allowed by CORS'));
         }
     },
-    // origin: frontendUrls.map(url => url.trim()),
-    // methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     credentials: true,
     allowedHeaders: "Origin, X-Requested-With, Content-Type, Accept, Authorization"
 };
 
-const httpServer = http.createServer(app);
+app.use(cors(corsOptions));
 
-// Initialize Socket.io
-socketService.initialize(httpServer, frontendUrls[0]);
+const httpServer = http.createServer(app);
 
 app.use(cors(corsOptions));
 app.use(express.json());
