@@ -44,19 +44,16 @@ const PORT: number = parseInt(process.env.PORT || '5000', 10);
 const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
 const corsOptions = {
-    // 🚀 මෙහිදී allowed origins කිහිපයක් පරීක්ෂා කිරීමට ඉඩ දෙන්න
     origin: function (origin: any, callback: any) {
         const allowedOrigins = [
             frontendUrl,
             "http://localhost:3000",
-            "https://logipuu-v1-frontend.vercel.app" // ඔබගේ සැබෑ Vercel URL එක මෙතනටත් දමන්න
+            "https://logipuu-v1-frontend.vercel.app"
         ];
-
-        // origin එක allowed ලැයිස්තුවේ තිබේ නම් හෝ එය null (same-origin) නම් ඉඩ දෙන්න
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
-            console.log("Blocked by CORS from origin:", origin); // Debugging සඳහා
+            console.log("Blocked by CORS from origin:", origin);
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -65,7 +62,6 @@ const corsOptions = {
     allowedHeaders: "Origin, X-Requested-With, Content-Type, Accept, Authorization"
 };
 
-app.use(cors(corsOptions));
 
 const httpServer = http.createServer(app);
 
@@ -126,6 +122,10 @@ const startServer = async () => {
     try {
         await db.query('SELECT NOW()');
         console.log("✅ Successfully connected to the database.");
+
+        // 🚀 Socket.IO initialize කරන්න - httpServer.listen() ට කලින්!
+        socketService.initialize(httpServer, frontendUrl);
+        console.log("✅ Socket.IO initialized.");
 
         httpServer.listen(PORT, () => {
             console.log(`✅ Server is running on http://localhost:${PORT}`);
