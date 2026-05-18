@@ -45,6 +45,7 @@ export const loginUserService = async (loginData: UserLoginDTO) => {
         permissions: userFromDb.permissions || [],
         userLevel: userFromDb.taso,
         driverNumericId: userFromDb.kuljId ? parseInt(String(userFromDb.kuljId), 10) : undefined,
+        driverEmail: userFromDb.driverEmail || null,
     };
 
     console.log("--- PAYLOAD BEING SIGNED INTO TOKEN ---", payload);

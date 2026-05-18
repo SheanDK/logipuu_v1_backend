@@ -9,6 +9,7 @@ export const findUserByTunnusWithRolesAndPermissionsQuery = `
         k.aktiivinen,
         k.taso,
         k.kulj_id,
+        kj.email AS driver_email,
         COALESCE(
             array_agg(DISTINCT r.roolin_nimi) FILTER (WHERE r.roolin_nimi IS NOT NULL), 
             '{}'
@@ -20,6 +21,8 @@ export const findUserByTunnusWithRolesAndPermissionsQuery = `
     FROM 
         public.kayttajat k
     LEFT JOIN 
+        public.kuljettajat kj ON k.kulj_id = kj.kulj_id
+    LEFT JOIN 
         public.kayttaja_roolit kr ON k.tunnus = kr.kayttaja_tunnus
     LEFT JOIN 
         public.roolit r ON kr.rooli_id = r.rooli_id
@@ -30,5 +33,5 @@ export const findUserByTunnusWithRolesAndPermissionsQuery = `
     WHERE 
         k.tunnus = $1
     GROUP BY
-        k.tunnus, k.nimi, k.salasana, k.aktiivinen, k.taso, k.kulj_id;
+        k.tunnus, k.nimi, k.salasana, k.aktiivinen, k.taso, k.kulj_id, kj.email;
 `;

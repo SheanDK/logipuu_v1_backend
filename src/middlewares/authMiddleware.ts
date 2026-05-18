@@ -15,6 +15,7 @@ export interface UserPayload extends JwtPayload {
     permissions: string[];
     userLevel: number;
     driverNumericId?: number;
+    driverEmail?: string | null;
     // kalustoNro?: number;
 }
 

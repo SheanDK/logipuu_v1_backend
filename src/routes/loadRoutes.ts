@@ -54,7 +54,7 @@ router.get('/for-inspection',
 
 router.get('/active-trips',
     protect,
-    authorize(officeRoles, VIEW_LOAD_PERMISSION),
+    authorize(allStaffRoles, VIEW_LOAD_PERMISSION),
     loadController.getActiveTripsForMapHandler
 );
 
