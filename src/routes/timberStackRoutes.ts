@@ -3,7 +3,7 @@ import { Router } from 'express';
 import * as timberStackController from '../controllers/timberStackController';
 import { protect } from '../middlewares/authMiddleware';
 import { authorize } from '../middlewares/rbacMiddleware';
-import { CreateTimberStackDto, UpdateTimberStackLocationDto } from '../dto/timberStack.dto';
+import { CreateTimberStackDto } from '../dto/timberStack.dto';
 import { validateDto } from '../middlewares/validationMiddleware';
 
 const router = Router();
@@ -43,7 +43,7 @@ router.get('/:id/wood-entries',
 // Get full details for the edit modal in the office
 router.get('/:id/full',
     protect,
-    authorize(officeRoles, TIMBER_MAP_VIEW),
+    authorize(allStaffRoles, TIMBER_MAP_VIEW),
     timberStackController.getTimberStackFullDetailsHandler
 );
 
