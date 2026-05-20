@@ -208,6 +208,7 @@ export const getTimberStackFullDetails = async (id: number): Promise<IPuulaaniFu
                     k.kuorma_id,
                     k.kulj_id,
                     k.status,
+                    k.ajomaarays_nro,
                     kul.nimi AS kuljettajan_nimi,
                     pt.puutavara AS puutavaralaji,
                     k.pvm,
