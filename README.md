@@ -160,3 +160,22 @@ ADD COLUMN completion_timestamp TIMESTAMPTZ;
 COMMENT ON COLUMN public.kuorma.actual_m3 IS 'The actual volume (m³) unloaded by the driver.';
 COMMENT ON COLUMN public.kuorma.actual_km IS 'The actual kilometers driven for the trip.';
 COMMENT ON COLUMN public.kuorma.completion_timestamp IS 'The exact timestamp when the driver marked the trip as completed.';
+
+
+
+****** 19-05-2025 *********
+
+For chat feature
+
+CREATE TABLE public.chat_messages (
+    message_id SERIAL PRIMARY KEY,
+    sender_id SMALLINT NOT NULL, -- Driver or Office User ID
+    recipient_id SMALLINT NOT NULL,
+    vehicle_number SMALLINT, -- වාහනය හඳුනා ගැනීමට
+    message_text TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexing: quick response
+CREATE INDEX idx_chat_participants ON public.chat_messages (sender_id, recipient_id);
