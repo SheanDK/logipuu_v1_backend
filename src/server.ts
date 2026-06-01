@@ -1,4 +1,4 @@
-// backend/src/app.ts
+// backend/src/server.ts
 import 'reflect-metadata';
 import express, { Application, Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
@@ -34,6 +34,7 @@ import chipTitleRoutes from './routes/chipTitleRoutes';
 import chipPlanningRoutes from './routes/chipPlanningRoutes';
 import chipInvoicingRoutes from './routes/chipInvoicingRoutes';
 import sessionRoutes from './routes/sessionRoutes';
+import backupRoutes from './routes/backupRoutes';
 import { globalErrorHandler } from './middlewares/errorHandler';
 
 dotenv.config();
@@ -105,6 +106,7 @@ apiRouter.use('/chip-titles', chipTitleRoutes);
 apiRouter.use('/chip-planning', chipPlanningRoutes);
 apiRouter.use('/chip-invoicing', chipInvoicingRoutes);
 apiRouter.use('/sessions', sessionRoutes);
+apiRouter.use('/backup', backupRoutes);
 
 app.use('/api', apiRouter);
 
