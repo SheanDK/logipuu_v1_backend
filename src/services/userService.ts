@@ -144,8 +144,33 @@ export const updateUserCurrentVehicle = async (
                 [vehicleId, userId]
             );
 
+            // Log "Session Started" inside Chat History
+            const regRes = await client.query('SELECT rek_nro FROM public.kalusto WHERE kalusto_nro = $1', [Number(vehicleId)]);
+            const regNo = regRes.rows[0]?.rekNro || regRes.rows[0]?.rek_nro || `Vehicle #${vehicleId}`;
+
+            await client.query(
+                `INSERT INTO public.chat_messages (sender_id, recipient_id, vehicle_number, message_text, is_read) 
+     VALUES (-1, $1, $2, $3, true)`,
+                [userId, vehicleId, JSON.stringify({
+                    key: 'session_started',
+                    vehicle: regNo
+                })]
+            );
+
+            // Notify dispatchers of the vehicle change in real-time
+            const { socketService } = require('./socketService');
+            socketService.emitToDispatchers('driverStatusChanged', {
+                userId: Number(userId),
+                status: 'online',
+                vehicleNumber: Number(vehicleId),
+                vehicleRegNo: regNo
+            });
+
+
         } else {
-            // when the driver logs out from one browser
+            // when the driver logs out from one browser --> Find the last vehicle registration before clearing
+            const lastVehicleRes = await client.query('SELECT current_vehicle_id FROM public.kayttajat WHERE kulj_id = $1', [userId]);
+            const lastVehicleId = lastVehicleRes.rows[0]?.current_vehicle_id;
 
             // 1. delete the session for this specific token
             await client.query(
@@ -167,7 +192,30 @@ export const updateUserCurrentVehicle = async (
                     `UPDATE public.kayttajat SET current_vehicle_id = NULL WHERE kulj_id = $1`,
                     [userId]
                 );
+
+                // Log "Session Ended" inside Chat History
+                if (lastVehicleId) {
+                    const regRes = await client.query('SELECT rek_nro FROM public.kalusto WHERE kalusto_nro = $1', [Number(lastVehicleId)]);
+                    const regNo = regRes.rows[0]?.rekNro || regRes.rows[0]?.rek_nro || `Vehicle #${lastVehicleId}`;
+
+                    await client.query(
+                        `INSERT INTO public.chat_messages (sender_id, recipient_id, vehicle_number, message_text, is_read) 
+     VALUES (-1, $1, $2, $3, true)`,
+                        [userId, lastVehicleId, JSON.stringify({
+                            key: 'session_ended',
+                            vehicle: regNo
+                        })]
+                    );
+                }
+
                 console.log(`[SESSION] Vehicle released for Driver ${userId} - No more active sessions.`);
+
+                const { socketService } = require('./socketService');
+                socketService.emitToDispatchers('driverStatusChanged', {
+                    userId: Number(userId),
+                    status: 'offline'
+                });
+                socketService.emitToDispatchers('chipLoadUpdated', { action: 'SESSION_CLEANUP' });
             } else {
                 console.log(`[SESSION] Session closed for Driver ${userId}, but vehicle remains locked due to ${activeCount} other session(s).`);
             }

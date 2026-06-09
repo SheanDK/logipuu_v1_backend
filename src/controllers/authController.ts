@@ -56,6 +56,13 @@ export const logoutHandler = async (req: AuthenticatedRequest, res: Response) =>
                 [userId]
             );
             console.log(`✅ All sessions closed for Driver ${userId}. Vehicle is now free.`);
+
+            const { socketService } = require('../services/socketService');
+            socketService.emitToDispatchers('driverStatusChanged', {
+                userId: Number(userId),
+                status: 'offline'
+            });
+            socketService.emitToDispatchers('chipLoadUpdated', { action: 'SESSION_CLEANUP' });
         } else {
             console.log(`ℹ️ Driver ${userId} still has ${activeSessionCount} active sessions. Vehicle remains locked.`);
         }
