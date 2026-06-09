@@ -35,6 +35,7 @@ import chipPlanningRoutes from './routes/chipPlanningRoutes';
 import chipInvoicingRoutes from './routes/chipInvoicingRoutes';
 import sessionRoutes from './routes/sessionRoutes';
 import backupRoutes from './routes/backupRoutes';
+import chatRoutes from './routes/chatRoutes';
 import { globalErrorHandler } from './middlewares/errorHandler';
 
 dotenv.config();
@@ -107,6 +108,7 @@ apiRouter.use('/chip-planning', chipPlanningRoutes);
 apiRouter.use('/chip-invoicing', chipInvoicingRoutes);
 apiRouter.use('/sessions', sessionRoutes);
 apiRouter.use('/backup', backupRoutes);
+apiRouter.use('/chat', chatRoutes);
 
 app.use('/api', apiRouter);
 
@@ -124,8 +126,6 @@ const startServer = async () => {
     try {
         await db.query('SELECT NOW()');
         console.log("✅ Successfully connected to the database.");
-
-        // 🚀 Socket.IO initialize කරන්න - httpServer.listen() ට කලින්!
         socketService.initialize(httpServer, frontendUrl);
         console.log("✅ Socket.IO initialized.");
 
