@@ -11,7 +11,7 @@ export const verifyReAuth = async (req: AuthenticatedRequest, res: Response, nex
     }
 
     try {
-        const username = req.user?.userId; // Assuming userId is username in token payload
+        const username = req.user?.userId;
         const result = await pool.query('SELECT salasana FROM public.kayttajat WHERE tunnus = $1', [username]);
 
         if (result.rows.length === 0) {

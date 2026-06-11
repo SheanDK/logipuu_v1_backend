@@ -126,6 +126,8 @@ const startServer = async () => {
     try {
         await db.query('SELECT NOW()');
         console.log("✅ Successfully connected to the database.");
+
+        // 🚀 Socket.IO initialize කරන්න - httpServer.listen() ට කලින්!
         socketService.initialize(httpServer, frontendUrl);
         console.log("✅ Socket.IO initialized.");
 

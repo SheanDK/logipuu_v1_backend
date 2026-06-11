@@ -7,7 +7,7 @@ import {
     ChipLoadImportSchema, TimberLoadImportSchema, ConsignmentImportSchema
 } from '../schemas/backupSchemas';
 
-// Helper to log audit events
+
 const logAudit = async (username: string, action: string, module: string, details: string, ip: string) => {
     await pool.query(
         `INSERT INTO public.system_audits (username, action_type, module_affected, details, ip_address) 
@@ -16,7 +16,7 @@ const logAudit = async (username: string, action: string, module: string, detail
     );
 };
 
-// 1. 🚀 NEW: Download Blank CSV Templates (This was missing)
+// 1.Download Blank CSV Templates
 export const downloadTemplateHandler = async (req: Request, res: Response, next: NextFunction) => {
     const { module } = req.params;
     try {
@@ -77,7 +77,7 @@ export const exportDataHandler = async (req: AuthenticatedRequest, res: Response
     } catch (error) { next(error); }
 };
 
-// 3. Validate Import (Dry Run with Async Database FK Checks)
+// 3. Validate Import 
 export const validateImportHandler = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const { module, data } = req.body;
 
@@ -111,11 +111,10 @@ export const validateImportHandler = async (req: AuthenticatedRequest, res: Resp
             }
         });
 
-        // Phase 2: Asynchronous Bulk Foreign Key Integrity Checks (Dry Run)
+        // Phase 2: Asynchronous Bulk Foreign Key Integrity Checks 
         const validRows: any[] = [];
         if (tempRows.length > 0) {
             if (module === 'chip_loads') {
-                // 🚀 FIXED: Filter out NaN values using Number.isFinite to prevent Postgres 500 [1]
                 const titleIds = [...new Set(tempRows.map(r => Number(r.data.title_id)).filter(n => Number.isFinite(n)))];
                 const vehicleNumbers = [...new Set(tempRows.map(r => Number(r.data.vehicle_number)).filter(n => Number.isFinite(n)))];
 
@@ -140,7 +139,6 @@ export const validateImportHandler = async (req: AuthenticatedRequest, res: Resp
                     if (isValid) validRows.push(r.data);
                 });
             } else if (module === 'timber_loads') {
-                // 🚀 FIXED: Filter out NaN values using Number.isFinite [1]
                 const clientIds = [...new Set(tempRows.map(r => Number(r.data.asiakas_id)).filter(n => Number.isFinite(n)))];
 
                 const existingClients = await pool.query('SELECT asiakkaan_id FROM public.asiakkaat WHERE asiakkaan_id = ANY($1)', [clientIds]);
@@ -154,7 +152,6 @@ export const validateImportHandler = async (req: AuthenticatedRequest, res: Resp
                     }
                 });
             } else if (module === 'consignment_loads') {
-                // 🚀 FIXED: Filter out NaN values using Number.isFinite [1]
                 const loadIds = [...new Set(tempRows.map(r => Number(r.data.kuorma_id)).filter(n => Number.isFinite(n)))];
 
                 const existingLoads = await pool.query('SELECT kuorma_id FROM public.kuorma WHERE kuorma_id = ANY($1)', [loadIds]);
@@ -196,7 +193,7 @@ export const executeImportHandler = async (req: AuthenticatedRequest, res: Respo
 
     const client = await pool.connect();
     try {
-        await client.query('BEGIN'); // Start transaction
+        await client.query('BEGIN');
 
         const onConflictClause = conflictStrategy === 'skip' ? 'DO NOTHING' : 'DO UPDATE SET';
 
