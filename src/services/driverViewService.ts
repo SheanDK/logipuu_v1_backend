@@ -142,25 +142,32 @@ export const getConsignmentsForDriver = async (driverId: number): Promise<any[]>
 };
 
 // 4. Get active trip for driver
-export const getActiveTripForDriver = async (driverId: number): Promise<any | null> => {
+export const getActiveTripForDriver = async (driverId: number, vehicleId?: number | null): Promise<any | null> => {
     const client = await pool.connect();
     try {
-        const activeTripQuery = `
+        let activeTripQuery = `
         SELECT ajomaarays_nro 
         FROM public.kuorma 
         WHERE
          kulj_id = $1 
          AND status NOT IN ('Assigned', 'Completed', 'Cancelled') 
-         AND is_active = TRUE 
-         ORDER BY pvm DESC, kuorma_id DESC 
-         LIMIT 1;`;
-        const activeTripResult = await client.query(activeTripQuery, [driverId]);
+         AND is_active = TRUE`;
+
+        const activeTripParams: any[] = [driverId];
+        if (vehicleId !== undefined && vehicleId !== null && !isNaN(vehicleId)) {
+            activeTripQuery += ` AND kalusto_nro = $2`;
+            activeTripParams.push(vehicleId);
+        }
+
+        activeTripQuery += ` ORDER BY pvm DESC, kuorma_id DESC LIMIT 1;`;
+
+        const activeTripResult = await client.query(activeTripQuery, activeTripParams);
 
         if (activeTripResult.rowCount === 0) { return null; }
         const ajomaaraysNro = activeTripResult.rows[0].ajomaaraysNro;
         if (!ajomaaraysNro) { return null; }
 
-        const allLegsQuery = `
+        let allLegsQuery = `
             SELECT 
                 k.kuorma_id, 
                 k.status, 
@@ -189,10 +196,17 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
                 k.ajomaarays_nro = $1 AND
                 k.kulj_id = $2 AND
                 k.is_active = TRUE AND
-                k.status NOT IN ('Completed', 'Cancelled')
-            ORDER BY k.kuorma_id ASC;
-        `;
-        const allLegsResult = await client.query(allLegsQuery, [ajomaaraysNro, driverId]);
+                k.status NOT IN ('Completed', 'Cancelled')`;
+
+        const allLegsParams: any[] = [ajomaaraysNro, driverId];
+        if (vehicleId !== undefined && vehicleId !== null && !isNaN(vehicleId)) {
+            allLegsQuery += ` AND k.kalusto_nro = $3`;
+            allLegsParams.push(vehicleId);
+        }
+
+        allLegsQuery += ` ORDER BY k.kuorma_id ASC;`;
+
+        const allLegsResult = await client.query(allLegsQuery, allLegsParams);
 
         if (allLegsResult.rowCount === 0) { return null; }
         const firstLeg = allLegsResult.rows[0];
@@ -204,7 +218,7 @@ export const getActiveTripForDriver = async (driverId: number): Promise<any | nu
         };
 
     } catch (error) {
-        console.error(`[Service Error] Failed to get active trip for driver ${driverId}:`, error);
+        console.error(`[Service Error] Failed to get active trip for driver ${driverId} and vehicle ${vehicleId}:`, error);
         throw new Error('Database query for active trip failed.');
     } finally {
         client.release();

@@ -75,7 +75,11 @@ export const getActiveTripHandler = async (req: AuthenticatedRequest, res: Respo
             return res.status(403).json({ message: "Forbidden: User is not a valid driver." });
         }
 
-        const activeTrip = await driverViewService.getActiveTripForDriver(driverId);
+        const vehicleIdString = req.query.vehicleId as string;
+        const vehicleId = vehicleIdString ? parseInt(vehicleIdString, 10) : null;
+        const validVehicleId = (vehicleId !== null && !isNaN(vehicleId)) ? vehicleId : null;
+
+        const activeTrip = await driverViewService.getActiveTripForDriver(driverId, validVehicleId);
         res.status(200).json(activeTrip);
 
     } catch (error) {
