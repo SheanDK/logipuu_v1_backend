@@ -103,7 +103,7 @@ class SocketService {
 
                 if (isOfficeUser) {
                     socket.join('dispatchers');
-                    socket.join('user_0'); // Office users join Support room to get direct chats!
+                    socket.join('user_0');
                 } else {
                     if (decoded.driverNumericId) {
                         socket.join(`user_${decoded.driverNumericId}`);

@@ -89,37 +89,53 @@ export const assignTitleToVehicle = async (req: Request, res: Response) => {
 export const dispatchRow = async (req: Request, res: Response) => {
     try {
         const { kalustoNro, week, year } = req.body;
+
+        if (!kalustoNro || isNaN(Number(kalustoNro)) || !week || !year) {
+            return res.status(400).json({ error: "kalustoNro, week, year are required and must be valid numbers." });
+        }
+
         const updatedRows = await chipPlanningService.dispatchVehicleRow(Number(kalustoNro), Number(week), Number(year));
 
         if (Array.isArray(updatedRows) && updatedRows.length > 0) {
             const { socketService } = require('../services/socketService');
             updatedRows.forEach(row => socketService.emit('chipLoadUpdated', row));
-            const firstLoadId = updatedRows[0].load_id || updatedRows[0].loadId;
 
-            const targetDriverId = await getDriverOfVehicle(Number(kalustoNro));
-            if (targetDriverId) {
+            const firstLoadId = updatedRows[0].load_id ?? updatedRows[0].loadId;
 
+            if (!firstLoadId || isNaN(Number(firstLoadId))) {
+                console.error("⚠️ dispatchRow: firstLoadId invalid:", firstLoadId, updatedRows[0]);
+            }
 
-                await notificationService.sendNotification(
-                    targetDriverId,
-                    'LOAD_ASSIGNED',
-                    `New loads have been assigned to your schedule for Week ${week}.`,
-                    Number(firstLoadId),
-                    Number(kalustoNro)
-                );
-            } else {
-                await notificationService.sendNotification(
-                    -1,
-                    'LOAD_ASSIGNED',
-                    `New loads were assigned to Vehicle ${kalustoNro} for Week ${week}.`,
-                    Number(firstLoadId),
-                    Number(kalustoNro)
-                );
+            try {
+                const targetDriverId = await getDriverOfVehicle(Number(kalustoNro));
+
+                if (targetDriverId) {
+                    await notificationService.sendNotification(
+                        targetDriverId,
+                        'LOAD_ASSIGNED',
+                        `New loads have been assigned to your schedule for Week ${week}.`,
+                        firstLoadId ? Number(firstLoadId) : null,  // ← null safety
+                        Number(kalustoNro)
+                    );
+                } else {
+                    await notificationService.sendNotification(
+                        -1,
+                        'LOAD_ASSIGNED',
+                        `New loads were assigned to Vehicle ${kalustoNro} for Week ${week}.`,
+                        firstLoadId ? Number(firstLoadId) : null,
+                        Number(kalustoNro)
+                    );
+                }
+            } catch (notifErr: any) {
+                console.error("❌ dispatchRow notification failed:", notifErr.message);
             }
         }
+
         res.status(200).json({ success: true, count: updatedRows.length });
+
     } catch (error: any) {
-        res.status(500).json({ error: 'Internal server error' });
+        console.error("❌ dispatchRow CRITICAL ERROR:", error.message, error.stack);
+        res.status(500).json({ error: error.message || 'Internal server error' });
     }
 };
 
@@ -195,8 +211,6 @@ export const deleteAssignedLoad = async (req: Request, res: Response) => {
 export const moveAssignedLoad = async (req: Request, res: Response) => {
     try {
         const { loadId, newKalustoNro, newDate } = req.body;
-
-        // 1. මූලික පරාමිති පරීක්ෂා කිරීම (NaN දෝෂ වැළැක්වීමට)
         if (!loadId || !newKalustoNro || isNaN(Number(loadId)) || isNaN(Number(newKalustoNro))) {
             return res.status(400).json({ error: "Invalid Load ID or Vehicle Number provided." });
         }
@@ -208,24 +222,16 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
         const oldVehicleId = Number(load.vehicle_number || load.vehicleNumber);
         const targetVehicleId = Number(newKalustoNro);
 
-        // 2. Database එකේ වාහනය සහ දිනය මාරු කිරීම
         const result = await chipPlanningService.moveLoadRecord(
             Number(loadId),
             targetVehicleId,
             newDate || load.scheduled_date || load.scheduledDate
         );
 
-        // 🚀 FIX: දැනටමත් ඉහළින් import කර ඇති notificationService සහ socketService සෘජුවම භාවිතා කරන්න
-        // (require('../services') යන පේළිය ඉවත් කළා)
-
-        // 3. රියදුරන් සොයා ගැනීම
         const originalDriverId = await getDriverOfVehicle(oldVehicleId);
         const targetDriverId = await getDriverOfVehicle(targetVehicleId);
 
-        // 4. Load එක දැනටමත් රියදුරුට යවා තිබුණේ නම් (DISPATCHED) පණිවිඩ යැවීම
         if (previousStatus === 'DISPATCHED') {
-
-            // පැරණි රියදුරාට (Old Driver) දැනුම් දීම - වැඩේ ඉවත් වූ බව
             if (originalDriverId) {
                 try {
                     await notificationService.sendNotification(
@@ -238,7 +244,6 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
                 } catch (e) { console.error("Old driver notification failed:", e); }
             }
 
-            //new notification to the driver of the new vehicle
             if (targetDriverId) {
                 try {
                     await notificationService.sendNotification(
@@ -250,12 +255,9 @@ export const moveAssignedLoad = async (req: Request, res: Response) => {
                     );
                 } catch (e) { console.error("New driver notification failed:", e); }
             } else {
-                // for the vehicle general notification
                 await notificationService.sendNotification(0, 'LOAD_ASSIGNED', `Load ${loadId} assigned to Vehicle ${targetVehicleId}.`, Number(loadId), targetVehicleId);
             }
         }
-
-        // update grid in the office
         socketService.emit('chipLoadUpdated', result);
 
         return res.status(200).json(result);
@@ -408,8 +410,8 @@ export const setChipLoad = async (req: Request, res: Response) => {
                     0,
                     'LOAD_COMPLETED',
                     `Vehicle ${finalVehicleNum} has completed and sent Load ID: ${finalLoadId}. Ready for invoicing.`,
-                    Number(finalLoadId),      // ✅ relatedId
-                    Number(finalVehicleNum)   // ✅ vehicleContextId
+                    Number(finalLoadId),
+                    Number(finalVehicleNum)
                 );
             } catch (notifErr) {
                 console.error('Failed to send notification to office:', notifErr);

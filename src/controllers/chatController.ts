@@ -44,7 +44,7 @@ export const getDriverContacts = async (req: AuthenticatedRequest, res: Response
 
 export const deleteMessages = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-        const senderId = req.user?.driverNumericId || 0; // Support ID is 0
+        const senderId = req.user?.driverNumericId || 0;
         const { messageIds } = req.body;
 
         if (!Array.isArray(messageIds)) {
